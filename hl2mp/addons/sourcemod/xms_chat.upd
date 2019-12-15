@@ -1,0 +1,19 @@
+"Updater"
+{
+	"Information"
+	{
+		"Version"
+		{
+			"Latest"	"1.13"
+		}
+		
+		"Notes"	"Minor changes"
+		"Notes"	"Configurable welcome message"
+	}
+	
+	"Files"
+	{
+		"Plugin"	"Path_SM/plugins/xms_chat.smx"
+		"Source"	"Path_SM/scripting/xms_chat.sp"
+	}
+}
