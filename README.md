@@ -9,12 +9,20 @@ You can see this system in use on:
 Discussion and help is available in the HL2DM Community Discord Channel: https://discord.gg/gT4cZ7v
 
 How to install
---
-Download and extract the files to your server. Edit *server.cfg* and *server_match.cfg* (set your desired hostname, sv_region, sv_downloadurl and anything else).
+---
+If you're running on a Linux VPS, you can use my quick-and-dirty script to automatically deploy a 100 tick HL2DM server, grab the latest XMS pack, and set up auto-update and auto-restart (Debian/Ubuntu, run as root):
 
-You need to install SourceMod and the [**steamtools**](https://builds.limetech.io/?p=steamtools) and [**VPhysics**](https://builds.limetech.io/?project=vphysics) extensions on your server. If you want to automatically zip and upload your match demos to an FTP server, you also need [**System2**](https://forums.alliedmods.net/showthread.php?t=146019). Additional requirements apply for xms_discord (see below). 
+- `wget -O - https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/deploy_server.sh | bash`
 
-Everything is configured via `addons/sourcemod/configs/xms.cfg` - you'll need to reload xms (`sm plugins reload xms`) for changes to the .cfg to take affect. 
+Otherwise, install the HL2DM server [yourself](https://developer.valvesoftware.com/wiki/SteamCMD) and then extract the files from the latest **[XMS pack](https://github.com/jackharpr/hl2dm-xms/releases)** (make sure to overwrite existing files). You can then proceed to configuration.
+
+If you set up your server manually (instead of using the XMS pack) you will of course need to install Metamod/SourceMod, along with the [**steamtools**](https://builds.limetech.io/?p=steamtools) and [**VPhysics**](https://builds.limetech.io/?project=vphysics) extensions. If you want to automatically zip and upload your match demos to an FTP server, you also need [**System2**](https://forums.alliedmods.net/showthread.php?t=146019). You should also get the [**Updater**](https://forums.alliedmods.net/showthread.php?p=1570806) plugin to keep XMS updated. Additional requirements apply for xms_discord (see below).
+
+Configuration
+---
+Everything should work out of the box, but you'll want to at least edit `cfg/server.cfg` and `cfg/server_match.cfg` to set your desired hostname, sv_region, etc.
+
+You should then go through `addons/sourcemod/configs/xms.cfg` to configure XMS to your desired settings. Everything is explained in there. You'll need to reload xms (`sm plugins reload xms`) for changes to the .cfg to take affect; this will also restart the current map.
 
 Here is a (probably incomplete) list of the features of each plugin:
 
