@@ -1,9 +1,16 @@
-#define PLUGIN_NAME         "XMS - Game Fixes & Enhancements"
-#define PLUGIN_VERSION      "1.13"
-#define PLUGIN_DESCRIPTION  "Various game bugfixes, fixed scoring and team locking"
-#define PLUGIN_AUTHOR       "harper, V952, toizy, sidezz"
-#define PLUGIN_URL          "HL2DM.PRO"
-#define UPDATE_URL          "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_fixes.upd"
+#define PLUGIN_VERSION "1.14"
+#define UPDATE_URL     "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_fixes.upd"
+
+public Plugin myinfo=
+{
+    name        = "XMS - Game Fixes & Enhancements",
+    version     = PLUGIN_VERSION,
+    description = "Various game bugfixes, fixed scoring and team locking",
+    author      = "harper, V952, toizy, sidezz",
+    url         = "www.hl2dm.pro"
+};
+
+/******************************************************************/
 
 #pragma semicolon 1
 #include <sourcemod>
@@ -14,46 +21,60 @@
 #include <morecolors>
 
 #undef REQUIRE_PLUGIN
-#include <updater>
-
+ #include <updater>
 #define REQUIRE_PLUGIN
+
 #pragma newdecls required
-#include <hl2dm-xms>
+ #include <hl2dm-xms>
+ 
+/******************************************************************/
+ 
+StringMap Id_kills,
+          Id_deaths,
+          Id_team;
 
-int         AllowClient;
+int       AllowClient;
             
-bool        AntiRagdoll[MAXPLAYERS + 1];
-
-StringMap   Id_kills,
-            Id_deaths,
-            Id_team;
-            
-bool        ClientInit[MAXPLAYERS + 1];
+bool      AntiRagdoll[MAXPLAYERS + 1],
+          ClientInit [MAXPLAYERS + 1];
 
 /******************************************************************/
 
-public Plugin myinfo={name=PLUGIN_NAME,version=PLUGIN_VERSION,description=PLUGIN_DESCRIPTION,author=PLUGIN_AUTHOR,url=PLUGIN_URL};
-
 public void OnPluginStart()
 {   
-    HookEvent("round_start", Event_RoundStart);
-    HookEvent("player_spawn", Event_PlayerSpawn, EventHookMode_Post);
-    HookEvent("player_death", Event_PlayerDeath);
+    HookEvent("round_start"          , Event_RoundStart);
+    HookEvent("player_death"         , Event_PlayerDeath);
+    HookEvent("player_spawn"         , Event_PlayerSpawn, EventHookMode_Post);
+
+    HookEvent("server_cvar"          , Event_GameMessage   , EventHookMode_Pre);
+    HookEvent("player_connect_client", Event_GameMessage   , EventHookMode_Pre);
+    HookEvent("player_connect"       , Event_GameMessage   , EventHookMode_Pre);
+    HookEvent("player_disconnect"    , Event_GameMessage   , EventHookMode_Pre);
+    HookEvent("player_team"          , Event_GameMessage   , EventHookMode_Pre);
+    HookEvent("player_changename"    , Event_GameMessage   , EventHookMode_Pre);
+    
+    HookUserMessage(GetUserMessageId("TextMsg"), UserMsg_TextMsg, true);
     HookConVarChange(FindConVar("sv_gravity"), OnGravityChanged);
     
     AddCommandListener(OnClientRequestTeam, "jointeam");
     AddCommandListener(OnClientRequestTeam, "spectate");
     
-    Id_kills = CreateTrie();
+    Id_kills  = CreateTrie();
     Id_deaths = CreateTrie();
-    Id_team = CreateTrie();
+    Id_team   = CreateTrie();
     
-    if(LibraryExists("updater")) Updater_AddPlugin(UPDATE_URL);
+    if(LibraryExists("updater"))
+    {
+        Updater_AddPlugin(UPDATE_URL);
+    }
 }
 
 public void OnLibraryAdded(const char[] name)
 {
-    if(StrEqual(name, "updater")) Updater_AddPlugin(UPDATE_URL);
+    if(StrEqual(name, "updater"))
+    {
+        Updater_AddPlugin(UPDATE_URL);
+    }
 }
 
 public void OnMapStart()
@@ -67,8 +88,10 @@ public void OnClientConnected(int client)
     {
         // police model by default - nobody wants to be the gleaming white combine model
         // Have to execute this immediately on connect, or it doesn't work
-        if(XMS_IsGameTeamplay()) ClientCommand(client, "cl_playermodel models/police.mdl");
-        
+        if(XMS_IsGameTeamplay())
+        {
+            ClientCommand(client, "cl_playermodel models/police.mdl");
+        }
         // if dm set everyone to rebel
         else ClientCommand(client, "cl_playermodel models/humans/group03/%s_%02i.mdl", (GetRandomInt(0, 1) ? "male" : "female"), GetRandomInt(1, 7));
     }
@@ -79,12 +102,16 @@ public void OnClientPutInServer(int client)
     if(!IsClientSourceTV(client))
     {
         // Instantly join spec before we determine the correct team
-        AllowClient = client;
+        AllowClient         = client;
         AntiRagdoll[client] = true;
         FakeClientCommandEx(client, "jointeam %i", TEAM_SPECTATORS);
         
         SDKHook(client, SDKHook_WeaponCanSwitchTo, Hook_WeaponCanSwitchTo);
-        SDKHook(client, SDKHook_OnTakeDamage, Hook_OnTakeDamage);
+        SDKHook(client, SDKHook_OnTakeDamage     , Hook_OnTakeDamage);
+    }
+    if(!IsFakeClient(client))
+    {
+        CPrintToChatAll("%s%N connected", CLR_INFO, client);
     }
 }
 
@@ -97,21 +124,21 @@ public void OnGamestateChanged(int new_state, int old_state)
 {
     if(new_state == STATE_CHANGE)
     {
-        Id_kills.Clear();
+        Id_kills .Clear();
         Id_deaths.Clear();
     }
 }
 
 public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon)
 {
-    if(!IsFakeClient(client))
+    if(IsClientConnected(client) && !IsFakeClient(client))
     {
         if(IsClientObserver(client))
         {
-            int     specMode = GetEntProp(client, Prop_Send, "m_iObserverMode"),
-                    specTarget = GetEntPropEnt(client, Prop_Send, "m_hObserverTarget");
-                    
-            Handle  hMenu = StartMessageOne("VGUIMenu", client);
+            int    specMode = GetEntProp(client, Prop_Send, "m_iObserverMode"),
+                   specTarget = GetEntPropEnt(client, Prop_Send, "m_hObserverTarget");
+
+            Handle hMenu = StartMessageOne("VGUIMenu", client);
             
             // disable broken spectator menu
             if(hMenu != INVALID_HANDLE)
@@ -133,8 +160,8 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
         else
         {
             // shotgun altfire lagcomp fix provided by v952
-            int     activeWeapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
-            char    weaponClass[32];
+            int  activeWeapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
+            char weaponClass[32];
             
             if(activeWeapon != -1 && GetEdictClassname(activeWeapon, weaponClass, sizeof(weaponClass))
                 && !strcmp(weaponClass, "weapon_shotgun") && (buttons & IN_ATTACK2) == IN_ATTACK2
@@ -145,6 +172,17 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
         }
     }
 
+    return Plugin_Continue;
+}
+
+public Action OnClientSayCommand(int client, const char[] command, const char[] sArgs)
+{
+    // Fix chat when paused
+    if(XMS_GetGamestate() == STATE_PAUSE)
+    {
+        CPrintToChatAllFrom(client, StrEqual(command, "say_team", false), sArgs);
+        return Plugin_Handled;
+    }
     return Plugin_Continue;
 }
 
@@ -178,9 +216,9 @@ public Action Event_RoundStart(Handle event, const char[] name, bool noBroadcast
 {
     if(XMS_GetGamestate() == STATE_MATCHWAIT)
     {
-        for (int i = MaxClients; i < GetMaxEntities(); i++)
+        for(int i = MaxClients; i < GetMaxEntities(); i++)
         {
-            if (IsValidEntity(i) && Phys_IsPhysicsObject(i))
+            if(IsValidEntity(i) && Phys_IsPhysicsObject(i))
             {
                 // Lock props on matchwait
                 Phys_EnableMotion(i, false);
@@ -188,9 +226,9 @@ public Action Event_RoundStart(Handle event, const char[] name, bool noBroadcast
         }
     }
     
-    Id_kills.Clear();
+    Id_kills. Clear();
     Id_deaths.Clear();
-    Id_team.Clear();
+    Id_team.  Clear();
 }
 
 public Action Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
@@ -221,11 +259,44 @@ public Action Event_PlayerDeath(Handle event, const char[] name, bool dontBroadc
     return Plugin_Continue;
 }
 
+public Action Event_GameMessage(Event event, const char[] name, bool dontBroadcast)
+{
+    int client = GetClientOfUserId(GetEventInt(event, "userid"));
+    
+    if(StrEqual(name, "player_connect_client"))
+    {
+        char username[MAX_NAME_LENGTH];
+        
+        
+        GetEventString(event, "name", username, sizeof(username));
+        if(!GetEventBool(event, "bot"))
+        {
+            CPrintToChatAll("%s%s is connecting...", CLR_INFO, username);
+        }
+    }
+    else if(StrEqual(name, "player_disconnect"))
+    {
+        CPrintToChatAll("%s%N disconnected", CLR_INFO, client);
+    }
+    else if(StrEqual(name, "player_changename"))
+    {
+        char username[MAX_NAME_LENGTH];
+        
+        GetEventString(event, "newname", username, sizeof(username));
+        CPrintToChatAll("%s%N changed name to \"%s\"", CLR_INFO, client, username);
+    }
+    
+    // block default messages
+    event.BroadcastDisabled = true;
+    
+    return Plugin_Continue;
+}
+
 public void OnGravityChanged(Handle convar, const char[] oldValue, const char[] newValue)
 {
     float newGravity[3]; 
     newGravity[2] -= StringToFloat(newValue);
-    
+            
     // Set correct prop gravity without requiring mapchange
     Phys_SetEnvironmentGravity(newGravity);
 }
@@ -235,13 +306,19 @@ public Action OnClientRequestTeam(int client, const char[] command, int args)
     int state = XMS_GetGamestate();
     int team = (StrEqual(command, "jointeam", false) ? GetCmdArgInt(1) : TEAM_SPECTATORS);
     
-    if(AllowClient == client) AllowClient = 0;
+    if(AllowClient == client)
+    {
+        AllowClient = 0;
+    }
     else if(state == STATE_PAUSE || state == STATE_MATCH || state == STATE_MATCHEX || state == STATE_MATCHWAIT)
     {
         CPrintToChat(client, "%s%sTeams are locked during a match.", CLR_FAIL, CHAT_PREFIX);
         return Plugin_Handled;
     }
-    else if(XMS_IsGameTeamplay() && team == TEAM_COMBINE) ClientCommand(client, "cl_playermodel models/police.mdl");
+    else if(XMS_IsGameTeamplay() && team == TEAM_COMBINE)
+    {
+        ClientCommand(client, "cl_playermodel models/police.mdl");
+    }
     
     return Plugin_Continue;
 }
@@ -256,43 +333,47 @@ public Action T_TeamChange(Handle timer, int client)
     int team = -1,
         state = XMS_GetGamestate();
 
-    if(!IsClientInGame(client)) return Plugin_Stop;
-    if(state == STATE_PAUSE) return Plugin_Continue;
-    
-    Id_team.GetValue(SteamID(client), team);
-    
-    if(team <= TEAM_UNASSIGNED && XMS_IsGameTeamplay())
+    if(IsClientInGame(client))
     {
-        if(state == STATE_DEFAULT)
-        {   // balance teams, if equal then choose at random
-            int r = GetTeamClientCount(TEAM_REBELS),
-                c = GetTeamClientCount(TEAM_COMBINE);
-
-            team = r > c ? TEAM_COMBINE : c > r ? TEAM_REBELS : GetRandomInt(0, 1) ? TEAM_REBELS : TEAM_COMBINE;                
+        if(state == STATE_PAUSE)
+        {
+            return Plugin_Continue;
         }
-        else return Plugin_Stop;
-    }
-    
-    if  (team != GetClientTeam(client) && 
-        (team != -1 || (state != STATE_MATCH && state != STATE_MATCHWAIT && state != STATE_MATCHWAIT)) &&
-        (team != TEAM_UNASSIGNED || !XMS_IsGameTeamplay())
-    ){
-        AllowClient = client;
-        AntiRagdoll[client] = IsPlayerAlive(client);
         
-        FakeClientCommandEx(client, "jointeam %i", XMS_IsGameTeamplay() ? team : TEAM_REBELS);
-    }
+        Id_team.GetValue(SteamID(client), team);
+        
+        if(XMS_IsGameTeamplay() && team <= TEAM_UNASSIGNED)
+        {
+            if(state == STATE_DEFAULT)
+            {   // attempt to balance teams, if equal then choose at random
+                int r = GetTeamClientCount(TEAM_REBELS),
+                    c = GetTeamClientCount(TEAM_COMBINE);
     
-    ClientInit[client] = true;
+                team = r > c ? TEAM_COMBINE : c > r ? TEAM_REBELS : GetRandomInt(0, 1) ? TEAM_REBELS : TEAM_COMBINE;                
+            }
+            else return Plugin_Stop;
+        }
+        
+        if(team != GetClientTeam(client) && 
+          (team != -1 || (state != STATE_MATCH && state != STATE_MATCHWAIT && state != STATE_MATCHWAIT)) &&
+          (team != TEAM_UNASSIGNED || !XMS_IsGameTeamplay())
+        ){
+            AllowClient = client;
+            AntiRagdoll[client] = IsPlayerAlive(client);
+            FakeClientCommandEx(client, "jointeam %i", XMS_IsGameTeamplay() ? team : TEAM_REBELS);
+        }
+        
+        ClientInit[client] = true;
+    }
     
     return Plugin_Stop;
 }
 
 public Action T_CheckPlayerStates(Handle timer)
 {       
-    static int wasTeam[MAXPLAYERS + 1] = -1;
+    static int  wasTeam [MAXPLAYERS + 1] = -1;
     static bool wasAlive[MAXPLAYERS + 1] = false;
-    int teamScore[4];
+    int         teamScore[4];
 
     if(XMS_GetGamestate() != STATE_CHANGE)
     {
@@ -305,9 +386,12 @@ public Action T_CheckPlayerStates(Handle timer)
                 continue;
             }
                 
-            if(IsClientSourceTV(i)) continue;
+            if(IsClientSourceTV(i))
+            {
+                continue;
+            }
             
-            int team = GetClientTeam(i);
+            int  team    = GetClientTeam(i);
             bool isAlive = IsPlayerAlive(i);
                 
             // client has just connected
@@ -316,9 +400,9 @@ public Action T_CheckPlayerStates(Handle timer)
                 int kills,
                     deaths;
                     
-                Id_kills.GetValue(SteamID(i), kills);
+                Id_kills .GetValue(SteamID(i), kills);
                 Id_deaths.GetValue(SteamID(i), deaths);
-                Client_SetScore(i, kills);
+                Client_SetScore (i, kills);
                 Client_SetDeaths(i, deaths);
                 
                 CreateTimer(1.0, T_TeamChange, i, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);          
@@ -358,9 +442,9 @@ public Action T_CheckPlayerStates(Handle timer)
             if(ClientInit[i])
             {
                 // Save player states
-                Id_kills.SetValue(SteamID(i), Client_GetScore(i));
+                Id_kills .SetValue(SteamID(i), Client_GetScore(i));
                 Id_deaths.SetValue(SteamID(i), Client_GetDeaths(i));    
-                Id_team.SetValue(SteamID(i), (XMS_IsGameTeamplay() ? GetClientTeam(i) : IsClientObserver(i) ? TEAM_SPECTATORS : TEAM_UNASSIGNED));          
+                Id_team  .SetValue(SteamID(i), (XMS_IsGameTeamplay() ? GetClientTeam(i) : IsClientObserver(i) ? TEAM_SPECTATORS : TEAM_UNASSIGNED));          
             }
         }
             
@@ -374,13 +458,28 @@ public Action T_CheckPlayerStates(Handle timer)
     return Plugin_Continue;
 }
 
+public Action UserMsg_TextMsg(UserMsg msg_id, BfRead msg, const int[] players, int playersNum, bool reliable, bool init)
+{
+    char message[70];
+    
+    BfReadString(msg, message, sizeof(message), true);
+    if(StrContains(message, "more seconds before trying to switch") != -1 || StrContains(message, "Your player model is") != -1 ||
+        StrContains(message, "You are on team") != -1
+    ){
+        // block game spam
+        return Plugin_Handled;
+    }
+    
+    return Plugin_Continue;
+}
+
 void GetSpriteData(int ref)
 {
     int sprite = EntRefToEntIndex(ref);
     
     if(IsValidEntity(sprite))
     {
-        int nade = GetEntPropEnt(sprite, Prop_Data, "m_hAttachedToEntity");
+        int  nade = GetEntPropEnt(sprite, Prop_Data, "m_hAttachedToEntity");
         char class[32];
         
         if(nade == -1) return;
@@ -413,7 +512,7 @@ void GetSpriteData(int ref)
     }
 }
 
-char[] SteamID(int client)
+stock char[] SteamID(int client)
 {
     char id[32];
     

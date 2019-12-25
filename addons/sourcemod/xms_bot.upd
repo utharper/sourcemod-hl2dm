@@ -1,0 +1,18 @@
+"Updater"
+{
+	"Information"
+	{
+		"Version"
+		{
+			"Latest"	"1.14"
+		}
+		
+		"Notes"	"Welcome bot for default mode"
+	}
+	
+	"Files"
+	{
+		"Plugin"	"Path_SM/plugins/xms_bots.smx"
+		"Source"	"Path_SM/scripting/xms_bots.sp"
+	}
+}

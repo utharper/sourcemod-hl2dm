@@ -1,9 +1,16 @@
-#define PLUGIN_NAME         "XMS - SourceTV"
-#define PLUGIN_VERSION      "1.13"
-#define PLUGIN_DESCRIPTION  "SourceTV controller and demo uploader for eXtended Match System"
-#define PLUGIN_AUTHOR       "harper"
-#define PLUGIN_URL          "HL2DM.PRO"
-#define UPDATE_URL          "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_sourcetv.upd"
+#define PLUGIN_VERSION "1.14"
+#define UPDATE_URL     "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_sourcetv.upd"
+
+public Plugin myinfo=
+{
+    name        = "XMS - SourceTV",
+    version     = PLUGIN_VERSION,
+    description = "SourceTV controller and demo uploader for eXtended Match System",
+    author      = "harper",
+    url         = "www.hl2dm.pro"
+};
+
+/******************************************************************/
 
 #pragma semicolon 1
 #include <sourcemod>
@@ -11,12 +18,14 @@
 #include <morecolors>
 
 #undef REQUIRE_PLUGIN
-#include <updater>
-#include <system2>
-
+ #include <updater>
+ #include <system2>
 #define REQUIRE_PLUGIN
+
 #pragma newdecls required
-#include <hl2dm-xms>
+ #include <hl2dm-xms>
+ 
+/******************************************************************/
 
 char    DemoName[256],
         DemoFolder[PLATFORM_MAX_PATH],
@@ -37,11 +46,12 @@ bool    IsRecording,
 
 /******************************************************************/
 
-public Plugin myinfo={name=PLUGIN_NAME,version=PLUGIN_VERSION,description=PLUGIN_DESCRIPTION,author=PLUGIN_AUTHOR,url=PLUGIN_URL};
-
 public void OnPluginStart()
 {
-    if(LibraryExists("updater")) Updater_AddPlugin(UPDATE_URL);
+    if(LibraryExists("updater"))
+    {
+        Updater_AddPlugin(UPDATE_URL);
+    } 
     
     if(LibraryExists("system2"))
     {
@@ -62,7 +72,10 @@ public void OnPluginStart()
 
 public void OnLibraryAdded(const char[] name)
 {
-    if(StrEqual(name, "updater")) Updater_AddPlugin(UPDATE_URL);
+    if(StrEqual(name, "updater"))
+    {
+        Updater_AddPlugin(UPDATE_URL);
+    }
 }
 
 public void OnAllPluginsLoaded()
@@ -71,79 +84,86 @@ public void OnAllPluginsLoaded()
     
     XMS_GetConfigString(buffer, sizeof(buffer), "ZipDemos", "SourceTV");
     ZipDemos = StrEqual(buffer, "1");
-    
-    XMS_GetConfigString(buffer, sizeof(buffer), "Enable", "SourceTV", "UploadDemos");
+    XMS_GetConfigString(buffer, sizeof(buffer), "Enable"  , "SourceTV", "UploadDemos");
     if(StrEqual(buffer, "1"))
     {
         UploadDemos = true;
 
-        XMS_GetConfigString(FTP_Hostname, sizeof(FTP_Hostname), "Host", "SourceTV", "UploadDemos");
+        XMS_GetConfigString(FTP_Hostname, sizeof(FTP_Hostname), "Host"    , "SourceTV", "UploadDemos");
         XMS_GetConfigString(FTP_Username, sizeof(FTP_Username), "Username", "SourceTV", "UploadDemos");
         XMS_GetConfigString(FTP_Password, sizeof(FTP_Password), "Password", "SourceTV", "UploadDemos");
-        XMS_GetConfigString(FTP_Path, sizeof(FTP_Path), "Path", "SourceTV", "UploadDemos");
-        XMS_GetConfigString(DemoWeb, sizeof(DemoWeb), "URL", "SourceTV", "UploadDemos");
+        XMS_GetConfigString(FTP_Path,     sizeof(FTP_Path)    , "Path"    , "SourceTV", "UploadDemos");
+        XMS_GetConfigString(DemoWeb,      sizeof(DemoWeb)     , "URL"     , "SourceTV", "UploadDemos");
         
-        XMS_GetConfigString(buffer, sizeof(buffer), "Port", "SourceTV", "UploadDemos");
+        XMS_GetConfigString(buffer,       sizeof(buffer)      , "Port"    , "SourceTV", "UploadDemos");
         FTP_Port = StringToInt(buffer);
         
-        XMS_GetConfigString(buffer, sizeof(buffer), "PurgeLocal", "SourceTV", "UploadDemos");
+        XMS_GetConfigString(buffer,       sizeof(buffer)      , "PurgeLocal", "SourceTV", "UploadDemos");
         PurgeDemos = StrEqual(buffer, "1");
     }
     
-    XMS_GetConfigString(DemoFolder, sizeof(DemoFolder), "DemoFolder", "SourceTV");
-    
+    XMS_GetConfigString(DemoFolder,       sizeof(DemoFolder)  , "DemoFolder", "SourceTV");
     if(!DirExists(DemoFolder)) CreateDirectory(DemoFolder, 509);
+    
     Format(buffer, sizeof(buffer), "%s/incomplete", DemoFolder);
-    if(!DirExists(buffer)) CreateDirectory(buffer, 509);
+    if(!DirExists(buffer))     CreateDirectory(buffer, 509);
 }
 
 public void OnGamestateChanged(int new_state, int old_state)
 {
     if(new_state == STATE_MATCHWAIT && !IsRecording) StartRecord();
-    else if(new_state == STATE_POST && IsRecording) CreateTimer(5.0, T_StopRecord, false);
-    else if((new_state == STATE_DEFAULT || new_state == STATE_CHANGE) && IsRecording) StopRecord(true);
+    else if(new_state == STATE_POST && IsRecording)  CreateTimer(5.0, T_StopRecord, false);
+    
+    else if(IsRecording)
+    {
+        if(old_state == STATE_POST && new_state == STATE_CHANGE)         StopRecord(false);
+        else if(new_state == STATE_DEFAULT || new_state == STATE_CHANGE) StopRecord(true);
+    }
 }
 
-public Action T_StopRecord(Handle timer, bool early)
+public Action T_StopRecord(Handle timer, bool isEarly)
 {
-    StopRecord(early);
+    StopRecord(isEarly);
 }
 
 void StartRecord()
 {
     XMS_GetGameID(DemoName, sizeof(DemoName));
     ServerCommand("tv_record %s/incomplete/%s", DemoFolder, DemoName);
-    
+    FakeClientCommand(GetClientOfSourceTV(), "status");
     IsRecording = true;
 }
 
-void StopRecord(bool early)
+void StopRecord(bool discard)
 {
-    char path_incomplete[PLATFORM_MAX_PATH],
-         path_complete[PLATFORM_MAX_PATH];
-         
-    BuildPath(Path_SM, path_incomplete, PLATFORM_MAX_PATH, "../../%s/incomplete/%s.dem", DemoFolder, DemoName);
-    BuildPath(Path_SM, path_complete, PLATFORM_MAX_PATH, "../../%s/%s.dem", DemoFolder, DemoName);
-    
-    if(early)
+    if(IsRecording)
     {
-        DeleteFile(path_incomplete);
-        CPrintToChatAll("%s(Match ended early - SourceTV demo not saved)", CLR_INFO);
-    }
-    else
-    {
-        RenameFile(path_complete, path_incomplete);
+        char path_incomplete [PLATFORM_MAX_PATH],
+             path_complete   [PLATFORM_MAX_PATH];
+             
+        BuildPath(Path_SM, path_incomplete, PLATFORM_MAX_PATH, "../../%s/incomplete/%s.dem", DemoFolder, DemoName);
+        BuildPath(Path_SM, path_complete  , PLATFORM_MAX_PATH, "../../%s/%s.dem"           , DemoFolder, DemoName);
         
-        if(ZipDemos) CompressDemo(path_complete);
-        else if(UploadDemos)
+        if(discard)
         {
-            strcopy(UploadPath, PLATFORM_MAX_PATH, path_complete);
-            UploadDemo();
+            DeleteFile(path_incomplete);
+            CPrintToChatAll("%s(Match ended early - SourceTV demo not saved)", CLR_INFO);
         }
-    }
-    
-    ServerCommand("tv_stoprecord");
-    IsRecording = false;
+        else
+        {
+            RenameFile(path_complete, path_incomplete);
+            
+            if(ZipDemos) CompressDemo(path_complete);
+            else if(UploadDemos)
+            {
+                strcopy(UploadPath, PLATFORM_MAX_PATH, path_complete);
+                UploadDemo();
+            }
+        }
+        
+        ServerCommand("tv_stoprecord");
+        IsRecording = false;
+     }
 }
 
 void CompressDemo(const char[] path)
@@ -154,12 +174,22 @@ void CompressDemo(const char[] path)
 
 void UploadDemo()
 {
-    System2FTPRequest ftpRequest = new System2FTPRequest(FtpResponseCallback, "ftp://%s/%s/%s.%s", FTP_Hostname, FTP_Path, DemoName, ZipDemos ? "zip" : "dem");
+    System2FTPRequest ftpRequest = new System2FTPRequest(FtpResponseCallback, "ftp://%s/%s/%s.%s", FTP_Hostname, FTP_Path, DemoName,ZipDemos ? "zip" : "dem");
     ftpRequest.CreateMissingDirs = true;
-    ftpRequest.SetPort(FTP_Port);
+    
+    ftpRequest.SetPort          (FTP_Port);
     ftpRequest.SetAuthentication(FTP_Username, FTP_Password);
-    ftpRequest.SetInputFile(UploadPath);
-    ftpRequest.StartRequest();     
+    ftpRequest.SetInputFile     (UploadPath);
+    ftpRequest.StartRequest     ();     
+}
+
+int GetClientOfSourceTV()
+{
+    for(int i = 1; i <= MAXPLAYERS + 1; i++)
+    {
+        if(IsClientSourceTV(i)) return i;
+    }
+    return -1;
 }
 
 stock void OnCompressed(bool success, const char[] command, System2ExecuteOutput output, any data)
@@ -181,6 +211,7 @@ stock void OnCompressed(bool success, const char[] command, System2ExecuteOutput
 stock void FtpResponseCallback(bool success, const char[] error, System2FTPRequest request, System2FTPResponse response)
 {
     CPrintToChatAll("%sSourceTV demo uploaded: %s%s/%s.%s", CLR_MAIN, CLR_HIGH, DemoWeb, DemoName, ZipDemos ? "zip" : "dem");
+    
     if(PurgeDemos)
     {
         DeleteFile(UploadPath);

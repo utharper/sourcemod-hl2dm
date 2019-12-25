@@ -4,10 +4,10 @@
 	{
 		"Version"
 		{
-			"Latest"	"1.13"
+			"Latest"	"1.14"
 		}
 		
-		"Notes"	"Automatic demo compression and upload via FTP"
+		"Notes"	"Version bump"
 	}
 	
 	"Files"

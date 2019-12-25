@@ -4,12 +4,10 @@
 	{
 		"Version"
 		{
-			"Latest"	"1.13"
+			"Latest"	"1.14"
 		}
-		
-		"Notes"	"Fixed run bug, improved list command"
-		"Notes"	"Added profile command"
-		"Notes" "Other minor changes"
+	
+		"Notes"	"Version bump"
 	}
 	
 	"Files"

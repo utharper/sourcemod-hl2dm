@@ -9,7 +9,7 @@ su hl2dm -c "mkdir ~/Steam && cd ~/Steam \
                 +force_install_dir /home/hl2dm/ \
                 +app_update 232370 validate \
                 +quit \
-        && cd ~ && curl -qLO \"https://github.com/jackharpr/hl2dm-xms/releases/download/v1.13/xms_pack_linux_v1.13.zip\" \
+        && cd ~ && curl -qLO \"https://github.com/jackharpr/hl2dm-xms/releases/latest/download/linux.zip\" \
         && unzip -o xms_pack_linux_v1.13.zip \
         && chmod +x hl2mp/addons/sourcemod/data/system2/linux/amd64/7z hl2mp/addons/sourcemod/data/system2/linux/i386/7z \
         && echo -e \"@ShutdownOnFailedCommand 1\n@NoPromptForPassword 1\nlogin anonymous\nforce_install_dir /home/hl2dm\napp_update 232370\nquit\" >> autoupdate \

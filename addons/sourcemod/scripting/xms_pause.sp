@@ -1,44 +1,57 @@
-#define PLUGIN_NAME         "XMS - Pause"
-#define PLUGIN_VERSION      "1.13"
-#define PLUGIN_DESCRIPTION  "Pause function for eXtended Match System"
-#define PLUGIN_AUTHOR       "harper"
-#define PLUGIN_URL          "HL2DM.PRO"
-#define UPDATE_URL          "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_pause.upd"
+#define PLUGIN_VERSION "1.14"
+#define UPDATE_URL     "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_pause.upd"
 
-#define SOUND_T_COUNT       "buttons/blip1.wav"
-#define SOUND_T_END         "hl1/fvox/beep.wav"
-#define PAUSETIME           60
+public Plugin myinfo=
+{
+    name        = "XMS - Pause",
+    version     = PLUGIN_VERSION,
+    description = "Pause system for eXtended Match System",
+    author      = "harper",
+    url         = "www.hl2dm.pro"
+};
+
+/******************************************************************/
 
 #pragma semicolon 1
 #include <sourcemod>
 #include <morecolors>
 
 #undef REQUIRE_PLUGIN
-#include <updater>
-
+ #include <updater>
 #define REQUIRE_PLUGIN
+
 #pragma newdecls required
 #include <hl2dm-xms>
+
+/******************************************************************/
+
+#define PAUSETIME 60
+#define SOUND_TIMER_COUNT "buttons/blip1.wav"
+#define SOUND_TIMER_END "hl1/fvox/beep.wav"
 
 int Pauser,
     RePauser,
     Return_state;
 
-/****************************************************/
-
-public Plugin myinfo={name=PLUGIN_NAME,version=PLUGIN_VERSION,description=PLUGIN_DESCRIPTION,author=PLUGIN_AUTHOR,url=PLUGIN_URL};
+/******************************************************************/
 
 public void OnPluginStart()
 {
     RegConsoleCmd("sm_pause", Command_Pause, "Pause/unpause the game");
     AddCommandListener(LCommand_Pause, "pause");
     
-    if(LibraryExists("updater")) Updater_AddPlugin(UPDATE_URL);
+    if(LibraryExists("updater"))
+    {
+        Updater_AddPlugin(UPDATE_URL);
+    }
 }
 
 public void OnLibraryAdded(const char[] name)
 {
-    if(StrEqual(name, "updater")) Updater_AddPlugin(UPDATE_URL);
+    if(StrEqual(name, "updater"))
+    {
+        Updater_AddPlugin(UPDATE_URL);
+    }
 }
 
 public void OnClientPutInServer(int client)
@@ -61,7 +74,10 @@ public void OnClientDisconnect_Post(int client)
 
 public Action T_RePause(Handle timer, int client)
 {
-    if(IsClientConnected(client)) FakeClientCommand(client, "pause");
+    if(IsClientConnected(client))
+    {
+        FakeClientCommand(client, "pause");
+    }
 }
 
 public Action Command_Pause(int client, int args)
@@ -93,17 +109,17 @@ public Action LCommand_Pause(int client, const char[] command, int argc)
     else switch(gamestate)
     {
         case STATE_MATCHWAIT: CPrintToChat(client, "%s%sWait until the match starts.", CLR_FAIL, CHAT_PREFIX);
-        case STATE_MATCHEX: CPrintToChat(client, "%s%sCan't pause during overtime!", CLR_FAIL, CHAT_PREFIX);
-        case STATE_POST: CPrintToChat(client, "%s%sThe match has ended.", CLR_FAIL, CHAT_PREFIX);
-        case STATE_DEFAULT: CPrintToChat(client, "%s%sYou can only pause the game during a match.", CLR_FAIL, CHAT_PREFIX);
+        case STATE_MATCHEX:   CPrintToChat(client, "%s%sCan't pause during overtime!", CLR_FAIL, CHAT_PREFIX);
+        case STATE_POST:      CPrintToChat(client, "%s%sThe match has ended.", CLR_FAIL, CHAT_PREFIX);
+        case STATE_DEFAULT:   CPrintToChat(client, "%s%sYou can only pause the game during a match.", CLR_FAIL, CHAT_PREFIX);
+        
         case STATE_PAUSE:
         {
             if(client == Pauser && client != RePauser)
             {
                 PrintCenterTextAll(NULL_STRING);
-                PlayGameSoundAll(SOUND_T_END);
+                PlayGameSoundAll(SOUND_TIMER_END);
                 CPrintToChatAllFrom(client, false, "%sMatch resumed.", CLR_MAIN);
-                
                 XMS_SetGamestate(Return_state);
                 Pauser = 0;
             }
@@ -150,14 +166,14 @@ public Action T_Unpause(Handle timer, int client)
     {
         iter = 0;
         PrintCenterTextAll(NULL_STRING);
-        PlayGameSoundAll(SOUND_T_END);
+        PlayGameSoundAll(SOUND_TIMER_END);
 
         FakeClientCommand(IsClientInGame(client) ? client : 0, "pause");
         return Plugin_Stop;
     }
     
     PrintCenterTextAll("%i", PAUSETIME - 1 - iter);
-    if(PAUSETIME - iter <= 10) PlayGameSoundAll(SOUND_T_COUNT);
+    if(PAUSETIME - iter <= 10) PlayGameSoundAll(SOUND_TIMER_COUNT);
     
     iter++;
     return Plugin_Continue;

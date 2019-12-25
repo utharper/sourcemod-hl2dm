@@ -1,8 +1,8 @@
-XMS (eXtended Match System) is a set of SourceMod plugins I made for my competitive HL2DM server, similar to the *PMS* pack from HL2DM.net but created from scratch with many more features and game fixes, and support for additional gamemodes. XMS is designed to be modular, such that you could (mostly) run any combination of these plugins if you really wanted to - only `xms.smx` is required - but this is intended to be a complete match server package. 
+XMS (eXtended Match System) is a set of SourceMod plugins for competitive HL2DM servers, originally inspired by the *PMS* pack from HL2DM.net but created from scratch with many more features and game fixes, and support for additional gamemodes. XMS is designed to be modular, such that you could (mostly) run any combination of these plugins if you really wanted to - only `xms.smx` is required - but this is intended to be a complete match server package.
 
-You can easily define your own custom gamemodes, but the default config has **dm**, **tdm**, **jm** (Jump Maps) and **lgdm** (Low-Grav).
+You can easily define your own custom gamemodes, but the default config contains **dm**, **tdm**, **jm** (Jump Maps) and **lgdm** (Low-Grav).
 
-You can see this system in use on:
+You can currently see this system in use on:
 - Australian Deathmatch (server.hl2dm.pro:27015)
 - West Coast Deathmatch (server-us.hl2dm.pro:27015)
 
@@ -20,11 +20,11 @@ If you set up your server manually (instead of using the XMS pack) you will of c
 
 Configuration
 ---
-Everything should work out of the box, but you'll want to at least edit `cfg/server.cfg` and `cfg/server_match.cfg` to set your desired hostname, sv_region, etc.
+Everything should work out of the box, but you'll first want to edit `cfg/server.cfg` and `cfg/server_match.cfg` to set your desired hostname, sv_region, etc.
 
-You should then go through `addons/sourcemod/configs/xms.cfg` to configure XMS to your desired settings. Everything is explained in there. You'll need to reload xms (`sm plugins reload xms`) for changes to the .cfg to take affect; this will also restart the current map.
+After verifying that things are working, you should go through `addons/sourcemod/configs/xms.cfg` to configure XMS to your desired settings. Everything is explained in there. You'll need to reload xms (`sm plugins reload xms`) for changes to the .cfg to take affect; this will also restart the current map.
 
-Here is a (probably incomplete) list of the features of each plugin:
+Here is an incomplete list of the features of each plugin:
 
 xms.smx
 ---
@@ -32,6 +32,15 @@ xms.smx
 - Natives/forwards for other plugins
 - Reverts to the default gamemode and default mapcycle when the server is empty (handy to attract newbies who use the basic server browser and will usually connect to default map servers)
 - Sets the game description (Game tab in server browser) to current mode.
+- Optional chat welcome message
+
+Client menu (xms_menu.smx)
+---
+Provides a simple menu which automatically opens and stays open. This allows players to quickly press ESC and access most functionality without having to type in commands:
+
+![menu](https://i.imgur.com/sJyEiJd.png)
+
+Players need to set `cl_showpluginmessages 1` for the menu to be visible (in common with all Sourcemod menus in HL2DM, after a game update a few years ago). If they have not set this, a warning message will be displayed in their chat advising them to do so.
 
 Client commands (xms_commands.smx)
 ---
@@ -90,16 +99,12 @@ Game Fixes & Enhancements (xms_fixes.smx)
 - Fixes the 1 health bug when spectating players (now the health value updates as expected)
 - Fixes prop gravity (without this fix, props retain the gravity from the previous map)
 - Fixes mp_falldamage not having any affect
-- Includes [shotgun altfire fix](https://forums.alliedmods.net/showthread.php?p=2362625) by **V952**
-- Includes [hands animation fix](https://forums.alliedmods.net/showthread.php?p=2404259) by **toizy**
-- Includes [env_sprite fix](https://forums.alliedmods.net/showthread.php?p=2587139) (grenade exploit fix) by **sidezz**
-
-Chat Messages (xms_chat.smx)
----
-- Sends a configurable Welcome Message when clients connect to the server.
 - Fixes messages not being sent when the game is paused.
 - Prevents useless game spam, such as "Please wait x seconds before switching", "You are on Team x"  and convar change messages.
 - Styles player connect, disconnect and name change messages.
+- Includes [shotgun altfire fix](https://forums.alliedmods.net/showthread.php?p=2362625) by **V952**
+- Includes [hands animation fix](https://forums.alliedmods.net/showthread.php?p=2404259) by **toizy**
+- Includes [env_sprite fix](https://forums.alliedmods.net/showthread.php?p=2587139) (grenade exploit fix) by **sidezz**
 
 Sounds (xms_sounds.smx)
 ---
@@ -149,6 +154,7 @@ Future improvements
 ---
 Likely there are some bugs, which I will try to fix as I become aware of them.
 
-Some ideas to extend functionality further (probably will not happen due to lack of player interest):
+Some ideas to extend functionality further:
 - Additional gamemodes e.g. arcade, CTF, Last Man Standing, 357 instagib
+- Automated events system which will lock the server to particular settings during a specified time period (for example, Low Grav night on Wednesdays)
 - Custom stats system and match reporting to a database, with a web interface similar to VirtuousGamers.eu

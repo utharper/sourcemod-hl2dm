@@ -1,39 +1,53 @@
-#define PLUGIN_NAME         "XMS - jm Gamemode"
-#define PLUGIN_VERSION      "1.13"
-#define PLUGIN_DESCRIPTION  "Jump Map gamemode features"
-#define PLUGIN_AUTHOR       "harper"
-#define PLUGIN_URL          "HL2DM.PRO"
-#define UPDATE_URL          "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_jm.upd"
+#define PLUGIN_VERSION "1.14"
+#define UPDATE_URL     "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_jm.upd"
 
-#define BITS_SPRINT         0x00000001
-#define OFFS_COLLISIONGROUP 500
+public Plugin myinfo=
+{
+    name        = "XMS - Gamemode: jm",
+    version     = PLUGIN_VERSION,
+    description = "Jump Map gamemode features",
+    author      = "harper",
+    url         = "www.hl2dm.pro"
+};
+
+/******************************************************************/
 
 #pragma semicolon 1
 #include <sourcemod>
+#include <smlib>
 
 #undef REQUIRE_PLUGIN
-#include <updater>
-
+ #include <updater>
 #define REQUIRE_PLUGIN
-#pragma newdecls required
-#include <hl2dm-xms>
+
+//#pragma newdecls required
+ #include <hl2dm-xms>
+ 
+/******************************************************************/
+
+#define BITS_SPRINT 0x00000001
+#define OFFS_COLLISIONGROUP 500
 
 bool PluginEnabled;
 
 /******************************************************************/
 
-public Plugin myinfo={name=PLUGIN_NAME,version=PLUGIN_VERSION,description=PLUGIN_DESCRIPTION,author=PLUGIN_AUTHOR,url=PLUGIN_URL};
-
 public void OnPluginStart()
 {
     HookEvent("player_spawn", Event_Player_Spawn, EventHookMode_Post);
     
-    if(LibraryExists("updater")) Updater_AddPlugin(UPDATE_URL);
+    if(LibraryExists("updater"))
+    {
+        Updater_AddPlugin(UPDATE_URL);
+    }
 }
 
 public void OnLibraryAdded(const char[] name)
 {
-    if(StrEqual(name, "updater")) Updater_AddPlugin(UPDATE_URL);
+    if(StrEqual(name, "updater"))
+    {
+        Updater_AddPlugin(UPDATE_URL);
+    }
 }
 
 public void OnMapStart()
@@ -55,6 +69,15 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
             SetEntPropFloat(client, Prop_Data, "m_flSuitPowerLoad", 0.0);
             SetEntProp(client, Prop_Send, "m_bitsActiveDevices", bits & ~BITS_SPRINT);
         }
+        
+        if(!IsClientObserver(client))
+        {
+            if(buttons & IN_JUMP)
+            {
+                // TODO auto jump
+            }
+        }
+                
     }
     
     return Plugin_Continue;

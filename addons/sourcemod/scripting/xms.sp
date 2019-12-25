@@ -1,9 +1,16 @@
-#define PLUGIN_NAME         "XMS Core (eXtended Match System)"
-#define PLUGIN_VERSION      "1.13"
-#define PLUGIN_DESCRIPTION  "Base plugin for competitive HL2DM servers"
-#define PLUGIN_AUTHOR       "harper"
-#define PLUGIN_URL          "HL2DM.PRO"
-#define UPDATE_URL          "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms.upd"
+#define PLUGIN_VERSION "1.14"
+#define UPDATE_URL     "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms.upd"
+
+public Plugin myinfo=
+{
+    name        = "XMS (eXtended Match System)",
+    version     = PLUGIN_VERSION,
+    description = "Base plugin for competitive HL2DM servers",
+    author      = "harper",
+    url         = "www.hl2dm.pro"
+};
+
+/******************************************************************/
 
 #pragma semicolon 1
 #include <sourcemod>
@@ -11,28 +18,33 @@
 #include <morecolors>
 
 #undef REQUIRE_PLUGIN
-#include <updater>
-
+ #include <updater>
 #define REQUIRE_PLUGIN
+
 #pragma newdecls required
-#include <hl2dm-xms>
+ #include <hl2dm-xms>
+ 
+/******************************************************************/
 
-int         Gamestate;
+#define RevertTime 1.0
 
-bool        Firstload = true,
-            IsTeamplay,
-            EndTrigger;
+KeyValues Cfg;
+
+int       Gamestate;
+
+bool      Firstload = true,
+          IsTeamplay,
+          EndTrigger;
             
-float       PreGameTime;
+float     PreGameTime;
 
-char        Gamemode[MAX_MODE_LENGTH],
-            DefaultMode[MAX_MODE_LENGTH],
-            Path_Cfg[PLATFORM_MAX_PATH],
-            GameID[1024];
+char      Gamemode   [MAX_MODE_LENGTH],
+          DefaultMode[MAX_MODE_LENGTH],
+          Path_Cfg   [PLATFORM_MAX_PATH],
+          WelcomeMsg [4][MAX_SAY_LENGTH],
+          GameID[1024];
 
-Handle      Fw_Gamestate;
-
-KeyValues   Cfg;
+Handle    Fw_Gamestate;
 
 /******************************************************************/
 
@@ -56,12 +68,13 @@ public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max
 
 public int N_GetConfigString(Handle plugin, int params)
 {
-    char    value[1024],
-            key[32],
-            inKey[32];
+    char value[1024],
+         key  [32],
+         inKey[32];
 
-    Cfg.Rewind();
     GetNativeString(3, key, sizeof(key));
+    
+    Cfg.Rewind();
     for(int param = 4; param <= params; param++)
     {
         GetNativeString(param, inKey, sizeof(inKey));
@@ -73,7 +86,10 @@ public int N_GetConfigString(Handle plugin, int params)
 
     if(Cfg.GetString(key, value, sizeof(value))) 
     {
-        if(StrEqual(value, NULL_STRING)) return 0;
+        if(StrEqual(value, NULL_STRING))
+        {
+            return 0;
+        }
 
         SetNativeString(1, value, GetNativeCell(2));
         return 1;
@@ -84,19 +100,22 @@ public int N_GetConfigString(Handle plugin, int params)
 
 public int N_GetConfigKeys(Handle plugin, int params)
 {
-    char    subkeys[1024],
-            inKey[32];
+    char subkeys[1024],
+         inKey  [32];
 
     Cfg.Rewind();
     for(int param = 3; param <= params; param++)
     {
         GetNativeString(param, inKey, sizeof(inKey));
-        if(!Cfg.JumpToKey(inKey)) return -1;
+        if(!Cfg.JumpToKey(inKey))
+        {
+            return -1;
+        }
     }
 
     if(Cfg.GotoFirstSubKey())
     {
-        int count = 1;
+        int count;
 
         do {
             Cfg.GetSectionName(subkeys[strlen(subkeys)], sizeof(subkeys));
@@ -148,9 +167,8 @@ public int N_SetGamemode(Handle plugin, int numParams)
 
 public int N_GetTimeRemaining(Handle plugin, int numParams)
 {
-    float t = GetConVarFloat(FindConVar("mp_timelimit")) * 60 - GetGameTime() + PreGameTime;
-
-    if(GetNativeCell(1)) t += GetConVarFloat(FindConVar("mp_chattime"));
+    float t = GetConVarFloat(FindConVar("mp_timelimit")) * 60 - GetGameTime() + PreGameTime + 
+        (GetNativeCell(1) ? GetConVarFloat(FindConVar("mp_chattime")) : 0.0);
 
     return view_as<int>(t ? t : 0.0);
 }
@@ -167,36 +185,61 @@ public int N_IsGameTeamplay(Handle plugin, int params)
 
 public int N_GetGameID(Handle plugin, int numParams)
 {
-    SetNativeString(1, GameID, GetNativeCell(2));
-    return 1;
+    int bytes;
+    
+    SetNativeString(1, GameID, GetNativeCell(2), true, bytes);
+    return bytes;
 }
 
 /******************************************************************/
 
-public Plugin myinfo={name=PLUGIN_NAME,version=PLUGIN_VERSION,description=PLUGIN_DESCRIPTION,author=PLUGIN_AUTHOR,url=PLUGIN_URL};
-
 public void OnPluginStart()
-{   
+{
+    CreateConVar("hl2dm-xms_version", PLUGIN_VERSION, _, FCVAR_NOTIFY);
+    
     BuildPath(Path_SM, Path_Cfg, PLATFORM_MAX_PATH, "configs/xms.cfg");
     Cfg = new KeyValues(NULL_STRING);
     Cfg.ImportFromFile(Path_Cfg);
     
-    XMS_GetConfigString(DefaultMode, sizeof(DefaultMode), "$default", "MapModes");
-    SplitString(DefaultMode, ",", DefaultMode, sizeof(DefaultMode));
+    XMS_GetConfigString(DefaultMode  , sizeof(DefaultMode), "$default", "MapModes");
+    XMS_GetConfigString(WelcomeMsg[0], MAX_SAY_LENGTH     , "Line1"   , "WelcomeMessage");
+    XMS_GetConfigString(WelcomeMsg[1], MAX_SAY_LENGTH     , "Line2"   , "WelcomeMessage");
+    XMS_GetConfigString(WelcomeMsg[2], MAX_SAY_LENGTH     , "Line3"   , "WelcomeMessage");
+    XMS_GetConfigString(WelcomeMsg[3], MAX_SAY_LENGTH     , "Line4"   , "WelcomeMessage");
 
     HookUserMessage(GetUserMessageId("VGUIMenu"), UserMsg_VGUIMenu);
     HookEvent("round_start", OnRoundStart, EventHookMode_Pre);
 
     IsTeamplay = GetConVarBool(FindConVar("mp_teamplay"));
-
-    CreateConVar("hl2dm-xms_version", PLUGIN_VERSION, _, FCVAR_NOTIFY);
     
-    if(LibraryExists("updater")) Updater_AddPlugin(UPDATE_URL);
+    if(LibraryExists("updater"))
+    {
+        Updater_AddPlugin(UPDATE_URL);
+    }
 }
 
 public void OnLibraryAdded(const char[] name)
 {
-    if(StrEqual(name, "updater")) Updater_AddPlugin(UPDATE_URL);
+    if(StrEqual(name, "updater"))
+    {
+        Updater_AddPlugin(UPDATE_URL);
+    }
+}
+
+public void OnClientPostAdminCheck(int client)
+{
+    CreateTimer(1.0, T_WelcomeMessage, client, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+public Action T_WelcomeMessage(Handle timer, int client)
+{
+    for(int i = 0; i <= 3; i++)
+    {
+        if(strlen(WelcomeMsg[i]))
+        {
+            if(IsClientInGame(client)) CPrintToChat(client, "%s%s", CLR_INFO, WelcomeMsg[i]);
+        }
+    }
 }
 
 public void OnMapStart()
@@ -227,24 +270,31 @@ public Action OnRoundStart(Handle event, const char[] name, bool noBroadcast)
 
 public void OnClientPutInServer(int client)
 {
-    CreateTimer(1.0, T_Announce, client, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+    if(!IsFakeClient(client))
+    {
+        if(GetRealClientCount(true) == 1)
+        {
+            LoadCycleForMode();
+        }
+        CreateTimer(1.0, T_Announce, client, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+    }
 }
 
 public Action T_Announce(Handle timer, int client)
 {
     static int iter = 0;
-
-    // I politely ask you not to remove this
-    PrintCenterText(client, "XMS (eXtended Match System) v%s - www.hl2dm.pro", PLUGIN_VERSION);
-
-    if(iter >= 3)
+    
+    if(IsClientInGame(client) && iter < 3)
     {
-        iter = 0;
-        return Plugin_Stop;
+        // Please do not modify or remove this
+        PrintCenterText(client, "XMS (eXtended Match System) v%s - www.hl2dm.pro", PLUGIN_VERSION);
+    
+        iter++;
+        return Plugin_Continue;
     }
-
-    iter++;
-    return Plugin_Continue;
+    
+    iter = 0;
+    return Plugin_Stop;
 }
 
 public Action UserMsg_VGUIMenu(UserMsg msg_id, Handle msg, const players[], int playersNum, bool reliable, bool init)
@@ -263,25 +313,25 @@ public Action UserMsg_VGUIMenu(UserMsg msg_id, Handle msg, const players[], int 
     return Plugin_Continue;
 }
 
-public void OnClientDisconnect_Post(int client)
+public void OnClientDisconnect(int client)
 {
-    if(GetClientCount(true) == 1 || (GetClientCount(true) == 0 && !GetConVarBool(FindConVar("tv_enable"))))
+    if(!IsFakeClient(client))
     {
-        // everyone left (except sourcetv)
-        if(Gamestate != STATE_CHANGE)
+        if(GetRealClientCount(Gamestate == STATE_MATCH || Gamestate == STATE_MATCHEX) == 1 && Gamestate != STATE_CHANGE)
         {
-            CreateTimer(Gamestate == STATE_MATCH ? 1.0 : 60.0, T_Revert);
+            CreateTimer(RevertTime, T_Revert);
         }
     }
 }
 
 public Action T_Revert(Handle timer)
 {
-    if(GetClientCount(true) == 1)
+    if(GetRealClientCount(Gamestate == STATE_MATCH || Gamestate == STATE_MATCHEX) == 0 && Gamestate != STATE_CHANGE)
     {
         // Revert to default state
         ChangeGamemode(DefaultMode);
-        ServerCommand("changelevel_next");
+        LoadDefaultCycle();
+        ServerCommand("sm_nextmap \"\";changelevel_next");
     }
 }
 
@@ -289,13 +339,6 @@ public void OnMapEnd()
 {
     ChangeGamestate(STATE_CHANGE);
     IsTeamplay = GetConVarBool(FindConVar("mp_teamplay"));
-
-    if(GetClientCount(false) <= 1)
-    {
-        // Stick to default maps when server is empty
-        ServerCommand("mapcyclefile \"mapcycle_default.txt\"");
-    }
-
 }
 
 void ChangeGamemode(const char[] mode)
@@ -352,7 +395,6 @@ void LoadMatchSettings()
 void LoadGamemode()
 {
     char servercmd[PLATFORM_MAX_PATH],
-         mapcycle[PLATFORM_MAX_PATH],
          description[1024];
 
     if(XMS_GetConfigString(servercmd, sizeof(servercmd), "ServerCommand", "GameModes", Gamemode))
@@ -367,9 +409,23 @@ void LoadGamemode()
     }
     else Steam_SetGameDescription("Custom Mode");
     
+    if(GetRealClientCount(false) > 0)
+    {
+        LoadCycleForMode();
+    }
+}
+
+void LoadCycleForMode()
+{
+    char mapcycle[PLATFORM_MAX_PATH];
+    
     if(XMS_GetConfigString(mapcycle, sizeof(mapcycle), "Mapcycle", "GameModes", Gamemode))
     {
-        ServerCommand("mapcyclefile \"%s\"", mapcycle);
+        ServerCommand("mapcyclefile %s", mapcycle);
     }
-    else ServerCommand("mapcyclefile \"mapcycle_default.txt\"");
+}
+
+void LoadDefaultCycle()
+{
+    ServerCommand("mapcyclefile mapcycle_default.txt");
 }

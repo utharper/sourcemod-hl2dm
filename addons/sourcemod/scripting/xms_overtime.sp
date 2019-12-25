@@ -1,11 +1,16 @@
-#define PLUGIN_NAME         "XMS - Overtime"
-#define PLUGIN_VERSION      "1.13"
-#define PLUGIN_DESCRIPTION  "Sudden-death overtime for eXtended Match System"
-#define PLUGIN_AUTHOR       "harper"
-#define PLUGIN_URL          "HL2DM.PRO"
-#define UPDATE_URL          "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_overtime.upd"
+#define PLUGIN_VERSION "1.14"
+#define UPDATE_URL     "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_overtime.upd"
 
-#define OVERTIME_TIME       1 // minutes
+public Plugin myinfo=
+{
+    name        = "XMS - Overtime",
+    version     = PLUGIN_VERSION,
+    description = "Sudden-death overtime for eXtended Match System",
+    author      = "harper",
+    url         = "www.hl2dm.pro"
+};
+
+/******************************************************************/
 
 #pragma semicolon 1
 #include <sourcemod>
@@ -13,46 +18,57 @@
 #include <morecolors>
 
 #undef REQUIRE_PLUGIN
-#include <updater>
-
+ #include <updater>
 #define REQUIRE_PLUGIN
+
 #pragma newdecls required
-#include <hl2dm-xms>
+ #include <hl2dm-xms>
+ 
+/******************************************************************/
 
-bool    Plugin_Enabled,
-        IsOvertime;
+#define OVERTIME_TIME       1 // minutes
 
-Handle  PreOvertimer = INVALID_HANDLE;
+ConVar Timelimit;
 
-ConVar  Timelimit;
+bool   Plugin_Enabled,
+       IsOvertime;
 
-/****************************************************/
+Handle PreOvertimer = INVALID_HANDLE;
 
-public Plugin myinfo={name=PLUGIN_NAME,version=PLUGIN_VERSION,description=PLUGIN_DESCRIPTION,author=PLUGIN_AUTHOR,url=PLUGIN_URL};
+/******************************************************************/
 
 public void OnPluginStart()
 {
     Timelimit = FindConVar("mp_timelimit");
     HookConVarChange(Timelimit, OnTimelimitChanged);
     
-    if(LibraryExists("updater")) Updater_AddPlugin(UPDATE_URL);
+    if(LibraryExists("updater"))
+    {
+        Updater_AddPlugin(UPDATE_URL);
+    }
 }
 
 public void OnLibraryAdded(const char[] name)
 {
-    if(StrEqual(name, "updater")) Updater_AddPlugin(UPDATE_URL);
+    if(StrEqual(name, "updater"))
+    {
+        Updater_AddPlugin(UPDATE_URL);
+    }
 }
 
 public void OnMapStart()
 {
-    char    gamemode[MAX_MODE_LENGTH],
-            overtime[2];
+    char gamemode[MAX_MODE_LENGTH],
+         overtime[2];
             
     XMS_GetGamemode(gamemode, sizeof(gamemode));
     XMS_GetConfigString(overtime, sizeof(overtime), "Overtime", "GameModes", gamemode);
     
     Plugin_Enabled = StrEqual(overtime, "1");
-    if(Plugin_Enabled) CreateOverTimer();
+    if(Plugin_Enabled)
+    {
+        CreateOverTimer();
+    }
 }
 
 public void OnGamestateChanged(int new_state, int old_state)
@@ -108,8 +124,8 @@ void StartOvertime()
     CPrintToChatAll("%sOvertime: %sThe next %s to score wins!", CLR_FAIL, CLR_MAIN, XMS_IsGameTeamplay() ? "team" : "player");
     CreateTimer(0.1, T_Overtime, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);    
     
-    if(state == STATE_MATCH)    XMS_SetGamestate(STATE_MATCHEX);
-    else                        XMS_SetGamestate(STATE_DEFAULTEX);
+    if(state == STATE_MATCH) XMS_SetGamestate(STATE_MATCHEX);
+    else                     XMS_SetGamestate(STATE_DEFAULTEX);
 }
 
 public Action T_Overtime(Handle timer)
@@ -149,10 +165,10 @@ void CreateOverTimer()
 
 int GetTopPlayer()
 {
-    int     best_score = -99,
-            best_scorer;
+    int best_score = -99,
+        best_scorer;
             
-    bool    tie;
+    bool tie;
         
     for(int i = 1; i <= MaxClients; i++)
     {

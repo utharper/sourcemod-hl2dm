@@ -1,9 +1,16 @@
-#define PLUGIN_NAME         "XMS - Discord Match Report"
-#define PLUGIN_VERSION      "1.13"
-#define PLUGIN_DESCRIPTION  "Posts match results to a Discord server"
-#define PLUGIN_AUTHOR       "harper"
-#define PLUGIN_URL          "HL2DM.PRO"
-#define UPDATE_URL          "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_discord.upd"
+#define PLUGIN_VERSION "1.14"
+#define UPDATE_URL     "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_discord.upd"
+
+public Plugin myinfo=
+{
+    name        = "XMS - Discord",
+    version     = PLUGIN_VERSION,
+    description = "Posts match results to Discord server",
+    author      = "harper",
+    url         = "www.hl2dm.pro"
+};
+
+/******************************************************************/
 
 #pragma semicolon 1
 #include <sourcemod>
@@ -12,11 +19,13 @@
 #include <morecolors>
 
 #undef REQUIRE_PLUGIN
-#include <updater>
-
+ #include <updater>
 #define REQUIRE_PLUGIN
+
 #pragma newdecls required
-#include <hl2dm-xms>
+ #include <hl2dm-xms>
+ 
+/******************************************************************/
 
 char    ServerName[64],
         WebHookURL[PLATFORM_MAX_PATH],
@@ -26,16 +35,20 @@ bool    DemosZipped;
 
 /****************************************************/
 
-public Plugin myinfo={name=PLUGIN_NAME,version=PLUGIN_VERSION,description=PLUGIN_DESCRIPTION,author=PLUGIN_AUTHOR,url=PLUGIN_URL};
-
 public void OnPluginStart()
 {
-    if(LibraryExists("updater")) Updater_AddPlugin(UPDATE_URL);
+    if(LibraryExists("updater"))
+    {
+        Updater_AddPlugin(UPDATE_URL);
+    }
 }
 
 public void OnLibraryAdded(const char[] name)
 {
-    if(StrEqual(name, "updater")) Updater_AddPlugin(UPDATE_URL);
+    if(StrEqual(name, "updater"))
+    {
+        Updater_AddPlugin(UPDATE_URL);
+    }
 }
 
 public void OnAllPluginsLoaded()
@@ -44,14 +57,12 @@ public void OnAllPluginsLoaded()
     
     XMS_GetConfigString(ServerName, sizeof(ServerName), "ServerName");
     XMS_GetConfigString(WebHookURL, sizeof(WebHookURL), "WebHookURL", "Discord");
-    
-    XMS_GetConfigString(buffer, sizeof(buffer), "Enable", "SourceTV", "UploadDemos");
+    XMS_GetConfigString(buffer,     sizeof(buffer)    , "Enable", "SourceTV", "UploadDemos");
     if(StrEqual(buffer, "1"))
     {
-        XMS_GetConfigString(buffer, sizeof(buffer), "ZipDemos", "SourceTV", "UploadDemos");
+        XMS_GetConfigString(buffer, sizeof(buffer)    , "ZipDemos", "SourceTV", "UploadDemos");
         DemosZipped = StrEqual(buffer, "1");
-        
-        XMS_GetConfigString(DemoURL, sizeof(DemoURL), "URL", "SourceTV", "UploadDemos");
+        XMS_GetConfigString(DemoURL, sizeof(DemoURL)  , "URL", "SourceTV", "UploadDemos");
     }
 }
 
@@ -67,17 +78,16 @@ void DiscordPush()
 {
     if(strlen(WebHookURL))
     {
-        int     playercount;
-        
-        char    gameID[1024],
-                gameURL[PLATFORM_MAX_PATH],
-                players[4096],
-                playerScores[4096],
-                teamScores[1024],
-                mode[MAX_MODE_LENGTH],
-                modeName[1024],
-                map[MAX_MAP_LENGTH],
-                gameInfo[4096];
+        int  playercount;
+        char gameID[1024],
+             gameURL[PLATFORM_MAX_PATH],
+             players[4096],
+             playerScores[4096],
+             teamScores[1024],
+             mode[MAX_MODE_LENGTH],
+             modeName[1024],
+             map[MAX_MAP_LENGTH],
+             gameInfo[4096];
             
         DiscordWebHook hook = new DiscordWebHook(WebHookURL);
         hook.SlackMode = true;
@@ -89,7 +99,10 @@ void DiscordPush()
         XMS_GetConfigString(modeName, sizeof(modeName), "Name", "GameModes", mode);
         GetCurrentMap(map, sizeof(map));
     
-        if(XMS_IsGameTeamplay()) Format(teamScores, sizeof(teamScores), "%i\n%i", Team_GetScore(TEAM_REBELS), Team_GetScore(TEAM_COMBINE));
+        if(XMS_IsGameTeamplay())
+        {
+            Format(teamScores, sizeof(teamScores), "%i\n%i", Team_GetScore(TEAM_REBELS), Team_GetScore(TEAM_COMBINE));
+        }
         
         for(int i = 1; i <= MaxClients; i++)
         {
@@ -100,33 +113,38 @@ void DiscordPush()
                 char id[32];
                 GetClientAuthId(i, AuthId_Engine, id, sizeof(id));
                 
-                Format(players, sizeof(players), "%s\%s\'%N' *%s*\n", players, XMS_IsGameTeamplay() ? (team == TEAM_REBELS ? "(R) ": team == TEAM_COMBINE ? "(C) " : "(?) ") : NULL_STRING, i, id);
+                Format(players, sizeof(players), "%s\%s\'%N' *%s*\n",
+                    players, XMS_IsGameTeamplay() ? (team == TEAM_REBELS ? "(R) ": team == TEAM_COMBINE ? "(C) " : "(?) ") : NULL_STRING, i, id
+                );
+                
                 Format(playerScores, sizeof(playerScores), "%s%i kills and %i deaths\n", playerScores, GetClientFrags(i), GetClientDeaths(i));
             }
         }
         
-        Format(gameInfo, sizeof(gameInfo), "**Server:** %s\n**Map:** %s\n**Mode:** %s (*%s*)\n**Players:** %i", ServerName, map, mode, modeName, playercount);
+        Format(gameInfo, sizeof(gameInfo), "**Server:** %s\n**Map:** %s\n**Mode:** %s (*%s*)\n**Players:** %i", 
+            ServerName, map, mode, modeName, playercount
+        );
         
         MessageEmbed Embed = new MessageEmbed();
         
-        Embed.SetColor("#f79321");
-        Embed.SetTitle(gameID);
-        Embed.AddField(NULL_STRING, gameInfo, false);
-        Embed.AddField(NULL_STRING, NULL_STRING, false);
-        Embed.AddField("Player *[SteamID]*", players, true);
-        Embed.AddField("Score", playerScores, true);
-        Embed.AddField(NULL_STRING, NULL_STRING, false);
+        Embed.SetColor ("#f79321");
+        Embed.SetTitle (gameID);
+        Embed.AddField (NULL_STRING         , gameInfo, false);
+        Embed.AddField (NULL_STRING         , NULL_STRING, false);
+        Embed.AddField ("Player *[SteamID]*", players, true);
+        Embed.AddField ("Score"             , playerScores, true);
+        Embed.AddField (NULL_STRING         , NULL_STRING, false);
         
         if(XMS_IsGameTeamplay())
         {
-            Embed.AddField("Team", "Rebels (R)\nCombine (C)", true);
-            Embed.AddField("Team Score", teamScores, true);
+            Embed.AddField("Team"           , "Rebels (R)\nCombine (C)", true);
+            Embed.AddField("Team Score"     , teamScores, true);
         }
         
         if(strlen(DemoURL))
         {
-            Embed.AddField(NULL_STRING, NULL_STRING, false);
-            Embed.AddField(NULL_STRING, gameURL, false);
+            Embed.AddField(NULL_STRING      , NULL_STRING, false);
+            Embed.AddField(NULL_STRING      , gameURL, false);
         }
         
         hook.Embed(Embed);
