@@ -1,6 +1,3 @@
-/*
-**
-*/
 #if defined _hl2dm_xms_included
  #endinput
 #endif
@@ -9,12 +6,10 @@
 #define MAX_MAP_LENGTH  32
 #define MAX_MODE_LENGTH 16
 #define MAX_SAY_LENGTH  192
-
 #define TEAM_UNASSIGNED 0
 #define TEAM_SPECTATORS 1
 #define TEAM_COMBINE    2
 #define TEAM_REBELS     3
-
 #define STATE_PAUSE     -1
 #define STATE_DEFAULT   0
 #define STATE_DEFAULTEX 1
@@ -24,11 +19,16 @@
 #define STATE_POST      5
 #define STATE_CHANGE    6
 
-#define CHAT_PREFIX ":: " // Prefix for client-only messages
-#define CLR_MAIN    "{white}" // Most text
-#define CLR_INFO    "{silver}" // Informational text (not too important)
-#define CLR_HIGH    "{goldenrod}" // Highlights, eg name of the map we are changing to
-#define CLR_FAIL    "{fullred}" // Error highlight
+#define SPECMODE_FIRSTPERSON 4
+#define SPECMODE_THIRDPERSON 5
+#define SPECMODE_ENEMYVIEW   6
+#define SPECMODE_FREELOOK    7
+
+#define CHAT_PM   ":: "         // Prefix for client-only messages
+#define CHAT_MAIN "{white}"     // Most text
+#define CHAT_INFO "{silver}"    // Informational text (not too important)
+#define CHAT_HIGH "{goldenrod}" // Highlights, eg name of the map we are changing to
+#define CHAT_FAIL "{fullred}"   // Error highlight
 
 /**
  * Retrieve the value of the given string in the given (sub)keys
@@ -117,9 +117,34 @@ native bool XMS_IsGameTeamplay();
 // Called when the Gamestate value changes
 forward void OnGamestateChanged(int new_state, int old_state);
 
+// check if this gamemode is available
+stock bool XMS_IsValidGamemode(const char[] mode)
+{
+    char gamemodes[512];
+    
+    XMS_GetConfigKeys(gamemodes, sizeof(gamemodes), "GameModes");
+    return (IsItemDistinctInList(mode, gamemodes));
+}
 
+// remove common map prefixes
+stock bool StripMapPrefix(const char[] map, char[] buffer, int maxlen)
+{
+    int pos = StrContains(map, "_");
+    
+    if(pos)
+    {
+        if(StrContains(map, "dm_") == 0 || StrContains(map, "jm_") == 0 || StrContains(map, "tdm_") == 0 || StrContains(map, "pg_") == 0 || StrContains(map, "jump_") == 0 || StrContains(map, "js_") == 0 || StrContains(map, "surf_") == 0 || StrContains(map, "tr_") == 0 || StrContains(map, "z_") == 0)
+        {
+            strcopy(buffer, maxlen, map[StrContains(map, "_") +1]);
+            return true;
+        }
+    }
+    
+    strcopy(buffer, maxlen, map);
+    return false;
+}
 
-// Useful extras
+// Useful extras...
 stock int GetCmdArgInt(int arg)
 {
     char buffer[192];
@@ -127,12 +152,10 @@ stock int GetCmdArgInt(int arg)
     GetCmdArg(arg, buffer, sizeof(buffer));
     return (StringToInt(buffer));
 }
-
 stock bool IsClientAdmin(int client)
 { 
     return (CheckCommandAccess(client, "generic_admin", ADMFLAG_GENERIC, false));
 }
-
 stock void ClientCommandAll(const char[] command, any ...)
 {
     char formatCmd[PLATFORM_MAX_PATH];
@@ -144,12 +167,6 @@ stock void ClientCommandAll(const char[] command, any ...)
         ClientCommand(i, formatCmd);
     }
 }
-
-stock void PlayGameSoundAll(const char[] path)
-{
-    ClientCommandAll("playgamesound %s", path);
-}
-
 stock int FReplaceString(char[] text, int maxlength, const char[] search, bool caseSensitive=false, const char[] replace, char[] ...)
 {
     char buffer[MAX_BUFFER_LENGTH];
@@ -157,15 +174,6 @@ stock int FReplaceString(char[] text, int maxlength, const char[] search, bool c
     VFormat(buffer, sizeof(buffer), replace, 6);
     return (ReplaceString(text, maxlength, search, buffer, caseSensitive));
 }
-
-stock bool XMS_IsValidGamemode(const char[] mode)
-{
-    char gamemodes[512];
-    
-    XMS_GetConfigKeys(gamemodes, sizeof(gamemodes), "GameModes");
-    return (IsItemDistinctInList(mode, gamemodes));
-}
-
 stock bool IsItemDistinctInList(const char[] item, const char[] list)
 {
     char itemx[32];
@@ -188,24 +196,6 @@ stock bool IsItemDistinctInList(const char[] item, const char[] list)
     
     return false;
 }
-
-stock bool StripMapPrefix(const char[] map, char[] buffer, int maxlen)
-{
-    int pos = StrContains(map, "_");
-    
-    if(pos)
-    {
-        if(StrContains(map, "dm_") == 0 || StrContains(map, "jm_") == 0 || StrContains(map, "tdm_") == 0 || StrContains(map, "pg_") == 0 || StrContains(map, "jump_") == 0 || StrContains(map, "js_") == 0 || StrContains(map, "surf_") == 0 || StrContains(map, "tr_") == 0 || StrContains(map, "z_") == 0)
-        {
-            strcopy(buffer, maxlen, map[StrContains(map, "_") +1]);
-            return true;
-        }
-    }
-    
-    strcopy(buffer, maxlen, map);
-    return false;
-}
-
 stock int GetGameVersion()
 {
     char version[512];
@@ -214,14 +204,27 @@ stock int GetGameVersion()
     SplitString(version[StrContains(version, "Server version:") + 16], "\n", version, sizeof(version));
     return StringToInt(version);
 }
-
-stock int GetRealClientCount(bool inGameOnly=true)
+stock int GetClientCookieInt(int client, Handle cookie)
+{
+    char sValue[256];
+    
+    GetClientCookie(client, cookie, sValue, sizeof(sValue));
+    return (StringToInt(sValue));
+}
+stock void SetClientCookieInt(int client, Handle cookie, int value)
+{
+    char sValue[256];
+    
+    IntToString(value, sValue, sizeof(sValue));
+    SetClientCookie(client, cookie, sValue);
+}
+stock int GetRealClientCount(bool inGameOnly=true, bool includeBots=false)
 {
     int count;
     
     for(int i = 1; i <= MaxClients; i++)
     {
-        if(IsClientConnected(i) && !IsFakeClient(i))
+        if(IsClientConnected(i) && (includeBots ? !IsClientSourceTV(i) : !IsFakeClient(i)))
         {
             if(IsClientInGame(i) || !inGameOnly)
             {
@@ -231,28 +234,27 @@ stock int GetRealClientCount(bool inGameOnly=true)
     }
     return count;
 }
-
-// Morecolors extras
 #if defined _colors_included
-stock void CPrintToChatFrom(int client, int recipient, bool team, const char[] message, any ...)
-{
-    char fmessage[512];
+ stock void CPrintToChatFrom(int client, int recipient, bool team, const char[] message, any ...)
+ {
+     char fmessage[512];
     
-    VFormat(fmessage, sizeof(fmessage), message, 5);
-    CPrintToChatEx(recipient, client, "%s{teamcolor}%N{default} :  %s", IsClientObserver(client) ? "*SPEC* " : team ? IsClientObserver(client) ? "(Spectator)" : "(TEAM)" : NULL_STRING, client, fmessage);
-}
-stock void CPrintToChatAllFrom(int client, bool team, const char[] message, any ...)
-{   
-    char fmessage[512];
+     VFormat(fmessage, sizeof(fmessage), message, 5);
+     CPrintToChatEx(recipient, client, "%s{teamcolor}%N{default} :  %s", IsClientObserver(client) ? "*SPEC* " : team ? IsClientObserver(client) ? "(Spectator)" : "(TEAM)" : NULL_STRING, client, fmessage);
+ }
+ 
+ stock void CPrintToChatAllFrom(int client, bool team, const char[] message, any ...)
+ {   
+     char fmessage[512];
     
-    VFormat(fmessage, sizeof(fmessage), message, 4);    
-    for (int i = 1; i <= MaxClients; i++)
-    {
-        if(!IsClientConnected(i) || !IsClientInGame(i)) continue;
-        if(team && GetClientTeam(client) != GetClientTeam(i)) continue;
-        CPrintToChatFrom(client, i, team, fmessage);
-    }
-}
+     VFormat(fmessage, sizeof(fmessage), message, 4);    
+     for (int i = 1; i <= MaxClients; i++)
+     {
+         if(!IsClientConnected(i) || !IsClientInGame(i)) continue;
+         if(team && GetClientTeam(client) != GetClientTeam(i)) continue;
+         CPrintToChatFrom(client, i, team, fmessage);
+     }
+ }
 #endif
 
 // Plugin library

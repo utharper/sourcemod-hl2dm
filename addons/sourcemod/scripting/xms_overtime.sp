@@ -1,4 +1,4 @@
-#define PLUGIN_VERSION "1.14"
+#define PLUGIN_VERSION "1.15"
 #define UPDATE_URL     "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_overtime.upd"
 
 public Plugin myinfo=
@@ -6,7 +6,7 @@ public Plugin myinfo=
     name        = "XMS - Overtime",
     version     = PLUGIN_VERSION,
     description = "Sudden-death overtime for eXtended Match System",
-    author      = "harper",
+    author      = "harper <www.hl2dm.pro>",
     url         = "www.hl2dm.pro"
 };
 
@@ -85,7 +85,7 @@ public void OnGamestateChanged(int new_state, int old_state)
         }
         else if(new_state == STATE_POST || new_state == STATE_CHANGE)
         {
-            if(IsOvertime) CPrintToChatAll("%sOvertime: %sNobody took the lead, so the game is a draw.", CLR_FAIL, CLR_MAIN);
+            if(IsOvertime) CPrintToChatAll("%sOvertime: %sNobody took the lead, so the game is a draw.", CHAT_FAIL, CHAT_MAIN);
             
             IsOvertime = false;
         }
@@ -105,11 +105,23 @@ public void OnMapEnd()
 
 public Action T_PreOvertime(Handle timer)
 {
-    if(XMS_IsGameTeamplay() && (GetTeamScore(TEAM_REBELS) - GetTeamScore(TEAM_COMBINE) == 0))
+    if(GetRealClientCount(true, true) > 1)
     {
-        StartOvertime();
+        if(XMS_IsGameTeamplay())
+        {
+            if(GetTeamScore(TEAM_REBELS) - GetTeamScore(TEAM_COMBINE) == 0)
+            {
+                if(GetTeamClientCount(TEAM_REBELS) && GetTeamClientCount(TEAM_COMBINE))
+                {
+                    StartOvertime();
+                }
+            }
+        }
+        else if(!GetTopPlayer())
+        {
+            StartOvertime();
+        }
     }
-    else if(!GetTopPlayer()) StartOvertime();
     
     PreOvertimer = INVALID_HANDLE;
 }
@@ -121,7 +133,7 @@ void StartOvertime()
     IsOvertime = true;
     
     SetConVarInt(Timelimit, GetConVarInt(Timelimit) + OVERTIME_TIME);
-    CPrintToChatAll("%sOvertime: %sThe next %s to score wins!", CLR_FAIL, CLR_MAIN, XMS_IsGameTeamplay() ? "team" : "player");
+    CPrintToChatAll("%sOvertime: %sThe next %s to score wins!", CHAT_FAIL, CHAT_MAIN, XMS_IsGameTeamplay() ? "team" : "player");
     CreateTimer(0.1, T_Overtime, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);    
     
     if(state == STATE_MATCH) XMS_SetGamestate(STATE_MATCHEX);
@@ -132,23 +144,28 @@ public Action T_Overtime(Handle timer)
 {
     int result;
     
+    if(!IsOvertime)
+    {
+        return Plugin_Stop;
+    }
+    
     if(XMS_IsGameTeamplay())
     {
         result = GetTeamScore(TEAM_REBELS) - GetTeamScore(TEAM_COMBINE);
         if(result == 0) return Plugin_Continue;
         
-        CPrintToChatAll("%sOvertime: %sTeam %s took the lead and win the game.", CLR_FAIL, CLR_MAIN, result < 0 ? "Combine" : "Rebels");
+        CPrintToChatAll("%sOvertime: %sTeam %s took the lead and win the game.", CHAT_FAIL, CHAT_MAIN, result < 0 ? "Combine" : "Rebels");
     }
     else
     {
         result = GetTopPlayer();
         if(!result) return Plugin_Continue;
         
-        CPrintToChatAll("%sOvertime: %s%N %stook the lead and wins the game.", CLR_FAIL, CLR_HIGH, result, CLR_MAIN);
+        CPrintToChatAll("%sOvertime: %s%N %stook the lead and wins the game.", CHAT_FAIL, CHAT_HIGH, result, CHAT_MAIN);
     }
     
-    IsOvertime = false;
     SetConVarInt(Timelimit, GetConVarInt(Timelimit) - OVERTIME_TIME);
+    IsOvertime = false;
     return Plugin_Stop;
 }
 

@@ -1,4 +1,4 @@
-#define PLUGIN_VERSION "1.14"
+#define PLUGIN_VERSION "1.15"
 #define UPDATE_URL     "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_hud.upd"
 
 public Plugin myinfo=
@@ -6,7 +6,7 @@ public Plugin myinfo=
     name        = "XMS - HUD",
     version     = PLUGIN_VERSION,
     description = "Timeleft and spectator HUD for eXtended Match System",
-    author      = "harper, Adrianilloo",
+    author      = "harper <www.hl2dm.pro>, Adrianilloo",
     url         = "www.hl2dm.pro"
 };
 
@@ -79,44 +79,44 @@ public Action T_TimeHud(Handle timer)
         count++;
         if(count == 25) count = 0;
     }
+    else if(gamestate == STATE_POST)
+    {
+        red = true;
+        Format(buffer, sizeof(buffer), "– Game Over –");
+    }
     else
     {
-        if(gamestate == STATE_POST)
+        if(gamestate == STATE_MATCHEX || gamestate == STATE_DEFAULTEX)
         {
             red = true;
-            Format(buffer, sizeof(buffer), "– Game Over –");
-        }
-        else if(gamestate == STATE_MATCHEX || gamestate == STATE_DEFAULTEX)
-        {
-            red = true;
-            Format(buffer, sizeof(buffer), "– Overtime –");
+            Format(buffer, sizeof(buffer), "– Overtime –\n");
         }
         
         if(GetConVarBool(FindConVar("mp_timelimit")))
         {
             float tl = XMS_GetTimeRemaining(false);
-            
+                
             if(tl < 0) tl = 0.0;
             int h = RoundToNearest(tl) / 3600,
-                s = RoundToNearest(tl) % 60,
-                m;
-                    
+            s = RoundToNearest(tl) % 60,
+            m;
+                        
             if(h)
             {
                 m = RoundToNearest(tl) / 60 - (h * 60);
-                Format(buffer, sizeof(buffer), "%dh %d:%02d\n%s", h, m, s, buffer);
+                Format(buffer, sizeof(buffer), "%s%dh %d:%02d", buffer, h, m, s);
             }
             else
             {
                 m = RoundToNearest(tl) / 60;
-                    
-                if(tl >= 60) Format(buffer, sizeof(buffer), "%d:%02d\n%s", m, s, buffer);
+                        
+                if(tl >= 60) Format(buffer, sizeof(buffer), "%s%d:%02d", buffer, m, s);
                 else
                 {
                     red = true;
-                        
-                    if(tl >= 10) Format(buffer, sizeof(buffer), "%i\n%s", RoundToNearest(tl), buffer);
-                    else         Format(buffer, sizeof(buffer), "%.1f\n%s", tl, buffer);
+                            
+                    if(tl >= 10) Format(buffer, sizeof(buffer), "%s%i", buffer, RoundToNearest(tl));
+                    else         Format(buffer, sizeof(buffer), "%s%.1f", buffer, tl);
                 }
             }
         }

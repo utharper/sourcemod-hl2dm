@@ -4,10 +4,10 @@
 	{
 		"Version"
 		{
-			"Latest"	"1.14"
+			"Latest"	"1.15"
 		}
 		
-		"Notes"	"Version bump"
+		"Notes"	"Fixed repause on client connect"
 	}
 	
 	"Files"

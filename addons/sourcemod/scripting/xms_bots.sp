@@ -1,4 +1,4 @@
-#define PLUGIN_VERSION "1.14"
+#define PLUGIN_VERSION "1.15"
 #define UPDATE_URL     "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_bots.upd"
 // Currently only supports a single bot in default mode -- leaves when player count exceeds 1
 
@@ -7,7 +7,7 @@ public Plugin myinfo=
     name        = "XMS - Bot",
     version     = PLUGIN_VERSION,
     description = "RCBot2 controller",
-    author      = "harper",
+    author      = "harper <www.hl2dm.pro>",
     url         = "www.hl2dm.pro"
 };
 
@@ -25,10 +25,13 @@ public Plugin myinfo=
  #include <hl2dm-xms>
  
 /******************************************************************/
- 
+
+#define MIN_MAP_TIME 20
+
 bool PluginEnabled;
      
-int BotClient;
+int BotClient,
+    Gamestate;
 
 /******************************************************************/
 
@@ -50,22 +53,60 @@ public void OnLibraryAdded(const char[] name)
     }
 }
 
+public void OnGamestateChanged(int new_state, int old_state)
+{
+    Gamestate = new_state;
+}
+
 public Action T_CheckBots(Handle timer)
 {
-    if(PluginEnabled)
+    if(PluginEnabled && XMS_GetTimeElapsed() >= MIN_MAP_TIME)
     {
-        if(BotClient && (GetRealClientCount() > 1 || GetRealClientCount() == 0))
+        int inGame     = GetRealClientCount(true, false),
+            connecting = GetRealClientCount(false, false) - inGame;
+
+        if(inGame == 1)
         {
-           KickBot();
+            if(!connecting && BotClient == 0)
+            {
+                BotClient = -1;
+                CreateTimer(5.0, T_AddBot, _, TIMER_FLAG_NO_MAPCHANGE);
+            }
+        }
+        else if(BotClient)
+        {
+            CreateTimer(5.0, T_DelBot, _, TIMER_FLAG_NO_MAPCHANGE);
+        }
+        
+        if(GetRealClientCount(true, true) > (GetRealClientCount(true, false) + (BotClient ? 1 : 0)))
+        {
+           LogMessage("More bots spawned than expected, kicking..");
+           ServerCommand("rcbotd kickbot");
         }
     }
     
     return Plugin_Continue;
 }
 
-public void OnClientDisconnect(int client)
+public Action T_AddBot(Handle timer)
 {
-    if(IsFakeClient(client)) BotClient = 0;
+    if(GetRealClientCount(true, false) == 1 && Gamestate == STATE_DEFAULT)
+    {
+        ServerCommand("rcbotd addbot");
+    }
+}
+
+public Action T_DelBot(Handle timer)
+{
+    if(GetRealClientCount(true, false) != 1 && Gamestate == STATE_DEFAULT)
+    {
+        if(BotClient && IsClientInGame(BotClient))
+        {
+            CPrintToChatAllFrom(BotClient, false, "I'll be back...");
+            ServerCommand("rcbotd kickbot");
+            BotClient = 0;
+        }
+    }
 }
 
 public void OnAllPluginsLoaded()
@@ -83,77 +124,69 @@ public void OnMapEnd()
     BotClient = 0;
 }
 
-public void OnClientPostAdminCheck(int client)
+public void OnClientPutInServer(int client)
 {
     if(PluginEnabled)
     {
         if(IsClientInGame(client))
         {
-            if(!IsFakeClient(client))
+            if(IsFakeClient(client) && !IsClientSourceTV(client))
             {
-                if(GetRealClientCount(true) == 1)
-                {
-                    AddBot();
-                }
-                else
-                {
-                    KickBot();
-                }
+                BotClient = client;
+                CreateTimer(1.0, T_AnnounceBot, _, TIMER_REPEAT);            
+            }
+        }
+    }
+}
+
+public Action T_AnnounceBot(Handle timer)
+{
+    static int iter;
+    
+    if(BotClient > 0)
+    {
+        if(IsClientInGame(BotClient))
+        {
+            if(iter == 0)
+            {
+                CPrintToChatAllFrom(BotClient, false, "Hi there, I'm a bot! {green}(beep)", CHAT_MAIN);
+                iter++;
             }
             else
             {
-                BotClient = client;
-                CPrintToChatAllFrom(client, false, "Hi there, I'm a bot! {green}(beep)", CLR_MAIN);
-                CPrintToChatAllFrom(client, false, "I'll play with you until more humans arrive!");
+                CPrintToChatAllFrom(BotClient, false, "I'll play with you until more humans arrive!");        
+                iter = 0;
+                return Plugin_Stop;
             }
         }
     }
-}
-
-public void OnClientDisconnect_Post(int client)
-{
-    if(PluginEnabled)
-    {
-        if(GetRealClientCount() == 2)
-        {
-            AddBot();
-        }
-    }
-}
-
-void AddBot()
-{
-    int state = XMS_GetGamestate();
-    
-    if(!BotClient)
-    {
-        if(state != STATE_POST && state != STATE_CHANGE)
-        {
-            ServerCommand("rcbotd addbot");
-        }
-    }
-}
-
-void KickBot()
-{
-    ServerCommand("rcbotd kickbot");
-    BotClient = 0;
+    return Plugin_Continue;
 }
 
 bool BotsAvailable()
 {
+    static bool RCBot2Running;
+    
     char gamemode[MAX_MODE_LENGTH],
          defaultmode[MAX_MODE_LENGTH],
          command[16];
     
-    ServerCommandEx(command, sizeof(command), "rcbotd");
-    if(!(StrContains(command, "Unknown command") == 0))
+    if(!RCBot2Running)
+    {
+        ServerCommandEx(command, sizeof(command), "rcbotd");
+        if(!(StrContains(command, "Unknown command") == 0))
+        {
+            RCBot2Running = true;
+        }
+        else LogError("RCBot2 not running");
+    }
+    
+    if(RCBot2Running)
     {
         XMS_GetGamemode(gamemode, sizeof(gamemode));
         XMS_GetConfigString(defaultmode, sizeof(defaultmode), "$default", "MapModes");
-        return StrEqual(gamemode, defaultmode);
+        return StrEqual(gamemode, defaultmode);        
     }
-    else LogError("RCBot2 not running");
     
     return false;
 }

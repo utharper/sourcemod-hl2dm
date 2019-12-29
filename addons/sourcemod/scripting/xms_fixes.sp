@@ -1,4 +1,4 @@
-#define PLUGIN_VERSION "1.14"
+#define PLUGIN_VERSION "1.15"
 #define UPDATE_URL     "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_fixes.upd"
 
 public Plugin myinfo=
@@ -6,7 +6,7 @@ public Plugin myinfo=
     name        = "XMS - Game Fixes & Enhancements",
     version     = PLUGIN_VERSION,
     description = "Various game bugfixes, fixed scoring and team locking",
-    author      = "harper, V952, toizy, sidezz",
+    author      = "harper <www.hl2dm.pro> with thanks to V952, toizy & sidezz",
     url         = "www.hl2dm.pro"
 };
 
@@ -19,6 +19,8 @@ public Plugin myinfo=
 #include <sdkhooks>
 #include <vphysics>
 #include <morecolors>
+#include <clientprefs>
+#include <geoip>
 
 #undef REQUIRE_PLUGIN
  #include <updater>
@@ -41,7 +43,7 @@ bool      AntiRagdoll[MAXPLAYERS + 1],
 /******************************************************************/
 
 public void OnPluginStart()
-{   
+{    
     HookEvent("round_start"          , Event_RoundStart);
     HookEvent("player_death"         , Event_PlayerDeath);
     HookEvent("player_spawn"         , Event_PlayerSpawn, EventHookMode_Post);
@@ -87,18 +89,26 @@ public void OnClientConnected(int client)
     if(!IsClientSourceTV(client))
     {
         // police model by default - nobody wants to be the gleaming white combine model
-        // Have to execute this immediately on connect, or it doesn't work
+        // Have to execute this immediately on connect, or it has no chance of working
         if(XMS_IsGameTeamplay())
         {
             ClientCommand(client, "cl_playermodel models/police.mdl");
         }
-        // if dm set everyone to rebel
+        // if dm try to set everyone to rebel
         else ClientCommand(client, "cl_playermodel models/humans/group03/%s_%02i.mdl", (GetRandomInt(0, 1) ? "male" : "female"), GetRandomInt(1, 7));
     }
 }
 
 public void OnClientPutInServer(int client)
-{
+{   
+    char loc[45];
+    
+    if(!IsFakeClient(client) && GetClientIP(client, loc, sizeof(loc)) && GeoipCountry(loc, loc, sizeof(loc)))
+    {
+        CPrintToChatAll("%s%N connected from %s", CHAT_INFO, client, loc);
+    }
+    else CPrintToChatAll("%s%N connected", CHAT_INFO, client);
+    
     if(!IsClientSourceTV(client))
     {
         // Instantly join spec before we determine the correct team
@@ -108,10 +118,6 @@ public void OnClientPutInServer(int client)
         
         SDKHook(client, SDKHook_WeaponCanSwitchTo, Hook_WeaponCanSwitchTo);
         SDKHook(client, SDKHook_OnTakeDamage     , Hook_OnTakeDamage);
-    }
-    if(!IsFakeClient(client))
-    {
-        CPrintToChatAll("%s%N connected", CLR_INFO, client);
     }
 }
 
@@ -137,20 +143,27 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
         {
             int    specMode = GetEntProp(client, Prop_Send, "m_iObserverMode"),
                    specTarget = GetEntPropEnt(client, Prop_Send, "m_hObserverTarget");
-
             Handle hMenu = StartMessageOne("VGUIMenu", client);
-            
-            // disable broken spectator menu
+                
             if(hMenu != INVALID_HANDLE)
             {
+                // disable broken spectator menu
                 BfWriteString(hMenu, "specmenu");
                 BfWriteByte(hMenu, 0);
                 EndMessage();
             }
             
-            // force freelook where appropriate
-            if(specMode == 6 || ((specTarget <= 0 || !IsClientInGame(specTarget)) && specMode != 7)) {
-                SetEntProp(client, Prop_Send, "m_iObserverMode", 7); }
+            // force free-look where appropriate - this removes the extra (pointless) third person spec mode
+            if(specMode == SPECMODE_ENEMYVIEW || specTarget <= 0 || !IsClientInGame(specTarget))
+            {
+                SetEntProp(client, Prop_Data, "m_iObserverMode", SPECMODE_FREELOOK);
+            }
+            
+            if(specMode == SPECMODE_FREELOOK)
+            {
+                // fix weird bug where spectator can't move while free-looking
+                SetEntityMoveType(client, MOVETYPE_NOCLIP);
+            }
             
             // block spectator sprinting
             buttons &= ~IN_SPEED;
@@ -203,10 +216,16 @@ public Action Hook_WeaponCanSwitchTo(int client, int weapon)
 
 public Action Hook_OnTakeDamage(int client, int &attacker, int &inflictor, float &damage, int &damagetype)
 {
-    // Fix mp_falldamage value not having any effect
     if(damagetype & DMG_FALL)
     {
+        // Fix mp_falldamage value not having any effect
         damage = GetConVarFloat(FindConVar("mp_falldamage"));
+        return Plugin_Changed;
+    }
+    else if(damagetype & DMG_BLAST)
+    {
+        // Remove explosion ringing noise (often removed by user config, which provides a competitive advantage)
+        damagetype = DMG_GENERIC;
         return Plugin_Changed;
     }
     return Plugin_Continue;
@@ -262,28 +281,17 @@ public Action Event_PlayerDeath(Handle event, const char[] name, bool dontBroadc
 public Action Event_GameMessage(Event event, const char[] name, bool dontBroadcast)
 {
     int client = GetClientOfUserId(GetEventInt(event, "userid"));
-    
-    if(StrEqual(name, "player_connect_client"))
+
+    if(StrEqual(name, "player_disconnect"))
     {
-        char username[MAX_NAME_LENGTH];
-        
-        
-        GetEventString(event, "name", username, sizeof(username));
-        if(!GetEventBool(event, "bot"))
-        {
-            CPrintToChatAll("%s%s is connecting...", CLR_INFO, username);
-        }
-    }
-    else if(StrEqual(name, "player_disconnect"))
-    {
-        CPrintToChatAll("%s%N disconnected", CLR_INFO, client);
+        CPrintToChatAll("%s%N disconnected", CHAT_INFO, client);
     }
     else if(StrEqual(name, "player_changename"))
     {
         char username[MAX_NAME_LENGTH];
         
         GetEventString(event, "newname", username, sizeof(username));
-        CPrintToChatAll("%s%N changed name to \"%s\"", CLR_INFO, client, username);
+        CPrintToChatAll("%s%N changed name to \"%s\"", CHAT_INFO, client, username);
     }
     
     // block default messages
@@ -312,7 +320,7 @@ public Action OnClientRequestTeam(int client, const char[] command, int args)
     }
     else if(state == STATE_PAUSE || state == STATE_MATCH || state == STATE_MATCHEX || state == STATE_MATCHWAIT)
     {
-        CPrintToChat(client, "%s%sTeams are locked during a match.", CLR_FAIL, CHAT_PREFIX);
+        CPrintToChat(client, "%s%sTeams are locked during a match.", CHAT_FAIL, CHAT_PM);
         return Plugin_Handled;
     }
     else if(XMS_IsGameTeamplay() && team == TEAM_COMBINE)
@@ -342,16 +350,25 @@ public Action T_TeamChange(Handle timer, int client)
         
         Id_team.GetValue(SteamID(client), team);
         
-        if(XMS_IsGameTeamplay() && team <= TEAM_UNASSIGNED)
+        if(XMS_IsGameTeamplay())
         {
-            if(state == STATE_DEFAULT)
-            {   // attempt to balance teams, if equal then choose at random
-                int r = GetTeamClientCount(TEAM_REBELS),
-                    c = GetTeamClientCount(TEAM_COMBINE);
-    
-                team = r > c ? TEAM_COMBINE : c > r ? TEAM_REBELS : GetRandomInt(0, 1) ? TEAM_REBELS : TEAM_COMBINE;                
+            if(team <= TEAM_UNASSIGNED)
+            {
+                if(state == STATE_DEFAULT || state == STATE_DEFAULTEX)
+                {
+                    int r = GetTeamClientCount(TEAM_REBELS),
+                        c = GetTeamClientCount(TEAM_COMBINE);
+        
+                    // attempt to balance teams, if equal then choose at random
+                    team = r > c ? TEAM_COMBINE : c > r ? TEAM_REBELS : GetRandomInt(0, 1) ? TEAM_REBELS : TEAM_COMBINE;                
+                }
+                else return Plugin_Stop;
             }
-            else return Plugin_Stop;
+            else
+            {
+                // invert team
+                team = (team == TEAM_COMBINE ? TEAM_REBELS : TEAM_COMBINE);
+            }
         }
         
         if(team != GetClientTeam(client) && 
@@ -381,7 +398,7 @@ public Action T_CheckPlayerStates(Handle timer)
         {
             if(!IsClientInGame(i))
             {
-                wasTeam[i] = -1;
+                wasTeam[i]  = -1;
                 wasAlive[i] = false;
                 continue;
             }
@@ -418,7 +435,7 @@ public Action T_CheckPlayerStates(Handle timer)
                         if(!wasAlive[i]) 
                         {
                             // player was dead and joined spec, the game will record a kill, fix:
-                            Client_SetScore(i, Client_GetScore(i) - 1);
+                            Client_SetScore (i, Client_GetScore(i) - 1);
                         }
                         else if(wasAlive[i] && XMS_IsGameTeamplay())
                         {
@@ -430,12 +447,12 @@ public Action T_CheckPlayerStates(Handle timer)
                 else if(wasAlive[i])
                 {
                     // player was alive and changed team, the game will record a suicide, fix:
-                    Client_SetScore(i, Client_GetScore(i) + 1);
+                    Client_SetScore (i, Client_GetScore(i) + 1);
                     Client_SetDeaths(i, Client_GetDeaths(i) - 1);
                 }   
             }
             
-            wasTeam[i] = team;
+            wasTeam[i]  = team;
             wasAlive[i] = isAlive;
             teamScore[team] += Client_GetScore(i);
             

@@ -1,12 +1,12 @@
-#define PLUGIN_VERSION "1.14"
+#define PLUGIN_VERSION "1.15"
 #define UPDATE_URL     "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_commands.upd"
 
 public Plugin myinfo=
 {
     name        = "XMS - Commands",
     version     = PLUGIN_VERSION,
-    description = "Client commands for XMS",
-    author      = "harper",
+    description = "Match commands for XMS",
+    author      = "harper <www.hl2dm.pro>",
     url         = "www.hl2dm.pro"
 };
 
@@ -114,6 +114,14 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
                 FakeClientCommandEx(client, "say !run dm");
             }
         }
+        else if(StrContains(args, "jointeam ") == 1)
+        {
+            FakeClientCommandEx(client, "jointeam %s", args[10]);
+        }
+        else if(StrEqual(args[1], "spec") || StrEqual(args[1], "spectate"))
+        {
+            FakeClientCommandEx(client, "spectate");
+        }
         else if(StrEqual(args[1], "cf"))
         {
             FakeClientCommandEx(client, "say !coinflip");
@@ -140,19 +148,19 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
               s = RoundToNearest(time) % 60,
               m = RoundToNearest(time) / 60 - (h ? (h * 60) : 0);
             
-        if(over) Format(output, sizeof(output), "%s%sMap will auto-change in %s%i%s seconds", CLR_MAIN, (broadcast ? NULL_STRING : CHAT_PREFIX), CLR_HIGH, s, CLR_MAIN);
-        else     Format(output, sizeof(output), "%s%sTime remaining: %s%ih %im %02is", CLR_MAIN, (broadcast ? NULL_STRING : CHAT_PREFIX), CLR_HIGH, h, m, s);
+        if(over) Format(output, sizeof(output), "%s%sMap will auto-change in %s%i%s seconds", CHAT_MAIN, (broadcast ? NULL_STRING : CHAT_PM), CHAT_HIGH, s, CHAT_MAIN);
+        else     Format(output, sizeof(output), "%s%sTime remaining: %s%ih %im %02is", CHAT_MAIN, (broadcast ? NULL_STRING : CHAT_PM), CHAT_HIGH, h, m, s);
     }
     else if(StrEqual(sArgs, "nextmap"))
     {
         char nextmap[MAX_MAP_LENGTH];
         
         GetNextMap(nextmap, sizeof(nextmap));
-        Format(output, sizeof(output), "%s%sNext map: %s%s", CLR_MAIN, (broadcast ? NULL_STRING : CHAT_PREFIX), CLR_HIGH, nextmap);
+        Format(output, sizeof(output), "%s%sNext map: %s%s", CHAT_MAIN, (broadcast ? NULL_STRING : CHAT_PM), CHAT_HIGH, nextmap);
     }
     else if(StrEqual(sArgs, "ff"))
     {
-        Format(output, sizeof(output), "%s%sFriendly fire is %s%s", CLR_MAIN, (broadcast ? NULL_STRING : CHAT_PREFIX), CLR_HIGH, (GetConVarBool(FindConVar("mp_friendlyfire")) ? "enabled" : "disabled"));
+        Format(output, sizeof(output), "%s%sFriendly fire is %s%s", CHAT_MAIN, (broadcast ? NULL_STRING : CHAT_PM), CHAT_HIGH, (GetConVarBool(FindConVar("mp_friendlyfire")) ? "enabled" : "disabled"));
     }
     else return Plugin_Continue;
     
@@ -184,16 +192,16 @@ public Action Command_Run(int client, int args)
                 sOutput [MAX_SAY_LENGTH],
                 sConOut [MAX_BUFFER_LENGTH],
                 mapChangingTo  [MAX_MAP_LENGTH],
-                modeChangingTo [MAX_MODE_LENGTH];
+                modeChangingTo [256];
     Handle      dir;
     any         filetype;
     
-    if(!args || args > 2)  CReplyToCommand(client, "%s%sUsage: !run <map and/or gamemode>, eg '!run tdm', '!run dm lockdown', '!run overwatch'", CLR_INFO, CHAT_PREFIX);
+    if(!args || args > 2)  CReplyToCommand(client, "%s%sUsage: !run <map and/or gamemode>, eg '!run tdm', '!run dm lockdown', '!run overwatch'", CHAT_INFO, CHAT_PM);
     else switch(state)
     {
-        case STATE_PAUSE:  CReplyToCommand(client, "%s%sError: %sYou can't use this command when the game is paused.", CLR_FAIL, CHAT_PREFIX, CLR_MAIN);
-        case STATE_CHANGE: CReplyToCommand(client, "%s%sError: %sPlease wait for the current action to complete.", CLR_FAIL, CHAT_PREFIX, CLR_MAIN);
-        case STATE_MATCH:  CReplyToCommand(client, "%s%sError: %sYou must %s!stop %sthe current match before using this command.", CLR_FAIL, CHAT_PREFIX, CLR_MAIN, CLR_INFO, CLR_MAIN);
+        case STATE_PAUSE:  CReplyToCommand(client, "%s%sError: %sYou can't use this command when the game is paused.", CHAT_FAIL, CHAT_PM, CHAT_MAIN);
+        case STATE_CHANGE: CReplyToCommand(client, "%s%sError: %sPlease wait for the current action to complete.", CHAT_FAIL, CHAT_PM, CHAT_MAIN);
+        case STATE_MATCH:  CReplyToCommand(client, "%s%sError: %sYou must %s!stop %sthe current match before using this command.", CHAT_FAIL, CHAT_PM, CHAT_MAIN, CHAT_INFO, CHAT_MAIN);
         default:
         {
             GetCmdArg(1, sQuery, sizeof(sQuery));
@@ -232,7 +240,7 @@ public Action Command_Run(int client, int args)
                         
                         RequestChange(client, modeChangingTo, mapChangingTo);
                     }
-                    else CReplyToCommand(client, "%s%sError: %sAlready using mode %s%s", CLR_FAIL, CHAT_PREFIX, CLR_MAIN, CLR_INFO, modeChangingTo);
+                    else CReplyToCommand(client, "%s%sError: %sAlready using mode %s%s", CHAT_FAIL, CHAT_PM, CHAT_MAIN, CHAT_INFO, modeChangingTo);
                     
                     return Plugin_Handled;
                 }
@@ -246,7 +254,7 @@ public Action Command_Run(int client, int args)
                 
                 if(!XMS_IsValidGamemode(modeChangingTo))
                 {       
-                    CReplyToCommand(client, "%s%sError:%s Invalid gamemode. Valid modes: %s%s", CLR_FAIL, CHAT_PREFIX, CLR_MAIN, CLR_INFO, Gamemodes);
+                    CReplyToCommand(client, "%s%sError:%s Invalid gamemode. Valid modes: %s%s", CHAT_FAIL, CHAT_PM, CHAT_MAIN, CHAT_INFO, Gamemodes);
                     return Plugin_Handled;
                 }
             }
@@ -257,7 +265,7 @@ public Action Command_Run(int client, int args)
             // lazy hack to prevent exceeding character limit in chat output
             if(!uselessCharCount)
             {
-                uselessCharCount = strlen(CLR_MAIN) * 3 + strlen(CHAT_PREFIX) + strlen(CLR_HIGH) + strlen(CLR_INFO) + strlen(CHAT_PREFIX);
+                uselessCharCount = strlen(CHAT_MAIN) * 3 + strlen(CHAT_PM) + strlen(CHAT_HIGH) + strlen(CHAT_INFO) + strlen(CHAT_PM);
                 uselessCharCount += strlen(", and xxx others.") + strlen("Found: "); // not using actual numbers in case we change things around
                 uselessCharCount += 2; // not sure what this is for, but scared to break it now
             }
@@ -289,7 +297,7 @@ public Action Command_Run(int client, int args)
                             Format(sConOut, sizeof(sConOut), "%s　%s", sConOut, sFile);
                             
                             // colorise matches
-                            FReplaceString(sFile, sizeof(sFile), sQuery, false, "%s%s%s", CLR_HIGH, sQuery, CLR_INFO);
+                            FReplaceString(sFile, sizeof(sFile), sQuery, false, "%s%s%s", CHAT_HIGH, sQuery, CHAT_INFO);
                                 
                             if(strlen(sOutput) + strlen(sFile) + uselessCharCount <= MAX_SAY_LENGTH)
                             {
@@ -313,13 +321,13 @@ public Action Command_Run(int client, int args)
             else if(!hits)
             {
                 fail_iter[client]++;
-                CReplyToCommand(client, "%sError: %sMap or mode %s%s%s not found.", CLR_FAIL, CLR_MAIN, CLR_INFO, sQuery, CLR_MAIN);
+                CReplyToCommand(client, "%sError: %sMap or mode %s%s%s not found.", CHAT_FAIL, CHAT_MAIN, CHAT_INFO, sQuery, CHAT_MAIN);
             }
             else
             {
                 multi_iter[client]++;
                 PrintToConsole(client, "\n\n\n*** Maps matching query `%s` ...\n%s\n\n\n", sQuery, sConOut);
-                CReplyToCommand(client, "%s%sFound%s: %s%s, and %s%i%s others.", CLR_MAIN, CHAT_PREFIX, CLR_INFO, sOutput, CLR_MAIN, CLR_HIGH, hits - xhits, CLR_MAIN);
+                CReplyToCommand(client, "%s%sFound%s: %s%s, and %s%i%s others.", CHAT_MAIN, CHAT_PM, CHAT_INFO, sOutput, CHAT_MAIN, CHAT_HIGH, hits - xhits, CHAT_MAIN);
             }
             
             if(matched)
@@ -329,13 +337,13 @@ public Action Command_Run(int client, int args)
             else if(multi_iter[client] >= 3 && !exact && hits > xhits)
             {
                 // maybe client is looking for a map but the chat output isn't long enough
-                CReplyToCommand(client, "%s%sTip: Open your console for a full list of maps matching your search.", CLR_INFO, CHAT_PREFIX);
+                CReplyToCommand(client, "%s%sTip: Open your console for a full list of maps matching your search.", CHAT_INFO, CHAT_PM);
                 multi_iter[client] = 0;
             }
             else if(fail_iter[client] >= 3)
             {
                 // maybe client needs reminding what is available on the server
-                CReplyToCommand(client, "%s%sTip: View a list of available maps/mode with the %s!list %scommand", CLR_INFO, CHAT_PREFIX, CLR_HIGH, CLR_INFO);
+                CReplyToCommand(client, "%s%sTip: View a list of available maps/mode with the %s!list %scommand", CHAT_INFO, CHAT_PM, CHAT_HIGH, CHAT_INFO);
                 fail_iter[client] = 0;
             }
             
@@ -347,40 +355,44 @@ public Action Command_Run(int client, int args)
     
 public Action Command_Start(int client, int args)
 {
-    int     state = XMS_GetGamestate();
+    int state = XMS_GetGamestate();
     
-    if(IsClientObserver(client) && !IsClientAdmin(client))
+    if(GetRealClientCount(true, false) == 1)
     {
-        CReplyToCommand(client, "%s%sError: Spectators can't use this command.", CLR_FAIL, CHAT_PREFIX);
+        CReplyToCommand(client, "%s%sError: Minimum of 2 human players needed to start a match.", CHAT_FAIL, CHAT_PM); 
+    }
+    else if(IsClientObserver(client) && !IsClientAdmin(client))
+    {
+        CReplyToCommand(client, "%s%sError: Spectators can't use this command.", CHAT_FAIL, CHAT_PM);
     }
     else if(!IsModeMatchable(Currentmode))
     {
-        CReplyToCommand(client, "%s%sError: The current mode %s%s%s does not support competitive matches.", CLR_FAIL, CHAT_PREFIX, CLR_INFO, Currentmode, CLR_FAIL);
+        CReplyToCommand(client, "%s%sError: The current mode %s%s%s does not support competitive matches.", CHAT_FAIL, CHAT_PM, CHAT_INFO, Currentmode, CHAT_FAIL);
     }
     else if(state == STATE_MATCH || state == STATE_MATCHEX)
     {
-        CReplyToCommand(client, "%s%sError: %sA match is already in progress. %s!stop %sit to start again.", CLR_FAIL, CHAT_PREFIX, CLR_MAIN, CLR_INFO, CLR_MAIN);
+        CReplyToCommand(client, "%s%sError: %sA match is already in progress. %s!stop %sit to start again.", CHAT_FAIL, CHAT_PM, CHAT_MAIN, CHAT_INFO, CHAT_MAIN);
     }
     else if(state == STATE_CHANGE || state == STATE_MATCHWAIT)
     {
-        CReplyToCommand(client, "%s%sError: %sWait for the current action to complete first.", CLR_FAIL, CHAT_PREFIX, CLR_MAIN);
+        CReplyToCommand(client, "%s%sError: %sWait for the current action to complete first.", CHAT_FAIL, CHAT_PM, CHAT_MAIN);
     }
     else if(state == STATE_PAUSE)
     {
-        CReplyToCommand(client, "%s%sError: %sYou can't use this command when the game is paused.", CLR_FAIL, CHAT_PREFIX, CLR_MAIN);
+        CReplyToCommand(client, "%s%sError: %sYou can't use this command when the game is paused.", CHAT_FAIL, CHAT_PM, CHAT_MAIN);
     }
     else if(state == STATE_POST || XMS_GetTimeRemaining(false) < 1)
     {
-        CReplyToCommand(client, "%s%sError: %sThe game has ended. You must reload the map first.", CLR_FAIL, CHAT_PREFIX, CLR_MAIN);
+        CReplyToCommand(client, "%s%sError: %sThe game has ended. You must reload the map first.", CHAT_FAIL, CHAT_PM, CHAT_MAIN);
     }
     else
     {
         XMS_SetGamestate(STATE_MATCHWAIT);
         
-        CPrintToChatAllFrom(client, false, "%sStarted a competitive match", CLR_MAIN);
+        CPrintToChatAllFrom(client, false, "%sStarted a competitive match", CHAT_MAIN);
         if(XMS_IsGameTeamplay() && GetTeamClientCount(TEAM_REBELS) != GetTeamClientCount(TEAM_COMBINE))
         {
-            CPrintToChatAll("%sWarning: %sTeams are unbalanced!", CLR_FAIL, CLR_MAIN);
+            CPrintToChatAll("%sWarning: %sTeams are unbalanced!", CHAT_FAIL, CHAT_MAIN);
         }
         
         RestartGame();
@@ -396,31 +408,31 @@ public Action Command_Stop(int client, int args)
     
     if(IsClientObserver(client) && !IsClientAdmin(client))
     {
-        CReplyToCommand(client, "%s%sError: %sSpectators can't use this command.", CLR_FAIL, CHAT_PREFIX, CLR_MAIN);
+        CReplyToCommand(client, "%s%sError: %sSpectators can't use this command.", CHAT_FAIL, CHAT_PM, CHAT_MAIN);
     }
     else if(state == STATE_PAUSE)
     {
-        CReplyToCommand(client, "%s%sError: %sYou can't use this command when the game is paused.", CLR_FAIL, CHAT_PREFIX, CLR_MAIN);
+        CReplyToCommand(client, "%s%sError: %sYou can't use this command when the game is paused.", CHAT_FAIL, CHAT_PM, CHAT_MAIN);
     }
     else if(state == STATE_DEFAULT || state == STATE_DEFAULTEX)
     {
-        CReplyToCommand(client, "%s%sError: %sThere is no match to stop.", CLR_FAIL, CHAT_PREFIX, CLR_MAIN);
+        CReplyToCommand(client, "%s%sError: %sThere is no match to stop.", CHAT_FAIL, CHAT_PM, CHAT_MAIN);
     }
     else if(state == STATE_MATCHEX)
     {
-        CReplyToCommand(client, "%s%sError: %sYou can't stop the match during overtime.", CLR_FAIL, CHAT_PREFIX, CLR_MAIN);
+        CReplyToCommand(client, "%s%sError: %sYou can't stop the match during overtime.", CHAT_FAIL, CHAT_PM, CHAT_MAIN);
     }
     else if(state == STATE_CHANGE || state == STATE_MATCHWAIT)
     {
-        CReplyToCommand(client, "%s%sError: %sPlease wait for the current action to complete.", CLR_FAIL, CHAT_PREFIX, CLR_MAIN);
+        CReplyToCommand(client, "%s%sError: %sPlease wait for the current action to complete.", CHAT_FAIL, CHAT_PM, CHAT_MAIN);
     }
     else if(state == STATE_POST || XMS_GetTimeRemaining(false) < 1)
     {
-        CReplyToCommand(client, "%s%sError: %sThe game has ended.", CLR_FAIL, CHAT_PREFIX, CLR_MAIN);
+        CReplyToCommand(client, "%s%sError: %sThe game has ended.", CHAT_FAIL, CHAT_PM, CHAT_MAIN);
     }
     else
     {
-        CPrintToChatAllFrom(client, false, "%sStopped the match", CLR_MAIN);
+        CPrintToChatAllFrom(client, false, "%sStopped the match", CHAT_MAIN);
         
         XMS_SetGamestate(STATE_DEFAULT);
         RestartGame();
@@ -433,8 +445,7 @@ public Action Command_List(int client, int args)
 {
     char sArg[MAX_MODE_LENGTH],
          path_mapcycle[PLATFORM_MAX_PATH];
-         
-    int count;
+    int  count;
     
     if(args)
     {
@@ -446,7 +457,7 @@ public Action Command_List(int client, int args)
             Handle  dir;
             any     filetype;
             
-            CReplyToCommand(client, "%s%sListing all maps on server:", CLR_MAIN, CHAT_PREFIX);
+            CReplyToCommand(client, "%s%sListing all maps on server:", CHAT_MAIN, CHAT_PM);
             
             dir = OpenDirectory(Path_Maps);
             while(ReadDirEntry(dir, sFile, sizeof(sFile), filetype))
@@ -455,12 +466,12 @@ public Action Command_List(int client, int args)
                 {
                     count++;
                     StripMapPrefix(sFile, sFile, sizeof(sFile));
-                    CReplyToCommand(client, "%s%s%s", CLR_INFO, CHAT_PREFIX, sFile);
+                    CReplyToCommand(client, "%s%s%s", CHAT_INFO, CHAT_PM, sFile);
                 }
             }
             CloseHandle(dir);
             
-            CReplyToCommand(client, "%s%s^ Found %s%i %smaps on the server ^", CLR_MAIN, CHAT_PREFIX, CLR_HIGH, count, CLR_MAIN);
+            CReplyToCommand(client, "%s%s^ Found %s%i %smaps on the server ^", CHAT_MAIN, CHAT_PM, CHAT_HIGH, count, CHAT_MAIN);
             
             return Plugin_Handled;
         }
@@ -475,7 +486,7 @@ public Action Command_List(int client, int args)
         XMS_GetConfigString(path_mapcycle, sizeof(path_mapcycle), "Mapcycle", "GameModes", sArg);
         Format(path_mapcycle, sizeof(path_mapcycle), "cfg/%s", path_mapcycle);
         
-        CReplyToCommand(client, "%s%sListing maps for gamemode %s%s%s:", CLR_MAIN, CHAT_PREFIX, CLR_HIGH, sArg, CLR_MAIN);
+        CReplyToCommand(client, "%s%sListing maps for gamemode %s%s%s:", CHAT_MAIN, CHAT_PM, CHAT_HIGH, sArg, CHAT_MAIN);
         
         file = OpenFile(path_mapcycle, "r");
         while(!file.EndOfFile() && file.ReadLine(map, sizeof(map)))
@@ -500,14 +511,14 @@ public Action Command_List(int client, int args)
             
             count++;
             StripMapPrefix(map, map, sizeof(map));
-            CReplyToCommand(client, "%s%s%s", CLR_INFO, CHAT_PREFIX, map);
+            CReplyToCommand(client, "%s%s%s", CHAT_INFO, CHAT_PM, map);
         }
         CloseHandle(file);
         
-        CReplyToCommand(client, "%s%s^ Found %s%i %smaps for gamemode %s%s%s ^", CLR_MAIN, CHAT_PREFIX, CLR_HIGH, count, CLR_MAIN, CLR_HIGH, sArg, CLR_MAIN);
-        CReplyToCommand(client, "%s%sAvailable modes: %s%s", CLR_INFO, CHAT_PREFIX, CLR_HIGH, Gamemodes);
+        CReplyToCommand(client, "%s%s^ Found %s%i %smaps for gamemode %s%s%s ^", CHAT_MAIN, CHAT_PM, CHAT_HIGH, count, CHAT_MAIN, CHAT_HIGH, sArg, CHAT_MAIN);
+        CReplyToCommand(client, "%s%sAvailable modes: %s%s", CHAT_INFO, CHAT_PM, CHAT_HIGH, Gamemodes);
     }
-    else CReplyToCommand(client, "%s%sError: %sInvalid gamemode %s", CLR_FAIL, CHAT_PREFIX, CLR_MAIN, sArg);
+    else CReplyToCommand(client, "%s%sError: %sInvalid gamemode %s", CHAT_FAIL, CHAT_PM, CHAT_MAIN, sArg);
     
     return Plugin_Handled;
 }
@@ -516,7 +527,7 @@ public Action Command_Coinflip(int client, int args)
 {
     int heads = GetRandomInt(0, 1);
     
-    CPrintToChatAllFrom(client, false, "%sFlipped a coin - it landed on %s%s%s.", CLR_MAIN, CLR_HIGH, heads ? "heads" : "tails", CLR_MAIN);
+    CPrintToChatAllFrom(client, false, "%sFlipped a coin - it landed on %s%s%s.", CHAT_MAIN, CHAT_HIGH, heads ? "heads" : "tails", CHAT_MAIN);
 }
 
 public Action Command_Profile(int client, int args)
@@ -529,13 +540,13 @@ public Action Command_Profile(int client, int args)
         
         if(target)
         {
-            GetClientAuthId(client, AuthId_SteamID64, communityID, sizeof(communityID));
+            GetClientAuthId(target, AuthId_SteamID64, communityID, sizeof(communityID));
             Format(url, sizeof(url), "https://steamcommunity.com/profiles/%s", communityID);
             ShowMOTDPanel(client, "Steam Profile", url, MOTDPANEL_TYPE_URL);
         }
         // else FindTarget will advise if no match
     }
-    else CReplyToCommand(client, "%s%sUsage: !profile <player name or userid>", CLR_INFO, CHAT_PREFIX);
+    else CReplyToCommand(client, "%s%sUsage: !profile <player name or userid>", CHAT_INFO, CHAT_PM);
 }
 
 public Action ACommand_Forcespec(int client, int args)
@@ -549,15 +560,15 @@ public Action ACommand_Forcespec(int client, int args)
             if(GetClientTeam(target) != TEAM_SPECTATORS)
             {
                 ChangeClientTeam(target, TEAM_SPECTATORS);
-                CPrintToChat(target, "%s%sAn admin has forced you to spectate. Follow admin instructions!", CLR_FAIL, CHAT_PREFIX);
+                CPrintToChat(target, "%s%sAn admin has forced you to spectate. Follow admin instructions!", CHAT_FAIL, CHAT_PM);
                 
-                CReplyToCommand(client,  "%s%sMoved %s%N%s to spectators.", CLR_MAIN, CHAT_PREFIX, CLR_HIGH, target, CLR_MAIN);
+                CReplyToCommand(client,  "%s%sMoved %s%N%s to spectators.", CHAT_MAIN, CHAT_PM, CHAT_HIGH, target, CHAT_MAIN);
             }
-            else CReplyToCommand(client, "%s%sError: %s%N%s is already a spectator.", CLR_FAIL, CHAT_PREFIX, CLR_HIGH, target, CLR_MAIN);
+            else CReplyToCommand(client, "%s%sError: %s%N%s is already a spectator.", CHAT_FAIL, CHAT_PM, CHAT_HIGH, target, CHAT_MAIN);
         }
         // else FindTarget will advise if no match
     }
-    else CReplyToCommand(client, "%s%sUsage: !forcespec <player name or userid>", CLR_INFO, CHAT_PREFIX);
+    else CReplyToCommand(client, "%s%sUsage: !forcespec <player name or userid>", CHAT_INFO, CHAT_PM);
 }
 
 public Action T_Start(Handle timer)
@@ -572,13 +583,13 @@ public Action T_Start(Handle timer)
     if(iter != DELAY_ACTION)
     {
         PrintCenterTextAll("~ match starting in %i seconds ~", DELAY_ACTION - iter);
-        PlayGameSoundAll(SOUND_TIMER_COUNT);
+        ClientCommandAll("playgamesound %s", SOUND_TIMER_COUNT);
         iter++;
         return Plugin_Continue;
     }
     
     PrintCenterTextAll(NULL_STRING);
-    PlayGameSoundAll(SOUND_TIMER_END);
+    ClientCommandAll("playgamesound %s", SOUND_TIMER_END);
     
     iter = 0;
     return Plugin_Stop; 
@@ -586,7 +597,7 @@ public Action T_Start(Handle timer)
 
 public Action T_Change(Handle timer, Handle dpack)
 {
-    static int iter;
+    static int  iter;
     static char map[MAX_MAP_LENGTH],
                 cmap[MAX_MAP_LENGTH], 
                 mode[MAX_MODE_LENGTH];
@@ -612,8 +623,8 @@ public Action T_Change(Handle timer, Handle dpack)
     {
         PrintCenterTextAll("~ loading %s:%s in %i seconds ~", mode, cmap, DELAY_ACTION - iter);
         
-        if(DELAY_ACTION - iter > 1) PlayGameSoundAll(SOUND_TIMER_COUNT);
-        else                        PlayGameSoundAll(SOUND_TIMER_END);
+        if(DELAY_ACTION - iter > 1) ClientCommandAll("playgamesound %s", SOUND_TIMER_COUNT);
+        else                        ClientCommandAll("playgamesound %s", SOUND_TIMER_END);
     }
     
     iter++;
@@ -622,13 +633,13 @@ public Action T_Change(Handle timer, Handle dpack)
 
 void RequestChange(int client, const char[] mode, const char[] map)
 {
-    char cmap[MAX_MAP_LENGTH];
+    char     cmap[MAX_MAP_LENGTH];
     DataPack dpack;
     
     StripMapPrefix(map, cmap, sizeof(cmap));
     XMS_SetGamestate(STATE_CHANGE);
     
-    CPrintToChatAllFrom(client, false, "%sChanging to %s%s:%s", CLR_MAIN, CLR_HIGH, mode, cmap);
+    CPrintToChatAllFrom(client, false, "%sChanging to %s%s:%s", CHAT_MAIN, CHAT_HIGH, mode, cmap);
     
     CreateDataTimer(1.0, T_Change, dpack, TIMER_REPEAT);
     
@@ -656,7 +667,7 @@ stock int GetModeForMap(char[] buffer, int maxlen, const char[] map)
 {   
     if(!XMS_GetConfigString(buffer, maxlen, map, "MapModes"))
     {
-        if(!XMS_GetConfigString(buffer, maxlen, "$default", "MapModes")) return -1;
+        if(!XMS_GetConfigString(buffer, maxlen, "$retain", "MapModes")) return -1;
         
         if(!strlen(Currentmode) || !IsItemDistinctInList(Currentmode, buffer))
         {
@@ -688,7 +699,7 @@ stock bool IsModeMatchable(const char[] mode)
 stock int ClientArgToTarget(int client, int arg)
 {
     char buffer[MAX_NAME_LENGTH];
-    int target;
+    int  target;
     
     GetCmdArg(arg, buffer, sizeof(buffer));
     

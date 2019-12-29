@@ -1,4 +1,4 @@
-#define PLUGIN_VERSION "1.14"
+#define PLUGIN_VERSION "1.15"
 #define UPDATE_URL     "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_sounds.upd"
 
 public Plugin myinfo=
@@ -6,7 +6,7 @@ public Plugin myinfo=
     name        = "XMS - Sounds",
     version     = PLUGIN_VERSION,
     description = "Game sounds for eXtended Match System",
-    author      = "harper",
+    author      = "harper <www.hl2dm.pro>",
     url         = "www.hl2dm.pro"
 };
 
@@ -69,14 +69,18 @@ public void OnGamestateChanged(int new_state, int old_state)
 
 public void OnClientPutInServer(int client)
 {
-    int state = XMS_GetGamestate();
-    
-    if(state != STATE_MATCH && state != STATE_MATCHEX && state != STATE_MATCHWAIT)
+    if(!IsFakeClient(client))
     {
-        PlayGameSoundAll(SOUND_CONNECT);
+        int state = XMS_GetGamestate();
+        
+        if(state != STATE_MATCH && state != STATE_MATCHEX && state != STATE_MATCHWAIT)
+        {
+            ClientCommandAll("playgamesound %s", SOUND_CONNECT);
+        }
+        
+        // cancel fade in case of early map change
+        ClientCommand(client, "soundfade 0 0 0 0");
     }
-    
-    ClientCommand(client, "soundfade 0 0 0 0"); // cancel fade in case of early map change
 }
 
 public void PlayRoundEndMusic()
@@ -85,7 +89,7 @@ public void PlayRoundEndMusic()
     int         rand;
     float       fadetime;
     
-    do rand = GetRandomInt(0, 5);
+    do   (rand = GetRandomInt(0, 5));
     while(last_rand == rand || rand == 5 && GetRandomInt(0, 1) != 1);
     
     last_rand = rand;
@@ -93,18 +97,23 @@ public void PlayRoundEndMusic()
     
     if(fadetime < 5) fadetime = 0.1;
     
-    PlayGameSoundAll(rand == 0 ? SOUND_MUSIC_0 : rand == 1 ? SOUND_MUSIC_1 : rand == 2 ? SOUND_MUSIC_2 : rand == 3 ? SOUND_MUSIC_3 : rand == 4 ? SOUND_MUSIC_4 : SOUND_MUSIC_5);
+    ClientCommandAll("playgamesound %s", rand == 0 ? SOUND_MUSIC_0 : rand == 1 ? SOUND_MUSIC_1 : rand == 2 ? SOUND_MUSIC_2 : rand == 3 ? SOUND_MUSIC_3 :
+        rand == 4 ? SOUND_MUSIC_4 : SOUND_MUSIC_5
+    );
     CreateTimer(fadetime, T_SoundFadeTrigger, _, TIMER_FLAG_NO_MAPCHANGE);
-    CreateTimer(0.1, T_SoundFadeAction, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+    CreateTimer(0.1     , T_SoundFadeAction,  _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public void OnClientDisconnect(int client)
 {
-    int state = XMS_GetGamestate();
-    
-    if(state != STATE_MATCH && state != STATE_MATCHEX && state != STATE_MATCHWAIT)
+    if(!IsFakeClient(client))
     {
-        PlayGameSoundAll(SOUND_DISCONNECT);
+        int state = XMS_GetGamestate();
+        
+        if(state != STATE_MATCH && state != STATE_MATCHEX && state != STATE_MATCHWAIT)
+        {
+            ClientCommandAll("playgamesound %s", SOUND_DISCONNECT);
+        }
     }
 }
 

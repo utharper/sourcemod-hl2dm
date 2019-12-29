@@ -1,4 +1,4 @@
-#define PLUGIN_VERSION "1.14"
+#define PLUGIN_VERSION "1.15"
 #define UPDATE_URL     "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_pause.upd"
 
 public Plugin myinfo=
@@ -6,7 +6,7 @@ public Plugin myinfo=
     name        = "XMS - Pause",
     version     = PLUGIN_VERSION,
     description = "Pause system for eXtended Match System",
-    author      = "harper",
+    author      = "harper <www.hl2dm.pro>",
     url         = "www.hl2dm.pro"
 };
 
@@ -59,7 +59,7 @@ public void OnClientPutInServer(int client)
     if(XMS_GetGamestate() == STATE_PAUSE)
     {
         RePauser = client;
-        CreateTimer(0.1, T_RePause, client, TIMER_FLAG_NO_MAPCHANGE);
+        CreateTimer(0.1, T_RePause, client, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
     }
 }
 
@@ -74,10 +74,19 @@ public void OnClientDisconnect_Post(int client)
 
 public Action T_RePause(Handle timer, int client)
 {
-    if(IsClientConnected(client))
+    static int iter;
+    
+    if(IsClientConnected(client)) FakeClientCommand(client, "pause");
+    iter++;
+    
+    if(iter >= 2)
     {
-        FakeClientCommand(client, "pause");
+        RePauser = 0;
+        iter = 0;
+        return Plugin_Stop;
     }
+    
+    return Plugin_Continue;
 }
 
 public Action Command_Pause(int client, int args)
@@ -97,35 +106,34 @@ public Action LCommand_Pause(int client, const char[] command, int argc)
     
     if(client == RePauser)
     {
-        RePauser = 0;
         return Plugin_Continue;
     }
     
     if(IsClientObserver(client) && !IsClientAdmin(client) && client != Pauser)
     {
-        CPrintToChat(client, "%s%sSpectators cannot use this command.", CLR_FAIL, CHAT_PREFIX); 
+        CPrintToChat(client, "%s%sSpectators cannot use this command.", CHAT_FAIL, CHAT_PM); 
     }
     
     else switch(gamestate)
     {
-        case STATE_MATCHWAIT: CPrintToChat(client, "%s%sWait until the match starts.", CLR_FAIL, CHAT_PREFIX);
-        case STATE_MATCHEX:   CPrintToChat(client, "%s%sCan't pause during overtime!", CLR_FAIL, CHAT_PREFIX);
-        case STATE_POST:      CPrintToChat(client, "%s%sThe match has ended.", CLR_FAIL, CHAT_PREFIX);
-        case STATE_DEFAULT:   CPrintToChat(client, "%s%sYou can only pause the game during a match.", CLR_FAIL, CHAT_PREFIX);
+        case STATE_MATCHWAIT: CPrintToChat(client, "%s%sWait until the match starts.", CHAT_FAIL, CHAT_PM);
+        case STATE_MATCHEX:   CPrintToChat(client, "%s%sCan't pause during overtime!", CHAT_FAIL, CHAT_PM);
+        case STATE_POST:      CPrintToChat(client, "%s%sThe match has ended.", CHAT_FAIL, CHAT_PM);
+        case STATE_DEFAULT:   CPrintToChat(client, "%s%sYou can only pause the game during a match.", CHAT_FAIL, CHAT_PM);
         
         case STATE_PAUSE:
         {
             if(client == Pauser && client != RePauser)
             {
                 PrintCenterTextAll(NULL_STRING);
-                PlayGameSoundAll(SOUND_TIMER_END);
-                CPrintToChatAllFrom(client, false, "%sMatch resumed.", CLR_MAIN);
+                ClientCommandAll("playgamesound %s", SOUND_TIMER_END);
+                CPrintToChatAllFrom(client, false, "%sMatch resumed.", CHAT_MAIN);
                 XMS_SetGamestate(Return_state);
                 Pauser = 0;
             }
             else if(client != RePauser)
             {
-                CPrintToChat(client, "%s%sOnly the player who paused the game can resume early.", CLR_FAIL, CHAT_PREFIX);
+                CPrintToChat(client, "%s%sOnly the player who paused the game can resume early.", CHAT_FAIL, CHAT_PM);
                 return Plugin_Handled;
             }
             
@@ -137,7 +145,7 @@ public Action LCommand_Pause(int client, const char[] command, int argc)
             if(GetConVarBool(FindConVar("sv_pausable")))
             {
                 PrintCenterTextAll("%i", PAUSETIME);
-                CPrintToChatAllFrom(client, false, "%sMatch paused for up to %i seconds.", CLR_MAIN, PAUSETIME);
+                CPrintToChatAllFrom(client, false, "%sMatch paused for up to %i seconds.", CHAT_MAIN, PAUSETIME);
                 Pauser = client;
                 
                 Return_state = gamestate;
@@ -166,14 +174,14 @@ public Action T_Unpause(Handle timer, int client)
     {
         iter = 0;
         PrintCenterTextAll(NULL_STRING);
-        PlayGameSoundAll(SOUND_TIMER_END);
+        ClientCommandAll("playgamesound %s", SOUND_TIMER_END);
 
         FakeClientCommand(IsClientInGame(client) ? client : 0, "pause");
         return Plugin_Stop;
     }
     
     PrintCenterTextAll("%i", PAUSETIME - 1 - iter);
-    if(PAUSETIME - iter <= 10) PlayGameSoundAll(SOUND_TIMER_COUNT);
+    if(PAUSETIME - iter <= 10) ClientCommandAll("playgamesound %s", SOUND_TIMER_COUNT);
     
     iter++;
     return Plugin_Continue;

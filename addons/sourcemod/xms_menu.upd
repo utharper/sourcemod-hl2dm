@@ -4,10 +4,10 @@
 	{
 		"Version"
 		{
-			"Latest"	"1.14"
+			"Latest"	"1.15"
 		}
 		
-		"Notes"	"Added client menu (requires cl_showpluginmessages 1)"
+		"Notes"	"Version bump"
 	}
 	
 	"Files"

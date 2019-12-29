@@ -1,4 +1,4 @@
-#define PLUGIN_VERSION "1.14"
+#define PLUGIN_VERSION "1.15"
 #define UPDATE_URL     "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms.upd"
 
 public Plugin myinfo=
@@ -6,7 +6,7 @@ public Plugin myinfo=
     name        = "XMS (eXtended Match System)",
     version     = PLUGIN_VERSION,
     description = "Base plugin for competitive HL2DM servers",
-    author      = "harper",
+    author      = "harper <www.hl2dm.pro>",
     url         = "www.hl2dm.pro"
 };
 
@@ -41,7 +41,6 @@ float     PreGameTime;
 char      Gamemode   [MAX_MODE_LENGTH],
           DefaultMode[MAX_MODE_LENGTH],
           Path_Cfg   [PLATFORM_MAX_PATH],
-          WelcomeMsg [4][MAX_SAY_LENGTH],
           GameID[1024];
 
 Handle    Fw_Gamestate;
@@ -202,10 +201,6 @@ public void OnPluginStart()
     Cfg.ImportFromFile(Path_Cfg);
     
     XMS_GetConfigString(DefaultMode  , sizeof(DefaultMode), "$default", "MapModes");
-    XMS_GetConfigString(WelcomeMsg[0], MAX_SAY_LENGTH     , "Line1"   , "WelcomeMessage");
-    XMS_GetConfigString(WelcomeMsg[1], MAX_SAY_LENGTH     , "Line2"   , "WelcomeMessage");
-    XMS_GetConfigString(WelcomeMsg[2], MAX_SAY_LENGTH     , "Line3"   , "WelcomeMessage");
-    XMS_GetConfigString(WelcomeMsg[3], MAX_SAY_LENGTH     , "Line4"   , "WelcomeMessage");
 
     HookUserMessage(GetUserMessageId("VGUIMenu"), UserMsg_VGUIMenu);
     HookEvent("round_start", OnRoundStart, EventHookMode_Pre);
@@ -223,22 +218,6 @@ public void OnLibraryAdded(const char[] name)
     if(StrEqual(name, "updater"))
     {
         Updater_AddPlugin(UPDATE_URL);
-    }
-}
-
-public void OnClientPostAdminCheck(int client)
-{
-    CreateTimer(1.0, T_WelcomeMessage, client, TIMER_FLAG_NO_MAPCHANGE);
-}
-
-public Action T_WelcomeMessage(Handle timer, int client)
-{
-    for(int i = 0; i <= 3; i++)
-    {
-        if(strlen(WelcomeMsg[i]))
-        {
-            if(IsClientInGame(client)) CPrintToChat(client, "%s%s", CLR_INFO, WelcomeMsg[i]);
-        }
     }
 }
 
@@ -266,6 +245,16 @@ public void OnMapStart()
 public Action OnRoundStart(Handle event, const char[] name, bool noBroadcast)
 {
     PreGameTime = GetGameTime();
+}
+
+public void OnGamestateChanged(int new_state, int old_state)
+{
+    if(new_state == STATE_MATCHWAIT)
+    {
+        char status[MAX_BUFFER_LENGTH];
+        ServerCommandEx(status, sizeof(status), "status");
+        PrintToConsoleAll(status);
+    }
 }
 
 public void OnClientPutInServer(int client)

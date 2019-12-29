@@ -1,4 +1,4 @@
-#define PLUGIN_VERSION "1.14"
+#define PLUGIN_VERSION "1.15"
 #define UPDATE_URL     "https://raw.githubusercontent.com/jackharpr/hl2dm-xms/master/addons/sourcemod/xms_jm.upd"
 
 public Plugin myinfo=
@@ -6,7 +6,7 @@ public Plugin myinfo=
     name        = "XMS - Gamemode: jm",
     version     = PLUGIN_VERSION,
     description = "Jump Map gamemode features",
-    author      = "harper",
+    author      = "harper <www.hl2dm.pro>",
     url         = "www.hl2dm.pro"
 };
 
@@ -20,7 +20,7 @@ public Plugin myinfo=
  #include <updater>
 #define REQUIRE_PLUGIN
 
-//#pragma newdecls required
+#pragma newdecls required
  #include <hl2dm-xms>
  
 /******************************************************************/
@@ -68,16 +68,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
         {
             SetEntPropFloat(client, Prop_Data, "m_flSuitPowerLoad", 0.0);
             SetEntProp(client, Prop_Send, "m_bitsActiveDevices", bits & ~BITS_SPRINT);
-        }
-        
-        if(!IsClientObserver(client))
-        {
-            if(buttons & IN_JUMP)
-            {
-                // TODO auto jump
-            }
-        }
-                
+        }       
     }
     
     return Plugin_Continue;

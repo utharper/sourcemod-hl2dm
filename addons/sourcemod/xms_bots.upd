@@ -4,10 +4,10 @@
 	{
 		"Version"
 		{
-			"Latest"	"1.14"
+			"Latest"	"1.15"
 		}
 		
-		"Notes"	"Welcome bot for default mode"
+		"Notes"	"Version bump"
 	}
 	
 	"Files"
