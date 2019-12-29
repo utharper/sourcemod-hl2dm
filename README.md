@@ -1,6 +1,6 @@
-XMS (eXtended Match System) is a set of SourceMod plugins for competitive HL2DM servers, originally inspired by the *PMS* pack from HL2DM.net but created from scratch with many more features and game fixes, and support for additional gamemodes. XMS is designed to be modular, such that you could (mostly) run any combination of these plugins if you really wanted to - only `xms.smx` is required - but this is intended to be a complete match server package.
+XMS (eXtended Match System) is a set of SourceMod plugins for competitive HL2DM servers, originally inspired by the *PMS* pack from HL2DM.net but created from scratch with many more features and game fixes, and support for additional gamemodes. You can easily define your own custom gamemodes, but the default config contains **dm**, **tdm**, **jm** (Jump Maps) and **lgdm** (Low-Grav).
 
-You can easily define your own custom gamemodes, but the default config contains **dm**, **tdm**, **jm** (Jump Maps) and **lgdm** (Low-Grav).
+XMS is designed to be modular, such that you could (mostly) run any combination of these plugins if you really wanted to - only `xms.smx` is required - but this is intended to be a complete match server package. `xms_exfov.smx` is standalone and does not require XMS to be running on your server.
 
 You can currently see this system in use on:
 - Australian Deathmatch (server.hl2dm.pro:27015)
@@ -26,25 +26,16 @@ After verifying that things are working, you should go through `addons/sourcemod
 
 Here is an incomplete list of the features of each plugin:
 
-xms.smx
+Base plugin (xms.smx)
 ---
 *Requires [SteamTools](https://builds.limetech.io/?p=steamtools)*
 - Natives/forwards for other plugins
 - Reverts to the default gamemode and default mapcycle when the server is empty (handy to attract newbies who use the basic server browser and will usually connect to default map servers)
 - Sets the game description (Game tab in server browser) to current mode.
-- Optional chat welcome message
-
-Client menu (xms_menu.smx)
----
-Provides a simple menu which automatically opens and stays open. This allows players to quickly press ESC and access most functionality without having to type in commands:
-
-![menu](https://i.imgur.com/sJyEiJd.png)
-
-Players need to set `cl_showpluginmessages 1` for the menu to be visible (in common with all Sourcemod menus in HL2DM, after a game update a few years ago). If they have not set this, a warning message will be displayed in their chat advising them to do so.
 
 Client commands (xms_commands.smx)
 ---
-**sm_run** `<gamemode>` `<map>`
+**!run** `<gamemode>` `<map>`
 
 Change to the specified map and/or gamemode. eg: `!run tdm`, `!run tdm lockdown`, `!run lockdown`.
 
@@ -53,29 +44,29 @@ For the map query, first a list of predefined map abbreviations (in xms.cfg) is 
 
 ![sm_run](https://i.imgur.com/TJzFJ85.png)
 
-**sm_start**
+**!start**
 
 Begins a countdown to start a competitive match. Teams are locked during a match: players can't switch teams, and spectators can't join. In the default configuration, matches are only available on the `dm` and `tdm` modes.
 
-**sm_stop**
+**!stop**
 
 Brings a match to a premature end. The match demo will be discarded.
 
-**sm_list**
+**!list**
 
 Displays a list of available maps on the server. By default, it will show maps from the current mapcycle (which is gamemode-specific).
 This can be overriden to show maps for another gamemode, eg *!list jm* will show all maps from mapcycle_jm.txt
 Players can also use *!list all* to display every map on the server.
 
-**sm_coinflip**
+**!coinflip**
 
 Randomly returns heads or tails. Useful for determining who gets first map choice, etc.
 
-**sm_profile** `<player name>`
+**!profile** `<player name>`
 
 Opens the player's Steam profile in a MOTD window.
 
-**sm_forcespec** `<player name>`
+**!forcespec** `<player name>`
 
 *Requires Generic Admin*
 
@@ -85,6 +76,15 @@ Moves the specified player to spectators. Useful if someone is AFK and blocking 
 - Unregistered backwards compatibility for PMS commands (cm, tp, cf) and the #.# command trigger
 - Overrides basetriggers to fix the output of 'say timeleft' (which doesn't reset with mp_restartgame). Also intercepts the 'nextmap' and 'ff' triggers for style consistency.
 - Converts **all** commands and arguments to lower-case, removing case sensitivity which causes frustration to players and is a poor design choice IMO. This could theoretically break other plugins if they expect uppercase arguments.
+
+Client menu (xms_menu.smx)
+---
+*Requires xms_commands*
+Provides a simple menu which automatically opens and stays open. This allows players to quickly press ESC and access most functionality without having to type in commands:
+
+![menu](https://i.imgur.com/sJyEiJd.png)
+
+Players need to set `cl_showpluginmessages 1` for the menu to be visible (in common with all Sourcemod menus in HL2DM, after a game update a few years ago). If they have not set this, a warning message will be displayed in their chat advising them to do so.
 
 Game Fixes & Enhancements (xms_fixes.smx)
 ---
@@ -96,6 +96,7 @@ Game Fixes & Enhancements (xms_fixes.smx)
 - Makes players default to the police model if they are on Team Combine (no more bright white combine models)
 - Stops clients from activating the (broken) spectator menu
 - Disables spectator sprinting
+- Removes the (pointless) alternative-third-person spec mode, now there is only one 3rd person view.
 - Fixes the 1 health bug when spectating players (now the health value updates as expected)
 - Fixes prop gravity (without this fix, props retain the gravity from the previous map)
 - Fixes mp_falldamage not having any affect
@@ -110,7 +111,7 @@ Sounds (xms_sounds.smx)
 ---
 - Plays a short sound on player connect/disconnect (except during a match)
 - Plays one of several HL2/HL1 music tracks during mp_chattime, fading out as the map changes.
-- Fully sv_pure 2 compatible (game sounds only)
+- Fully sv_pure compatible (original game sounds only)
 
 HUD (xms_hud.smx)
 ---
@@ -149,6 +150,14 @@ Simply reports all match results to a Discord server, optionally with a link to 
 A link to download the demo will be shown if you have enabled demo uploading in the config, and set your URL in there.
 
 ![Discord Match Report](https://i.imgur.com/ngaHGzn.png)
+
+Extended FOV (xms_exfov.smx)
+---
+**This plugin is standalone once compiled, you don't need to be running XMS.**
+
+Removes the field-of-view limit (by default the game limits it to 90), allowing players to set it to any value between 90 and 120. Players can set their FOV by typing `fov <value>` in console, or via the **!fov** command.
+
+The FOV temporarily (and seamlessly) resets to 90 when players use zoom functions (such as toggle_zoom and crossbow secondary attack), to overcome glitchy behaviour as seen in previous FOV plugins.
 
 Future improvements
 ---
