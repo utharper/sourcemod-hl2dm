@@ -1,0 +1,13 @@
+real2ctf_atomicgarden5
+real2ctf_atrium2
+real2ctf_flare2
+jctf_halls3_tox_b3
+jctf_halls3_tox_v2a
+jctf_lockdown_mod2_beta2
+ctf_mini_fort_b5_3
+jctf_overwatch2_tox_b2
+ctf_powerhouse_tox_b2
+jctf_powerhouse_tox_v1b
+real2ctf_prisonriot2
+ctf_runoff_tox_v2a
+ctf_spider_b1

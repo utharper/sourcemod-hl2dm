@@ -1,0 +1,16 @@
+"Updater"
+{
+	"Information"
+	{
+		"Version"
+		{
+			"Latest"	"1.2"
+		}
+	}
+	
+	"Files"
+	{
+		"Plugin"	"Path_SM/plugins/xms_discord.smx"
+		"Source"	"Path_SM/scripting/xms_discord.sp"
+	}
+}

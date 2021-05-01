@@ -1,0 +1,13 @@
+"Phrases"
+{
+	"xfov_fail"
+	{
+		"#format"	"{1:i},{2:i}"
+		"en"		"{E}[!] {I}FOV must be a value between {N}{1} {I}and {N}{2}{I}."
+	}
+	"xfov_success"
+	{
+		"#format"	"{1:i}"
+		"en"		"{N}your field-of-view has been set to {H}{1}{N}."
+	}
+}

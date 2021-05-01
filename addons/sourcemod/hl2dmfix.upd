@@ -1,0 +1,16 @@
+"Updater"
+{
+	"Information"
+	{
+		"Version"
+		{
+			"Latest"	"1.1"
+		}
+	}
+	
+	"Files"
+	{
+		"Plugin"	"Path_SM/plugins/hl2dmfix.smx"
+		"Source"	"Path_SM/scripting/hl2dmfix.sp"
+	}
+}

@@ -1,0 +1,16 @@
+"Updater"
+{
+	"Information"
+	{
+		"Version"
+		{
+			"Latest"	"1.2"
+		}
+	}
+	
+	"Files"
+	{
+		"Plugin"	"Path_SM/plugins/gameme_hud.smx"
+		"Source"	"Path_SM/scripting/gameme_hud.sp"
+	}
+}

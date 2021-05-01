@@ -1,0 +1,16 @@
+"Updater"
+{
+	"Information"
+	{
+		"Version"
+		{
+			"Latest"	"1.1"
+		}
+	}
+	
+	"Files"
+	{
+		"Plugin"	"Path_SM/plugins/xms_bots.smx"
+		"Source"	"Path_SM/scripting/xms_bots.sp"
+	}
+}

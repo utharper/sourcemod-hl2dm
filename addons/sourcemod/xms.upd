@@ -1,0 +1,23 @@
+"Updater"
+{
+	"Information"
+	{
+		"Version"
+		{
+			"Latest"	"1.8"
+		}
+	}
+	
+	"Files"
+	{
+		"Plugin"	"Path_SM/plugins/xms.smx"
+		"Plugin"	"Path_SM/translations/xms.phrases.txt"
+		
+		"Plugin"	"Path_Mod/sound/xms/gg.mp3"
+		"Plugin"	"Path_Mod/sound/xms/votecall.wav"
+		"Plugin"	"Path_Mod/sound/xms/votefail.wav"
+		"Plugin"	"Path_Mod/sound/xms/voteaccept.wav"
+		
+		"Source"	"Path_SM/scripting/xms.sp"
+	}
+}

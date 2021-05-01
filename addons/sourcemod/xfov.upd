@@ -1,0 +1,18 @@
+"Updater"
+{
+	"Information"
+	{
+		"Version"
+		{
+			"Latest"	"2.0"
+		}
+	}
+	
+	"Files"
+	{
+		"Plugin"	"Path_SM/plugins/xfov.smx"
+		"Plugin"	"Path_SM/translations/xfov.phrases.txt"
+
+		"Source"	"Path_SM/scripting/xfov.sp"
+	}
+}

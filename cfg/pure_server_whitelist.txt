@@ -1,0 +1,21 @@
+whitelist
+{
+	// Allow custom weapon models
+	models\weapons\...				any
+	materials\models\weapons\...	any
+
+	// Allow custom spray decals.
+	materials\temp\...          	any
+	materials\vgui\logos\...    	any
+	materials\vgui\logos\ui\... 	any
+	
+	// Allow xms resources
+	materials\decals\custom\xms\...	any
+	sound\xms\...					any
+	
+	// Fix snd_restart crashing
+	scripts\soundmixers.txt         any
+
+	// CTF Overlay fix
+	materials\j_ctf\...				any
+}
