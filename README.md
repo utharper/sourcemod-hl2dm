@@ -25,9 +25,9 @@ The FOV temporarily resets to 90 when players use zoom functions (such as toggle
 ### Convars
 You can configure these in `cfg/sourcemod/plugins.xfov.cfg` after first load.
 
-* `hl2dm_xfov_default` - Default FOV for new players. 90 by default.
-* `hl2dm_xfov_minimum` - Minimum FOV allowed on server. 90 by default.
-* `hl2dm_xfov_max` - Maximum FOV allowed on server. 110 by default.
+* `xfov_defaultfov` - Default FOV for new players. 90 by default.
+* `xfov_minfov` - Minimum FOV allowed on server. 90 by default.
+* `xfov_maxfov` - Maximum FOV allowed on server. 110 by default.
 
 ### Download
 * [Download zip](https://github.com/utharper/sourcemod-hl2dm/releases/download/latest/xfov.zip)
