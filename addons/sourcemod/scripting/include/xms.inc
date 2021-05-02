@@ -1,10 +1,12 @@
 #if !defined _jhl2dm_included
     #error "jhl2dm required"
     #endinput
-    #if defined _xms_included
-        #endinput
-    #endif
 #endif
+
+#if defined _xms_included
+    #endinput
+#endif
+
 #define _xms_included
 
 /**************************************************************************************************/
