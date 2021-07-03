@@ -1249,7 +1249,9 @@ public Action ListenCmd_Team(int client, const char[] command, int args)
 // basecommands overrides
 public Action Listen_Basecommands(int client, const char[] command, int args)
 {
-    Basecommands_Override(client, command, false);
+    if(IsClientConnected(client) && IsClientInGame(client)) {
+        Basecommands_Override(client, command, false);
+    }
     return Plugin_Stop; // doesn't work for timeleft, blocked in TextMsg
 }
 
@@ -1957,7 +1959,9 @@ void ForceTeamSwitch(int client, int team)
 
 public Action T_JoinOptimalTeam(Handle timer, int client)
 {
-    ForceTeamSwitch(client, GetOptimalTeam());
+    if(IsClientConnected(client) && IsClientInGame(client)) {
+        ForceTeamSwitch(client, GetOptimalTeam());
+    }
 }
 
 void InvertTeams()
