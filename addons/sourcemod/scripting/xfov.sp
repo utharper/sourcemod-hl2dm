@@ -1,3 +1,5 @@
+#pragma semicolon 1
+
 #define PLUGIN_VERSION  "2.0"
 #define PLUGIN_URL      "www.hl2dm.community"
 #define PLUGIN_UPDATE   "http://raw.githubusercontent.com/utharper/sourcemod-hl2dm/master/addons/sourcemod/extended_fov.upd"
@@ -10,10 +12,8 @@ public Plugin myinfo = {
     url               = PLUGIN_URL
 };
 
-/**************************************************************************************************/
+/**************************************************************/
 
-#pragma semicolon 1
-#pragma newdecls optional
 #include <sourcemod>
 #include <clientprefs>
 #include <morecolors>
@@ -21,157 +21,165 @@ public Plugin myinfo = {
 #undef REQUIRE_PLUGIN
 #include <updater>
 
+#define REQUIRE_PLUGIN
 #pragma newdecls required
 #include <jhl2dm>
 
-/**************************************************************************************************/
+/**************************************************************/
 
-ConVar ghConVarMin;
-ConVar ghConVarDefault;
-ConVar ghConVarMax;
+enum(+=1) {
+    ZOOM_NONE, ZOOM_XBOW, ZOOM_SUIT, ZOOM_TOGL, FIRSTPERSON
+}
+
+/**************************************************************/
+
+int    giClientZoom[MAXPLAYERS + 1];
+
 Handle ghCookie;
 
-int giClientZoom[MAXPLAYERS + 1];
-enum(+=1) { ZOOM_NONE, ZOOM_XBOW, ZOOM_SUIT, ZOOM_TOGL, FIRSTPERSON }
+ConVar ghConVarMin,
+       ghConVarDefault,
+       ghConVarMax;
 
-/**************************************************************************************************/
+/**************************************************************/
 
 public void OnPluginStart()
 {
     LoadTranslations("xfov.phrases.txt");
-    
+
     ghCookie = RegClientCookie("hl2dm_fov", "Field-of-view value", CookieAccess_Public);
-    ghConVarMin = CreateConVar("xfov_minfov", "90", "Minimum FOV allowed on server");
+
+    ghConVarMin     = CreateConVar("xfov_minfov", "90", "Minimum FOV allowed on server");
     ghConVarDefault = CreateConVar("xfov_defaultfov", "90", "Default FOV of players on server");
-    ghConVarMax = CreateConVar("xfov_maxfov", "110", "Maximum FOV allowed on server");
-    CreateConVar("xfov_version", PLUGIN_VERSION, _, FCVAR_NOTIFY);
-    
+    ghConVarMax     = CreateConVar("xfov_maxfov", "110", "Maximum FOV allowed on server");
     AutoExecConfig();
-    
+
+    CreateConVar("xfov_version", PLUGIN_VERSION, _, FCVAR_NOTIFY);
+
     RegConsoleCmd("sm_fov", Command_FOV, "Set your desired field-of-view value");
     AddCommandListener(OnClientChangeFOV, "fov");
     AddCommandListener(OnClientToggleZoom, "toggle_zoom");
-    
-    MC_AddColor("N", COLOR_NORMAL);
-    MC_AddColor("I", COLOR_INFORMATION);
-    MC_AddColor("H", COLOR_HIGHLIGHT);
-    MC_AddColor("E", COLOR_ERROR);
-    
-    if(LibraryExists("updater")) {
+
+    RegisterColors();
+
+    if (LibraryExists("updater")) {
         Updater_AddPlugin(PLUGIN_UPDATE);
     }
 }
 
-public void OnLibraryAdded(const char[] name)
+public void OnLibraryAdded(const char[] sName)
 {
-    if(StrEqual(name, "updater")) {
+    if (StrEqual(sName, "updater")) {
         Updater_AddPlugin(PLUGIN_UPDATE);
     }
 }
 
-public Action Command_FOV(int client, int args)
+public Action Command_FOV(int iClient, int iArgs)
 {
-    RequestFOV(client, GetCmdArgInt(1));
+    RequestFOV(iClient, GetCmdArgInt(1));
 }
 
-public Action OnClientChangeFOV(int client, const char[] command, int args)
+public Action OnClientChangeFOV(int iClient, const char[] sCommand, int iArgs)
 {
-    RequestFOV(client, GetCmdArgInt(1));
+    RequestFOV(iClient, GetCmdArgInt(1));
 }
 
-void RequestFOV(int client, int fov)
+void RequestFOV(int iClient, int iFov)
 {
-    if(fov < GetConVarInt(ghConVarMin) || fov > GetConVarInt(ghConVarMax)) {
-        MC_ReplyToCommand(client, "%t", "xfov_fail", GetConVarInt(ghConVarMin), GetConVarInt(ghConVarMax));
+    if (iFov < GetConVarInt(ghConVarMin) || iFov > GetConVarInt(ghConVarMax)) {
+        MC_ReplyToCommand(iClient, "%t", "xfov_fail", GetConVarInt(ghConVarMin), GetConVarInt(ghConVarMax));
     }
-    else {
-        char sFov[4];
-        IntToString(fov, sFov, sizeof(sFov));
-        SetClientCookie(client, ghCookie, sFov);
-        MC_ReplyToCommand(client, "%t", "xfov_success", fov);
-    }
-}
-
-public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon)
-{
-    if(AreClientCookiesCached(client))
+    else
     {
-        static int lastbuttons[MAXPLAYERS + 1];
-        
-        int fov = GetClientCookieInt(client, ghCookie);
-        
-        if(fov < GetConVarInt(ghConVarMin) || fov > GetConVarInt(ghConVarMax)) {
+        char sFov[4];
+
+        IntToString(iFov, sFov, sizeof(sFov));
+        SetClientCookie(iClient, ghCookie, sFov);
+        MC_ReplyToCommand(iClient, "%t", "xfov_success", iFov);
+    }
+}
+
+public Action OnPlayerRunCmd(int iClient, int &iButtons, int &iImpulse, float fVel[3], float fAngles[3], int &iWeapon)
+{
+    if (AreClientCookiesCached(iClient))
+    {
+        static int iLastButtons[MAXPLAYERS + 1];
+
+        int iFov = GetClientCookieInt(iClient, ghCookie);
+
+        if (iFov < GetConVarInt(ghConVarMin) || iFov > GetConVarInt(ghConVarMax)) {
             // fov is out of bounds, reset
-            fov = GetConVarInt(ghConVarDefault);
+            iFov = GetConVarInt(ghConVarDefault);
         }
-        
-        if(!IsClientObserver(client) && IsPlayerAlive(client))
+
+        if (!IsClientObserver(iClient) && IsPlayerAlive(iClient))
         {
             char sWeapon[32];
-            
-            GetClientWeapon(client, sWeapon, sizeof(sWeapon));
-            
-            if(giClientZoom[client] == ZOOM_XBOW || giClientZoom[client] == ZOOM_TOGL) {
+
+            GetClientWeapon(iClient, sWeapon, sizeof(sWeapon));
+
+            if (giClientZoom[iClient] == ZOOM_XBOW || giClientZoom[iClient] == ZOOM_TOGL) {
                 // block suit zoom while xbow/toggle-zoomed
-                buttons &= ~IN_ZOOM;
+                iButtons &= ~IN_ZOOM;
             }
-            
-            if(giClientZoom[client] == ZOOM_TOGL)
+
+            if (giClientZoom[iClient] == ZOOM_TOGL)
             {
-                if(StrEqual(sWeapon, "weapon_crossbow")) {
+                if (StrEqual(sWeapon, "weapon_crossbow")) {
                     // block xbow zoom while toggle zoomed
-                    buttons &= ~IN_ATTACK2;
+                    iButtons &= ~IN_ATTACK2;
                 }
-                
-                SetEntProp(client, Prop_Send, "m_iDefaultFOV", 90);
+
+                SetEntProp(iClient, Prop_Send, "m_iDefaultFOV", 90);
                 return Plugin_Continue;
             }
-            
-            if(buttons & IN_ZOOM)
+
+            if (iButtons & IN_ZOOM)
             {
-                if(!(lastbuttons[client] & IN_ZOOM) && !giClientZoom[client]) {
+                if (!(iLastButtons[iClient] & IN_ZOOM) && !giClientZoom[iClient]) {
                     // suit zooming
-                    giClientZoom[client] = ZOOM_SUIT;
+                    giClientZoom[iClient] = ZOOM_SUIT;
                 }
             }
-            else if(giClientZoom[client] == ZOOM_SUIT) {
+            else if (giClientZoom[iClient] == ZOOM_SUIT) {
                 // no longer suit zooming
-                giClientZoom[client] = ZOOM_NONE;
+                giClientZoom[iClient] = ZOOM_NONE;
             }
-            
-            if((StrEqual(sWeapon, "weapon_crossbow") && (buttons & IN_ATTACK2) && !(lastbuttons[client] & IN_ATTACK2)) || (!StrEqual(sWeapon, "weapon_crossbow") && giClientZoom[client] == ZOOM_XBOW))
+
+            if ((StrEqual(sWeapon, "weapon_crossbow") && (iButtons & IN_ATTACK2) && !(iLastButtons[iClient] & IN_ATTACK2)) || (!StrEqual(sWeapon, "weapon_crossbow") && giClientZoom[iClient] == ZOOM_XBOW))
             {
                 // xbow zoom cycle
-                giClientZoom[client] = (giClientZoom[client] == ZOOM_XBOW ? ZOOM_NONE : ZOOM_XBOW);
+                giClientZoom[iClient] = (giClientZoom[iClient] == ZOOM_XBOW ? ZOOM_NONE : ZOOM_XBOW);
             }
         }
         else {
-            giClientZoom[client] = ZOOM_NONE;
+            giClientZoom[iClient] = ZOOM_NONE;
         }
-        
+
         // set values
-        if(giClientZoom[client] || (IsClientObserver(client) && GetEntProp(client, Prop_Send, "m_iObserverMode") == FIRSTPERSON)) {
-            SetEntProp(client, Prop_Send, "m_iDefaultFOV", 90);
+        if (giClientZoom[iClient] || (IsClientObserver(iClient) && GetEntProp(iClient, Prop_Send, "m_iObserverMode") == FIRSTPERSON)) {
+            SetEntProp(iClient, Prop_Send, "m_iDefaultFOV", 90);
         }
-        else if(giClientZoom[client] == ZOOM_NONE) {
-            SetEntProp(client, Prop_Send, "m_iFOV", fov);
-            SetEntProp(client, Prop_Send, "m_iDefaultFOV", fov);
+        else if (giClientZoom[iClient] == ZOOM_NONE) {
+            SetEntProp(iClient, Prop_Send, "m_iFOV", iFov);
+            SetEntProp(iClient, Prop_Send, "m_iDefaultFOV", iFov);
         }
-        
-        lastbuttons[client] = buttons;
+
+        iLastButtons[iClient] = iButtons;
     }
-    
+
     return Plugin_Continue;
 }
 
-public Action OnClientToggleZoom(int client, const char[] command, int args)
+public Action OnClientToggleZoom(int iClient, const char[] sCommand, int iArgs)
 {
-    if(giClientZoom[client] != ZOOM_NONE) {
-        if(giClientZoom[client] == ZOOM_TOGL || giClientZoom[client] == ZOOM_SUIT) {
-            giClientZoom[client] = ZOOM_NONE;
+    if (giClientZoom[iClient] != ZOOM_NONE)
+    {
+        if (giClientZoom[iClient] == ZOOM_TOGL || giClientZoom[iClient] == ZOOM_SUIT) {
+            giClientZoom[iClient] = ZOOM_NONE;
         }
     }
     else {
-        giClientZoom[client] = ZOOM_TOGL;
+        giClientZoom[iClient] = ZOOM_TOGL;
     }
 }
