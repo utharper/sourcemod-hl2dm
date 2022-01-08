@@ -1,0 +1,8 @@
+"Phrases"
+{
+    "gameme_hud_display"
+    {
+        "#format"       "{1:s},{2:i},{3:i},{4:s},{5:i},{6:i},{7:i},{8:i},{9:i},{10:i},{11:i},{12:i},{13:i},{14:i}"
+        "en"            "{1}\n rank {2} of {3}\n time: {4}\n kills: {5} (+{6})\n deaths: {7} (+{8})\n headshots: {9} (+{10})\n suicides: {11} (+{12})\n avg accuracy: {13}%%%%\n best killspree: {14}"
+    }
+}

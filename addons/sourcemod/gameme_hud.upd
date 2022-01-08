@@ -1,16 +1,19 @@
 "Updater"
 {
-	"Information"
-	{
-		"Version"
-		{
-			"Latest"	"1.2"
-		}
-	}
-	
-	"Files"
-	{
-		"Plugin"	"Path_SM/plugins/gameme_hud.smx"
-		"Source"	"Path_SM/scripting/gameme_hud.sp"
-	}
+    "Information"
+    {
+        "Version"
+        {
+            "Latest"    "1.3"
+        }
+    }
+
+    "Files"
+    {
+        "Plugin"    "Path_SM/plugins/gameme_hud.smx"
+        "Plugin"    "Path_SM/translations/gameme_hud.phrases.txt"
+
+        "Source"    "Path_SM/scripting/gameme_hud.sp"
+        "Source"    "Path_SM/scripting/include/gameme_hud.inc"
+    }
 }
