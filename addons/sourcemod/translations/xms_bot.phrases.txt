@@ -1,0 +1,168 @@
+"Phrases"
+{
+    "xms_bot_greet1"
+    {
+        "en"        "Hey there. I'm a bot. {green}(beep)"
+    }
+    "xms_bot_greet2"
+    {
+        "en"        "howdy, i'm a bot btw. {green}(beep)"
+    }
+    "xms_bot_greet3"
+    {
+        "en"        "hi there.. im a bot {green}(beep)"
+    }
+
+    "xms_bot_play1"
+    {
+        "en"        "i'll play with you, til another human arrives =)"
+    }
+    "xms_bot_play2"
+    {
+        "en"        "you seemed lonely so i came here to play with you :D"
+    }
+    "xms_bot_play3"
+    {
+        "en"        "Let's fight!"
+    }
+
+    "xms_bot_knownmap1"
+    {
+        "en"        "nice, i'm pretty good on this map."
+    }
+    "xms_bot_knownmap2"
+    {
+        "en"        "haha, i love this map. Prepare to lose!"
+    }
+    "xms_bot_knownmap3"
+    {
+        "en"        "GLHF! =)"
+    }
+
+    "xms_bot_unknownmap1"
+    {
+        "en"        "Hmm.. i don't know this map very well =("
+    }
+    "xms_bot_unknownmap2"
+    {
+        "en"        "i'm still learning this map, hopefully i dont get lost lol"
+    }
+    "xms_bot_unknownmap3"
+    {
+        "en"        "Is this map new? Looks cool"
+    }
+
+    "xms_bot_taunt1"
+    {
+        "en"        "good fight"
+    }
+    "xms_bot_taunt2"
+    {
+        "en"        "too easy ;D"
+    }
+    "xms_bot_taunt3"
+    {
+        "en"        "That was a close one :)"
+    }
+    "xms_bot_taunt4"
+    {
+        "en"        "ezpz"
+    }
+    "xms_bot_taunt5"
+    {
+        "en"        "haha"
+    }
+    "xms_bot_taunt6"
+    {
+        "en"        "Boom!"
+    }
+
+    "xms_bot_death1"
+    {
+        "en"        "Nice shot."
+    }
+    "xms_bot_death2"
+    {
+        "en"        "ouch"
+    }
+    "xms_bot_death3"
+    {
+        "en"        "For a human, you're pretty good at this."
+    }
+    "xms_bot_death4"
+    {
+        "en"        "I will have my revenge..."
+    }
+    "xms_bot_death5"
+    {
+        "en"        "ffs, where are all the health packs?"
+    }
+    "xms_bot_death6"
+    {
+        "en"        "nice 1 :)"
+    }
+
+    "xms_bot_suicide1"
+    {
+        "en"        "oops"
+    }
+    "xms_bot_suicide2"
+    {
+        "en"        "damn"
+    }
+    "xms_bot_suicide3"
+    {
+        "en"        "lol"
+    }
+
+    "xms_bot_response1"
+    {
+        "en"        "?"
+    }
+    "xms_bot_response2"
+    {
+        "en"        "huh?"
+    }
+    "xms_bot_response3"
+    {
+        "en"        "Sorry, I'm too busy playing to talk."
+    }
+    "xms_bot_response4"
+    {
+        "en"        "Less talk, more play!"
+    }
+    "xms_bot_response5"
+    {
+        "en"        "Let's be friends."
+    }
+    "xms_bot_response6"
+    {
+        "en"        "Be nice to bots. We're your future overlords :P"
+    }
+    "xms_bot_response7"
+    {
+        "en"        "you seem pretty cool for a human :)"
+    }
+
+    "xms_bot_end1"
+    {
+        "en"        "GG"
+    }
+    "xms_bot_end2"
+    {
+        "en"        "gg!"
+    }
+
+    "xms_bot_quit1"
+    {
+        "en"        "gg, bbl"
+    }
+    "xms_bot_quit2"
+    {
+        "en"        "I'm gonna take a break."
+    }
+    "xms_bot_quit3"
+    {
+        "en"        "Bye for now :)"
+    }
+}

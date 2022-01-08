@@ -1,16 +1,18 @@
 "Updater"
 {
-	"Information"
-	{
-		"Version"
-		{
-			"Latest"	"1.1"
-		}
-	}
-	
-	"Files"
-	{
-		"Plugin"	"Path_SM/plugins/xms_bots.smx"
-		"Source"	"Path_SM/scripting/xms_bots.sp"
-	}
+    "Information"
+    {
+        "Version"
+        {
+            "Latest"    "1.2"
+        }
+    }
+
+    "Files"
+    {
+        "Plugin"    "Path_SM/plugins/xms_bots.smx"
+        "Plugin"    "Path_SM/translations/xms_bot.phrases.txt"
+
+        "Source"    "Path_SM/scripting/xms_bots.sp"
+    }
 }
