@@ -1,4 +1,6 @@
-#define PLUGIN_VERSION  "1.1"
+#pragma semicolon 1
+
+#define PLUGIN_VERSION  "1.2"
 #define PLUGIN_URL      "www.hl2dm.community"
 #define PLUGIN_UPDATE   "http://raw.githubusercontent.com/utharper/sourcemod-hl2dm/master/addons/sourcemod/hl2dmfix.upd"
 
@@ -10,10 +12,8 @@ public Plugin myinfo = {
     url               = PLUGIN_URL
 };
 
-/**************************************************************************************************/
+/**************************************************************/
 
-#pragma semicolon 1
-#pragma newdecls optional
 #include <sourcemod>
 #include <vphysics>
 #include <sdkhooks>
@@ -21,310 +21,327 @@ public Plugin myinfo = {
 
 #undef REQUIRE_PLUGIN
 #include <updater>
-#define REQUIRE_PLUGIN
 
 #pragma newdecls required
 #include <jhl2dm>
 
-/**************************************************************************************************/
+/**************************************************************/
 
-ConVar ghConVarGravity;
-ConVar ghConVarFalldamage;
-ConVar ghConVarTeamplay;
-StringMap gsmKills, gsmDeaths, gsmTeams;
-bool gbRoundEnd;
-bool gbMOTDExists;
-bool gbTeamplay;
+bool      gbRoundEnd,
+          gbMOTDExists,
+          gbTeamplay,
+          gbModTags;
 
-ConVar ghConVarTags;
-bool gbModTags;
+ConVar    ghConVarGravity,
+          ghConVarFalldamage,
+          ghConVarTeamplay,
+          ghConVarTags;
 
-/**************************************************************************************************/
+StringMap gmKills,
+          gmDeaths,
+          gmTeams;
+
+/**************************************************************/
+
+public APLRes AskPluginLoad2(Handle hPlugin, bool bLate, char[] sError, int iLen)
+{
+    RegPluginLibrary("hl2dmfix");
+}
 
 public void OnPluginStart()
 {
-    gsmKills = CreateTrie();
-    gsmDeaths = CreateTrie();
-    gsmTeams = CreateTrie();
-    
+    gmKills  = CreateTrie();
+    gmDeaths = CreateTrie();
+    gmTeams  = CreateTrie();
+
     ghConVarFalldamage = FindConVar("mp_falldamage");
-    ghConVarTeamplay = FindConVar("mp_teamplay");
-    
-    ghConVarGravity = FindConVar("sv_gravity");
+    ghConVarTeamplay   = FindConVar("mp_teamplay");
+    ghConVarGravity    = FindConVar("sv_gravity");
+    ghConVarTags       = FindConVar("sv_tags");
+
     ghConVarGravity.AddChangeHook(OnGravityChanged);
-    
-    ghConVarTags = FindConVar("sv_tags");
     ghConVarTags.AddChangeHook(OnTagsChanged);
-    
-    gbMOTDExists = (FileExists("cfg/motd.txt") && FileSize("cfg/motd.txt") > 2);
-    
+
     HookEvent("server_cvar", Event_GameMessage, EventHookMode_Pre);
-    HookUserMessage(GetUserMessageId("TextMsg"), UserMsg_TextMsg, true);
+    HookUserMessage(GetUserMessageId("TextMsg"),  UserMsg_TextMsg,  true);
     HookUserMessage(GetUserMessageId("VGUIMenu"), UserMsg_VGUIMenu, false);
-    
+
+    if (LibraryExists("updater")) {
+        Updater_AddPlugin(PLUGIN_UPDATE);
+    }
+
     CreateConVar("hl2dmfix_version", PLUGIN_VERSION, _, FCVAR_NOTIFY);
     AddPluginTag();
-    
-    if(LibraryExists("updater")) {
+}
+
+public void OnLibraryAdded(const char[] sName)
+{
+    if (StrEqual(sName, "updater")) {
         Updater_AddPlugin(PLUGIN_UPDATE);
     }
 }
 
-public void OnLibraryAdded(const char[] name)
+public void OnTagsChanged(Handle hConvar, const char[] sOldValue, const char[] sNewValue)
 {
-    if(StrEqual(name, "updater")) {
-        Updater_AddPlugin(PLUGIN_UPDATE);
-    }
-}
-
-public void OnTagsChanged(Handle convar, const char[] oldValue, const char[] newValue)
-{
-    if(!gbModTags) {
+    if (!gbModTags) {
         AddPluginTag();
     }
 }
 
 void AddPluginTag()
 {
-    char tags[128];
-    ghConVarTags.GetString(tags, sizeof(tags));
-  
-    if(StrContains(tags, "hl2dmfix") == -1)
+    char sTags[128];
+
+    ghConVarTags.GetString(sTags, sizeof(sTags));
+
+    if (StrContains(sTags, "hl2dmfix") == -1)
     {
-        StrCat(tags, sizeof(tags), tags[0] != 0 ? ",hl2dmfix" : "hl2dmfix");
+        StrCat(sTags, sizeof(sTags), sTags[0] != 0 ? ",hl2dmfix" : "hl2dmfix");
         gbModTags = true;
-        ghConVarTags.SetString(tags);
+        ghConVarTags.SetString(sTags);
         gbModTags = false;
     }
 }
 
-public Action OnClientSayCommand(int client, const char[] command, const char[] sArgs)
+public Action OnClientSayCommand(int iClient, const char[] sCommand, const char[] sArgs)
 {
-    char args[MAX_SAY_LENGTH];
-    bool loop;
-    
-    if(StrContains(sArgs, "#.#") == 0)
+    char sArgs2[MAX_SAY_LENGTH];
+    bool bLoop;
+
+    if (StrContains(sArgs, "#.#") == 0)
     {
         // Backwards compatibility for the old #.# command prefix
-        args[0] = '!';
-        strcopy(args[1], sizeof(args) - 1, sArgs[IsCharSpace(sArgs[3]) ? 4 : 3]);
-        loop = true;
+        sArgs2[0] = '!';
+        strcopy(sArgs2[1], sizeof(sArgs2) - 1, sArgs[IsCharSpace(sArgs[3]) ? 4 : 3]);
+        bLoop = true;
     }
     else {
-        strcopy(args, sizeof(args), sArgs);
+        strcopy(sArgs2, sizeof(sArgs2), sArgs);
     }
-    
-    if(StrContains(args, "!") == 0 || StrContains(args, "/") == 0)
+
+    if (StrContains(sArgs2, "!") == 0 || StrContains(sArgs2, "/") == 0)
     {
         // remove case sensitivity for *ALL* commands
-        for(int i = 1; i <= strlen(args); i++)
+        for (int i = 1; i <= strlen(sArgs2); i++)
         {
-            if(IsCharUpper(args[i])) {
-                String_ToLower(args, args, sizeof(args));
-                loop = true;
+            if (IsCharUpper(sArgs2[i]))
+            {
+                String_ToLower(sArgs2, sArgs2, sizeof(sArgs2));
+                bLoop = true;
                 break;
             }
-        }       
+        }
     }
-    
-    else if(!gbTeamplay && StrEqual(command, "say_team", false))
+
+    else if (!gbTeamplay && StrEqual(sCommand, "say_team", false))
     {
         // disable team chat in dm
-        loop = true;
+        bLoop = true;
     }
-    
-    if(loop) {
-        FakeClientCommandEx(client, "say %s", args);
+
+    if (bLoop) {
+        FakeClientCommandEx(iClient, "say %s", sArgs2);
         return Plugin_Stop;
     }
-    
+
     return Plugin_Continue;
 }
 
-public Action UserMsg_TextMsg(UserMsg msg_id, BfRead msg, const int[] players, int playersNum, bool reliable, bool init)
+public Action UserMsg_TextMsg(UserMsg msg, Handle hMsg, const int[] iPlayers, int iNumPlayers, bool bReliable, bool bInit)
 {
-    char message[70];
-    BfReadString(msg, message, sizeof(message), true);
-    
-    // block game chat spam
+    char sMessage[70];
 
-    if(StrContains(message, "more seconds before trying to switch") != -1 || StrContains(message, "Your player model is") != -1 || StrContains(message, "You are on team") != -1) {
+    BfReadString(hMsg, sMessage, sizeof(sMessage), true);
+    if (StrContains(sMessage, "more seconds before trying to switch") != -1 || StrContains(sMessage, "Your player model is") != -1 || StrContains(sMessage, "You are on team") != -1)
+    {
+        // block game chat spam
         return Plugin_Handled;
     }
-    
+
     return Plugin_Continue;
 }
 
 public void OnMapStart()
 {
-    gbTeamplay = ghConVarTeamplay.BoolValue;
-    gbRoundEnd = false;
+    gbMOTDExists = (FileExists("cfg/motd.txt") && FileSize("cfg/motd.txt") > 2);
+    gbTeamplay   = ghConVarTeamplay.BoolValue;
+    gbRoundEnd   = false;
+
     CreateTimer(0.1, T_CheckPlayerStates, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public void OnMapEnd()
 {
-    gsmKills.Clear();
-    gsmDeaths.Clear();
+    gmKills.Clear();
+    gmDeaths.Clear();
 }
 
-public Action Event_RoundStart(Handle event, const char[] name, bool noBroadcast)
+public Action Event_RoundStart(Handle hEvent, const char[] sEvent, bool bDontBroadcast)
 {
-    gsmTeams.Clear();
-    gsmKills.Clear();
-    gsmDeaths.Clear();
+    gmTeams.Clear();
+    gmKills.Clear();
+    gmDeaths.Clear();
 }
 
-public void OnClientPutInServer(int client)
-{   
-    if(!IsClientSourceTV(client))
+public void OnClientPutInServer(int iClient)
+{
+    if (!IsClientSourceTV(iClient))
     {
-        SDKHook(client, SDKHook_WeaponCanSwitchTo, Hook_WeaponCanSwitchTo);
-        SDKHook(client, SDKHook_OnTakeDamage, Hook_OnTakeDamage);
-        
-        if(!gbMOTDExists) {
+        SDKHook(iClient, SDKHook_WeaponCanSwitchTo, Hook_WeaponCanSwitchTo);
+        SDKHook(iClient, SDKHook_OnTakeDamage,      Hook_OnTakeDamage);
+
+        if (!gbMOTDExists)
+        {
             // disable showing the MOTD panel if there's nothing to show
-            CreateTimer(0.5, T_BlockConnectMOTD, client, TIMER_FLAG_NO_MAPCHANGE);
+            CreateTimer(0.5, T_BlockConnectMOTD, iClient, TIMER_FLAG_NO_MAPCHANGE);
         }
     }
 }
 
-public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon)
+public Action OnPlayerRunCmd(int iClient, int &iButtons, int &iImpulse, float fVel[3], float fAngles[3], int &iWeapon)
 {
-    if(!IsClientConnected(client) || !IsClientInGame(client) || IsFakeClient(client)) {
+    if (!IsClientConnected(iClient) || !IsClientInGame(iClient) || IsFakeClient(iClient)) {
         return Plugin_Continue;
     }
-    
-    if(IsClientObserver(client))
+
+    if (IsClientObserver(iClient))
     {
-        Handle ghMenu = StartMessageOne("VGUIMenu", client);
-        int specMode = GetEntProp(client, Prop_Send, "m_iObserverMode");
-        int specTarget = GetEntPropEnt(client, Prop_Send, "m_hObserverTarget");
-        
+        int    iMode   = GetEntProp(iClient, Prop_Send, "m_iObserverMode"),
+               iTarget = GetEntPropEnt(iClient, Prop_Send, "m_hObserverTarget");
+        Handle hMenu   = StartMessageOne("VGUIMenu", iClient);
+
         // disable broken spectator menu >
-        if(ghMenu != INVALID_HANDLE) {
-            BfWriteString(ghMenu, "specmenu");
-            BfWriteByte(ghMenu, 0);
+        if (hMenu != INVALID_HANDLE) {
+            BfWriteString(hMenu, "specmenu");
+            BfWriteByte(hMenu, 0);
             EndMessage();
         }
-        
+
         // force free-look where appropriate - this removes the extra (pointless) third person spec mode >
-        if(specMode == SPECMODE_ENEMYVIEW || specTarget <= 0 || !IsClientInGame(specTarget)) {
-            SetEntProp(client, Prop_Data, "m_iObserverMode", SPECMODE_FREELOOK);
+        if (iMode == SPECMODE_ENEMYVIEW || iTarget <= 0 || !IsClientInGame(iTarget)) {
+            SetEntProp(iClient, Prop_Data, "m_iObserverMode", SPECMODE_FREELOOK);
         }
-        
+
         // fix bug where spectator can't move while free-looking >
-        if(specMode == SPECMODE_FREELOOK) {
-            SetEntityMoveType(client, MOVETYPE_NOCLIP);
+        if (iMode == SPECMODE_FREELOOK) {
+            SetEntityMoveType(iClient, MOVETYPE_NOCLIP);
         }
-                
+
         // block spectator sprinting >
-        buttons &= ~IN_SPEED;
-        
+        iButtons &= ~IN_SPEED;
+
         // also fixes 1hp bug >
         return Plugin_Changed;
     }
-    
-    
-    if(!IsPlayerAlive(client)) {
-        // no use when dead
-        buttons &= ~IN_USE;
-        return Plugin_Changed;        
+
+
+    if (!IsPlayerAlive(iClient))
+    {
+        // no use when dead >
+        iButtons &= ~IN_USE;
+        return Plugin_Changed;
     }
-    
-    // shotgun altfire lagcomp fix by V952
-    int activeWeapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
-    char weaponClass[32];
-    
-    if(IsValidEdict(activeWeapon)) {
-        GetEdictClassname(activeWeapon, weaponClass, sizeof(weaponClass));
-        if(StrEqual(weaponClass, "weapon_shotgun") && (buttons & IN_ATTACK2) == IN_ATTACK2) {
-            buttons |= IN_ATTACK;              
+
+    // shotgun altfire lagcomp fix by V952 >
+    int  iActiveWeapon = GetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon");
+    char sWeapon[32];
+
+    if (IsValidEdict(iActiveWeapon))
+    {
+        GetEdictClassname(iActiveWeapon, sWeapon, sizeof(sWeapon));
+
+        if (StrEqual(sWeapon, "weapon_shotgun") && (iButtons & IN_ATTACK2) == IN_ATTACK2) {
+            iButtons |= IN_ATTACK;
         }
     }
-    
-    // Block crouch standing-view exploit
-    if((buttons & IN_DUCK) && GetEntProp(client, Prop_Send, "m_bDucked", 1) && GetEntProp(client, Prop_Send, "m_bDucking", 1)) {
-        buttons ^= IN_DUCK;
+
+    // Block crouch standing-view exploit >
+    if ((iButtons & IN_DUCK) && GetEntProp(iClient, Prop_Send, "m_bDucked", 1) && GetEntProp(iClient, Prop_Send, "m_bDucking", 1)) {
+        iButtons ^= IN_DUCK;
     }
-    
+
     return Plugin_Changed;
-    
 }
 
-public void OnGravityChanged(Handle convar, const char[] oldValue, const char[] newValue)
+public void OnGravityChanged(Handle hConvar, const char[] sOldValue, const char[] sNewValue)
 {
-    float newGravity[3];
-    newGravity[2] -= StringToFloat(newValue);
-    
-    // force sv_gravity change to take effect immediately (by default, props retain the previous map's gravity)
-    Phys_SetEnvironmentGravity(newGravity);
+    float fGravity[3];
+
+    fGravity[2] -= StringToFloat(sNewValue);
+
+    // force sv_gravity change to take effect immediately (by default, props retain the previous map's gravity) >
+    Phys_SetEnvironmentGravity(fGravity);
 }
 
-public Action Hook_OnTakeDamage(int client, int &attacker, int &inflictor, float &damage, int &damagetype)
+public Action Hook_OnTakeDamage(int iClient, int &iAttacker, int &iInflictor, float &fDamage, int &iDamageType)
 {
-    if(damagetype & DMG_FALL) {
-        // Fix mp_falldamage value not having any effect
-        damage = ghConVarFalldamage.FloatValue;
+    if (iDamageType & DMG_FALL)
+    {
+        // Fix mp_falldamage value not having any effect >
+        fDamage = ghConVarFalldamage.FloatValue;
     }
-    else if(damagetype & DMG_BLAST) {
-        // Remove explosion ringing noise for everyone (typically this is removed by competitive configs, which provides a significant advantage and cannot be prevented)
-        damagetype = DMG_GENERIC;
+    else if (iDamageType & DMG_BLAST)
+    {
+        // Remove explosion ringing noise for everyone
+        // (typically this is removed by competitive configs, which provides a significant advantage and cannot be prevented)
+        iDamageType = DMG_GENERIC;
     }
     else {
         return Plugin_Continue;
     }
-    
+
     return Plugin_Changed;
 }
 
-public Action Hook_WeaponCanSwitchTo(int client, int weapon)
+public Action Hook_WeaponCanSwitchTo(int iClient, int iWeapon)
 {
-    // Hands animation fix by toizy
-    SetEntityFlags(client, GetEntityFlags(client) | FL_ONGROUND);
+    // Hands animation fix by toizy >
+    SetEntityFlags(iClient, GetEntityFlags(iClient) | FL_ONGROUND);
 }
 
-public void OnEntityCreated(int entity, const char[] classname)
+public void OnEntityCreated(int iEntity, const char[] sEntity)
 {
-    // env_sprite fix by sidezz
-    if(StrEqual(classname, "env_sprite", false) || StrEqual(classname, "env_spritetrail", false)) {
-        RequestFrame(GetSpriteData, EntIndexToEntRef(entity));
+    // env_sprite fix by sidezz >
+    if (StrEqual(sEntity, "env_sprite", false) || StrEqual(sEntity, "env_spritetrail", false)) {
+        RequestFrame(GetSpriteData, EntIndexToEntRef(iEntity));
     }
 }
 
-void GetSpriteData(int ref)
+void GetSpriteData(int iRef)
 {
-    int sprite = EntRefToEntIndex(ref);
-    
-    if(IsValidEntity(sprite))
+    int iSprite = EntRefToEntIndex(iRef);
+
+    if (IsValidEntity(iSprite))
     {
-        int nade = GetEntPropEnt(sprite, Prop_Data, "m_hAttachedToEntity");
-        char class[32];
-        
-        if(nade == -1) {
+        int  iNade = GetEntPropEnt(iSprite, Prop_Data, "m_hAttachedToEntity");
+        char sClass[32];
+
+        if (iNade == -1) {
             return;
         }
-        
-        GetEdictClassname(nade, class, sizeof(class));
-        if(StrEqual(class, "npc_grenade_frag", false))
+
+        GetEdictClassname(iNade, sClass, sizeof(sClass));
+
+        if (StrEqual(sClass, "npc_grenade_frag", false))
         {
-            for(int i = MaxClients + 1; i < 2048; i++)
+            for (int i = MaxClients + 1; i < 2048; i++)
             {
-                char otherClass[32];
-                
-                if(!IsValidEntity(i)) {
+                char sOtherClass[32];
+
+                if (!IsValidEntity(i)) {
                     continue;
                 }
-                
-                GetEdictClassname(i, otherClass, sizeof(otherClass));
-                if(StrEqual(otherClass, "env_spritetrail", false) || StrEqual(otherClass, "env_sprite", false))
+
+                GetEdictClassname(i, sOtherClass, sizeof(sOtherClass));
+
+                if (StrEqual(sOtherClass, "env_spritetrail", false) || StrEqual(sOtherClass, "env_sprite", false))
                 {
-                    if(GetEntPropEnt(i, Prop_Data, "m_hAttachedToEntity") == nade)
+                    if (GetEntPropEnt(i, Prop_Data, "m_hAttachedToEntity") == iNade)
                     {
-                        int glow = GetEntPropEnt(nade, Prop_Data, "m_pMainGlow"), 
-                        trail = GetEntPropEnt(nade, Prop_Data, "m_pGlowTrail");
-                        
-                        if(i != glow && i != trail) {
+                        int iGlow  = GetEntPropEnt(iNade, Prop_Data, "m_pMainGlow"),
+                            iTrail = GetEntPropEnt(iNade, Prop_Data, "m_pGlowTrail");
+
+                        if (i != iGlow && i != iTrail) {
                             AcceptEntityInput(i, "Kill");
                         }
                     }
@@ -334,127 +351,142 @@ void GetSpriteData(int ref)
     }
 }
 
-public Action T_CheckPlayerStates(Handle timer)
+public Action T_CheckPlayerStates(Handle hTimer)
 {
-    static bool wasAlive[MAXPLAYERS + 1] = false;
-    static int wasTeam[MAXPLAYERS + 1] = -1;
-    int teamScore[4];
-    
-    for(int i = 1; i <= MaxClients; i++)
-    {   
-        if(!IsClientInGame(i))
+    static bool bWasAlive[MAXPLAYERS + 1] = false;
+    static int  iWasTeam[MAXPLAYERS + 1]  = -1;
+
+    int iTeamScore[4];
+
+    for (int iClient = 1; iClient <= MaxClients; iClient++)
+    {
+        if (!IsClientInGame(iClient))
         {
-            wasTeam[i] = -1;
-            wasAlive[i] = false;
+            iWasTeam[iClient]  = -1;
+            bWasAlive[iClient] = false;
             continue;
         }
-        
-        if(IsClientSourceTV(i)) {
+
+        if (IsClientSourceTV(iClient)) {
             continue;
         }
-        
-        int isTeam = GetClientTeam(i);
-        bool isAlive = IsPlayerAlive(i);
-        
-        if(wasTeam[i] == -1)
+
+        int  iTeam  = GetClientTeam(iClient);
+        bool bAlive = IsPlayerAlive(iClient);
+
+        if (iWasTeam[iClient] == -1)
         {
-            int kills, deaths;
-            gsmKills.GetValue(GetClientSteamID(i), kills);
-            gsmDeaths.GetValue(GetClientSteamID(i), deaths);
-            Client_SetScore(i, kills);
-            Client_SetDeaths(i, deaths);
-        }        
-        
-        else if(isTeam != wasTeam[i])
-        {
-            OnPlayerPostTeamChange(i, wasTeam[i], isTeam, wasAlive[i], isAlive);
+            int iKills,
+                iDeaths;
+
+            gmKills.GetValue(UnbufferedAuthId(iClient), iKills);
+            gmDeaths.GetValue(UnbufferedAuthId(iClient), iDeaths);
+
+            Client_SetScore(iClient, iKills);
+            Client_SetDeaths(iClient, iDeaths);
         }
-        
-        wasTeam[i] = isTeam;
-        wasAlive[i] = isAlive;
-        teamScore[isTeam] += Client_GetScore(i);
-    
-        if(!gbRoundEnd) {
-            SavePlayerState(i);
+        else if (iTeam != iWasTeam[iClient]) {
+            OnPlayerPostTeamChange(iClient, iTeam, bWasAlive[iClient], bAlive);
+        }
+
+        iWasTeam[iClient]  = iTeam;
+        bWasAlive[iClient] = bAlive;
+        iTeamScore[iTeam] += Client_GetScore(iClient);
+
+        if (!gbRoundEnd) {
+            SavePlayerState(iClient);
         }
     }
-    
-    // team score should reflect current team members
-    for(int i = 1; i < 4; i++) {
-        Team_SetScore(i, teamScore[i]);
+
+    // team scores should reflect current team members
+    for (int i = 1; i < 4; i++) {
+        Team_SetScore(i, iTeamScore[i]);
     }
 }
-
 
 void SavePlayerStates()
 {
-    for (int i = 1; i <= MaxClients; i++) {
-        if(IsClientInGame(i) && !IsClientSourceTV(i)) {
-            SavePlayerState(i);
+    for (int iClient = 1; iClient <= MaxClients; iClient++)
+    {
+        if (IsClientInGame(iClient) && !IsClientSourceTV(iClient)) {
+            SavePlayerState(iClient);
         }
     }
 }
 
-void SavePlayerState(int i)
+void SavePlayerState(int iClient)
 {
-    gsmKills.SetValue(GetClientSteamID(i), Client_GetScore(i));
-    gsmDeaths.SetValue(GetClientSteamID(i), Client_GetDeaths(i));
-    gsmTeams.SetValue(GetClientSteamID(i), (gbTeamplay ? GetClientTeam(i) : IsClientObserver(i) ? TEAM_SPECTATORS : TEAM_REBELS));        
+    int  iTeam;
+    char sId[32];
+
+    GetClientAuthId(iClient, AuthId_Engine, sId, sizeof(sId));
+    iTeam = (
+        gbTeamplay ? GetClientTeam(iClient)
+        : IsClientObserver(iClient) ? TEAM_SPECTATORS
+        : TEAM_REBELS
+    );
+
+    gmKills.SetValue (sId, Client_GetScore(iClient));
+    gmDeaths.SetValue(sId, Client_GetDeaths(iClient));
+    gmTeams.SetValue (sId, iTeam);
 }
 
-void OnPlayerPostTeamChange(int client, int wasTeam, int isTeam, bool wasAlive, bool isAlive)
+void OnPlayerPostTeamChange(int iClient, int iTeam, bool bWasAlive, bool bIsAlive)
 {
-    if(!isAlive)
+    if (!bIsAlive)
     {
-        if(isTeam == TEAM_SPECTATORS)
+        if (iTeam == TEAM_SPECTATORS)
         {
-            if(gbTeamplay)
+            if (gbTeamplay)
             {
-                if(!wasAlive) {
+                if (!bWasAlive) {
                     // player was dead and joined spec, the game will record a kill, fix:
-                    Client_SetScore(client, Client_GetScore(client) -1);
+                    Client_SetScore(iClient, Client_GetScore(iClient) -1);
                 }
                 else {
                     // player was alive and joined spec, the game will record a death, fix:
-                    Client_SetDeaths(client, Client_GetDeaths(client) -1);
+                    Client_SetDeaths(iClient, Client_GetDeaths(iClient) -1);
                 }
             }
         }
-        else if(wasAlive) {
+        else if (bWasAlive) {
             // player was alive and changed team, the game will record a suicide, fix:
-            Client_SetScore(client, Client_GetScore(client) +1);
-            Client_SetDeaths(client, Client_GetDeaths(client) -1);
-        }            
+            Client_SetScore(iClient, Client_GetScore(iClient) +1);
+            Client_SetDeaths(iClient, Client_GetDeaths(iClient) -1);
+        }
     }
 }
 
-public Action T_BlockConnectMOTD(Handle timer, int client)
+public Action T_BlockConnectMOTD(Handle hTimer, int iClient)
 {
-    if(IsClientConnected(client) && IsClientInGame(client) && !IsFakeClient(client))
+    if (IsClientConnected(iClient) && IsClientInGame(iClient) && !IsFakeClient(iClient))
     {
-        Handle msg = StartMessageOne("VGUIMenu", client);
-        if(msg != INVALID_HANDLE) {
-            BfWriteString(msg, "info");
-            BfWriteByte(msg, 0);
+        Handle hMsg = StartMessageOne("VGUIMenu", iClient);
+
+        if (hMsg != INVALID_HANDLE)
+        {
+            BfWriteString(hMsg, "info");
+            BfWriteByte(hMsg, 0);
             EndMessage();
         }
     }
 }
 
-public Action UserMsg_VGUIMenu(UserMsg msg_id, Handle msg, const players[], int playersNum, bool reliable, bool init)
+public Action UserMsg_VGUIMenu(UserMsg msg, Handle hMsg, const int[] iPlayers, int iNumPlayers, bool bReliable, bool bInit)
 {
-    char buffer[10];
-    BfReadString(msg, buffer, sizeof(buffer));
-    
-    if(StrEqual(buffer, "scores")) {
+    char sMsg[10];
+
+    BfReadString(hMsg, sMsg, sizeof(sMsg));
+    if (StrEqual(sMsg, "scores")) {
         gbRoundEnd = true;
         RequestFrame(SavePlayerStates);
     }
+
     return Plugin_Continue;
 }
 
-public Action Event_GameMessage(Event event, const char[] name, bool dontBroadcast)
+public Action Event_GameMessage(Event hEvent, const char[] sEvent, bool bDontBroadcast)
 {
     // block Server cvar spam
-    event.BroadcastDisabled = true;
+    hEvent.BroadcastDisabled = true;
 }
