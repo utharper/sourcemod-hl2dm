@@ -47,7 +47,7 @@ This has not really been developed far but already fixes a few things:
 - Disable the spectator bottom menu, as the options are mislabeled and it tends to get stuck in place
 - Disable an extra third-person spectator mode which serves no function
 - Fix various small spectator bugs
-- Fix all of the game's many scoring bugs
+- Fix all of the game's scoring bugs
 - Improved save scores (if someone disconnects and rejoins the same round, their score is retained)
 - Block an exploit which allows crouched players to have the visibility of a standing player
 - (via Vphysics) Fix prop gravity not changing correctly with sv_gravity
@@ -60,7 +60,7 @@ This has not really been developed far but already fixes a few things:
 No configuration is required.
 
 ### Download
-* [Plugin](https://github.com/utharper/sourcemod-hl2dm/releases/download/latest/hl2dmfix.smx)
+* [Download](https://github.com/utharper/sourcemod-hl2dm/releases/download/latest/hl2dmfix.smx)
 * [Source](addons/sourcemod/scripting/hl2dmfix.sp)
 
 
@@ -69,14 +69,14 @@ No configuration is required.
 
 **XMS** (eXtended Match System) is the most advanced system for competitive HL2DM servers. Commands are backwards compatible with VG servers and the old servermanagement plugin by gavvvr. It also features an easy player menu and is intended to be as simple for players to use as possible.
 
-You can easily define your own custom gamemodes, but the default config contains **dm**, **tdm**, **jm** (jump/bhop), **lg** (low grav), **ctf** (Capture The Flag), **arcade** (spawn with all weapons), and **np** (no props).
+You can easily define your own custom gamemodes, but the default config contains **dm**, **tdm**, **jm** (jump/bhop), **kb** (killbox low-grav), **ctf** (Capture The Flag), and **arcade** (spawn with all weapons).
 
-Everything is configured through `addons\sourcemod\configs\xms.cfg`.
+Everything is configured and explained in `addons\sourcemod\configs\xms.cfg`.
 
 ### Menu
 XMS provides a simple menu which automatically opens and stays open. This allows players to quickly press ESC and access most functionality without having to type in commands:
 
-![menu](https://i.imgur.com/1g4ZcNH.png)
+![menu](https://i.imgur.com/019FgqV.png)
 
 From this menu players can choose their team, call a vote to change the map/gamemode, start/stop/pause a match, view other player's steam profiles, set their FOV (if xfov is in use), change their player model, etc etc.
 
@@ -87,15 +87,17 @@ Players need to set `cl_showpluginmessages 1` for the menu to be visible (in com
 
 (Vote to) change to the specified map and/or gamemode. eg: `!run tdm`, `!run tdm:lockdown`, `!run lockdown`.
 
-For the map query, first a list of predefined map abbreviations (in xms.cfg) is checked, eg `ldr6` corresponds to`dm_lockdown_r6`. If an exact match is not found there, then the server maps folder is searched directly. If multiple maps match the search term, then it will output a list to the player and take no action. This may seem over-complicated but is intended to be intuitive to players, instead of having to memorise a thousand map abbreviations.
+For the map query, first a list of predefined map abbreviations (in xms.cfg) is checked, eg `ld` corresponds to`dm_lockdown`. If an exact match is not found there, then the server maps folder is searched directly. If multiple maps match the search term, then it will output a list to the player and take no action. This may seem over-complicated but is intended to be intuitive to players, instead of having to memorise a thousand map abbreviations.
+
+You can input multiple modes/maps to create a multiple choice vote. eg: `!run lockdown, halls3, dm:runoff, tdm:runoff, arcade:powerhouse` (one command)
 
 **!runnext** `<gamemode>`:`<map>`
 
-Same as !run, but sets the next map rather than changing immediately.
+Exactly the same as !run, but it sets the next map rather than changing immediately.
 
 **!start**
 
-(Vote to) begin a countdown to start a competitive match. Teams are locked during a match: players can't switch teams, and spectators can't join.
+(Vote to) begin a countdown to start a competitive match. During a match several important game settings are enforced, and a match demo is recorded. Teams are also locked during a match: players can't switch teams, and spectators can't join.
 
 **!cancel**
 
@@ -103,8 +105,9 @@ Same as !run, but sets the next map rather than changing immediately.
 
 **!list**
 
-Display a list of available maps and modes on the server.
-This can be overriden to show maps for another gamemode, eg *!list jm* will show all maps from mapcycle_jm.txt
+Display a list of available maps in the current gamemode. This can be overriden to show maps for another gamemode:
+- `!list jm` will show all maps from the jm mode's mapcycle (mapcycle_jm.txt)
+- `!list all` will show every map on the server.
 
 **!coinflip**
 
@@ -121,6 +124,14 @@ Open the given player's Steam profile in a MOTD window.
 **!allow** `<player name>`
 
 *Requires Generic Admin*. Allow the specified player to join an ongoing match. Useful to substitute players mid-game, or if one of the players has ragequit.
+
+**!shuffle**
+
+(Vote to) shuffle the teams. Team counts will be balanced, and all players assigned to a random team.
+
+**!invert**
+
+(Vote to) invert the teams. All players will swap from their current team, to the opposite team.
 
 **!vote** `<motion>`
 
@@ -155,7 +166,7 @@ Shortcut to open the hud color submenu
 - Locked teams during a match, so the server does not need to be password protected
 - Overrides the output of basecommands `timeleft`, `nextmap`, `currentmap` to corrected values
 - Force player models to rebels or standard combine (no more gleaming white combine models unless a player chooses it)
-- Revert to default mapcycle when server is empty (attracts random players using the simplified server browser)
+- Optionally reverts to default mapcycle when server is empty (attracts random players using the simplified server browser)
 
 ### Configuration
 
@@ -175,6 +186,8 @@ Finally, you will need to configure your mapcycles (these are also in the `cfg` 
 
 RCBot2 controller. Quickly created because I had issues with getting bot quotas to work. In its current state, the plugin will spawn a bot when someone joins an empty server. The bot will play until a second human connects, then it will promptly leave. The idea is to boost activity by keeping someone in the server long enough for others to join.
 
+The bot also has a few little taunts and other messages which you can modify in the translation file. Configured in the `"Bots"` section of `xms.cfg`.
+
 ### Download
 * Included with XMS download
 * [Source](addons/sourcemod/scripting/xms_bots.sp)
@@ -183,11 +196,12 @@ RCBot2 controller. Quickly created because I had issues with getting bot quotas 
 ## xms_discord
 **Requires XMS and the [SteamWorks](https://forums.alliedmods.net/showthread.php?t=229556) extension**
 
-![xms_discord output example](https://i.imgur.com/ZrAMYDy.png)
+![xms_discord output example](https://i.imgur.com/Gc4iH3e.png)
 
 This plugin was created for the [HL2DM Community Discord server](https://hl2dm.community). It posts the results of all matches, along with links to download the match demo and view the participant's profiles. This is done via webhook(s), you can set up multiple webhooks if you wish.
+It will also optionally post player feedback (submitted via the XMS menu) to a seperate webhook/channel.
 
-Everything is configured in `xms.cfg`, in the `"xms_discord"` section.
+Everything is configured in the `"Discord"` section of `xms.cfg`.
 
 ### Download
 * Included with XMS download
@@ -197,15 +211,17 @@ Everything is configured in `xms.cfg`, in the `"xms_discord"` section.
 # gameme_hud
 **Requires the [gameME plugin](https://github.com/gamemedev/plugin-sourcemod) (gameME is a paid service)**
 
-Displays a HUD showing your overall rank, kills, deaths, headshots, accuracy, etc.
-Only shows when the scoreboard is open (by holding TAB). If you are spectating another player, it will show their stats instead.
+Displays a HUD (left of the socreboard) showing your overall rank, kills, deaths, headshots, accuracy, etc.
+It only shows when the scoreboard is open (by holding TAB). If you are spectating another player, it will show their stats instead.
 
-This was quickly hacked together and causes a LOT of rcon message spam in the server console.
+![gameme_hud_example](https://i.imgur.com/zww76IL.png)
+
+This was quickly hacked together and causes a LOT of rcon message spam in the server console. This annoyance can be remedied with the [Cleaner](https://forums.alliedmods.net/showthread.php?p=1789738) extension.
 
 No configuration is required. If the server is also running XMS, it will use the player's desired `!hudcolor`.
 
-![gameme_hud_example](https://i.imgur.com/MZfEHwF.png)
+It is not strictly just a HUD, as it also provides hacky natives for other plugins to access the data. This allows for stats to also appear in the XMS menu.
 
 ### Download
-* [Plugin](https://github.com/utharper/sourcemod-hl2dm/releases/download/latest/gameme_hud.smx)
+* [Download zip](https://github.com/utharper/sourcemod-hl2dm/releases/download/latest/gameme_hud.zip)
 * [Source](addons/sourcemod/scripting/gameme_hud.sp)

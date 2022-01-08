@@ -1,0 +1,407 @@
+"Phrases"
+{
+    "xmenu_announce"
+    {
+        "en"        "{I}Press ESC to open the server menu."
+    }
+    "xmenu_fail"
+    {
+        "en"        "{E}[!] Can't display server menu\n{E}[!] {I}Please type {N}CL_ShowPluginMessages 1 {I}in your console!\n go to Options > Keyboard > Advanced > Enable Developer Console > OK > Press {N}~"
+    }
+
+    "xmenu_exit"
+    {
+        "en"        "<< [Exit]"
+    }
+    "xmenu_back"
+    {
+        "en"        "< [Back]"
+    }
+    "xmenu_next"
+    {
+        "en"        "[Next] >"
+    }
+
+    "xmenutitle_0"
+    {
+        "#format"   "{1:s}"
+        "en"        "XMS {1}"
+    }
+    "xmenutitle_1"
+    {
+        "en"        "XMS Menu > Change Team"
+    }
+    "xmenutitle_2"
+    {
+        "en"        "XMS Menu > Call Vote"
+    }
+    "xmenutitle_2_map"
+    {
+        "en"        "XMS Menu > Call Vote > Change Map"
+    }
+    "xmenutitle_2_mapfilter"
+    {
+        "#format"   "{1:s}"
+        "en"        "XMS Menu > Call Vote > Sort Maps By Letter {1}"
+    }
+    "xmenutitle_2_mapconfirm"
+    {
+        "#format"   "{1:s},{2:s}"
+        "en"        "XMS Menu > Call Vote > {1} > {2}"
+    }
+    "xmenutitle_2_mode"
+    {
+        "en"        "XMS Menu > Call Vote > Change Gamemode"
+    }
+    "xmenutitle_2_modemap"
+    {
+        "#format"   "{1:s}"
+        "en"        "XMS Menu > Call Vote > {1} > Select map"
+    }
+    "xmenutitle_2_start"
+    {
+        "en"        "XMS Menu > Call Vote > Start Match"
+    }
+    "xmenutitle_3"
+    {
+        "en"        "XMS Menu > Player Info"
+    }
+    "xmenutitle_4"
+    {
+        "en"        "XMS Menu > Settings"
+    }
+    "xmenutitle_4_model"
+    {
+        "en"        "XMS Menu > Settings > Player model"
+    }
+    "xmenutitle_4_fov"
+    {
+        "en"        "XMS Menu > Settings > FOV"
+    }
+    "xmenutitle_4_hudcolor"
+    {
+        "en"        "XMS Menu > Settings > HUD color"
+    }
+    "xmenutitle_5"
+    {
+        "en"        "XMS Menu > Switch Server"
+    }
+    "xmenutitle_6"
+    {
+        "en"        "XMS Menu > Admin"
+    }
+    "xmenutitle_6_feedback"
+    {
+        "en"        "XMS Menu > Admin > View Feedback/Reports"
+    }
+    "xmenutitle_7"
+    {
+        "en"        "XMS Menu > Report Feedback"
+    }
+
+    "xmenumsg_0"
+    {
+        "#format"   "{1:s},{2:s},{3:s},{4:s},{5:i},{6:s},{7:i},{8:s},{9:s}"
+        "en"        "If you close this page, say: !menu\n\n▪ mode  :  {1} ({2})\n▪ map    :  {3}\n▪ server :  {4}\n▪ version:  v{5}/XMS {6}\n▪ type    :  {7} tick {8}\n\n{9}"
+    }
+    "xmenumsg_1"
+    {
+        "en"        "Choose the team you want to join.\n\nNote: Teams are locked during\na match."
+    }
+    "xmenumsg_2"
+    {
+        "#format"   "{1:i}"
+        "en"        "What do you want to call a vote on?\n\n(If there are less than {1} people\nin the server, your vote will\nautomatically succeed.)"
+    }
+    "xmenumsg_2_map"
+    {
+        "#format"   "{1:i},{2:s}"
+        "en"        "Please choose a map. Listing {1}\nmaps available for mode: {2}"
+    }
+    "xmenumsg_2_map_filter"
+    {
+        "en"        "Select the first letter of\nthe map you're looking for."
+    }
+    "xmenumsg_2_map_byletter"
+    {
+        "#format"   "{1:i},{2:s}"
+        "en"        "Filter applied.\n{1} maps starting with \"{2}\"."
+    }
+    "xmenumsg_2_mode"
+    {
+        "#format"   "{1:s}"
+        "en"        "Select a mode to change to.\nThe current mode is: {1}."
+    }
+    "xmenumsg_2_mapconfirm"
+    {
+        "#format"   "{1:s},{2:s},{3:s},{4:s}"
+        "en"        "Do you want the map to load now,\nor after the current map ends?\n\nCommands:\n   !run {1}:{2}\n   !runNext {3}:{4}"
+    }
+    "xmenumsg_2_start"
+    {
+        "en"        "[CONFIRMATION REQUIRED]\nThis will restart the game!\n\nTeams will be locked, so make\nsure everyone is in the correct\nteam before starting!\n\nCommand:  !start"
+    }
+    "xmenumsg_3"
+    {
+        "en"        "Select a player to view their\nstats and profile."
+    }
+    "xmenumsg_3_admin"
+    {
+        "en"        "Select a player to view their\nstats and profile, or use your admin\npowers on them."
+    }
+    "xmenumsg_3_gameme"
+    {
+        "#format"   "{1:s}"
+        "en"        "TOP 5 PLAYERS:\n{1}"
+    }
+    "xmenumsg_3_player"
+    {
+        "#format"   "{1:s},{2:i},{3:s}"
+        "en"        "userid: {2} {3}\n\n* Press ESC after clicking to view"
+    }
+    "xmenumsg_3_player_gameme"
+    {
+        "#format"   "{1:s},{2:i},{3:s},{4:s},{5:s},{6:s},{7:s},{8:s},{9:s},{10:s},{11:s},{12:s},{13:s}"
+        "en"        "userid: {2} {3}\n\n* Press ESC after clicking to view\n\nRank #{4} with {5} points\nPlaytime: {6}\nKills: {7}\nDeaths: {8} (KPD: {9})\nHeadshots: {10}\nSuicides: {11}\nAccuracy: {12}%%%\nBest Kill Spree: {13}"
+    }
+    "xmenumsg_4"
+    {
+        "en"        "Please select from the available\noptions. These settings will be\nremembered by the server (except\nfor player model, which is reset by\nmap or team changes.)\n\n\n\n* You can change music volume in\nthe game's Options menu."
+    }
+    "xmenumsg_4_model"
+    {
+        "en"        "Select your desired player model.\n\nYour choice will take effect the\nnext time you spawn.\n\nCommand:  !model <name>"
+    }
+    "xmenumsg_4_fov"
+    {
+        "en"        "You can change your field-of-view,\nwithin the allowed limits. A higher\nvalue is recommended for modern\nwidescreen monitors.\n\nCommand:  !fov <value>"
+    }
+    "xmenumsg_4_hudcolor"
+    {
+        "en"        "You can change the color of server\ntext messages (timeleft, pressed\nkeys HUD, etc). The range of colors\nis small due to engine limitations.\n\nCommand:  !hudcolor <r> <g> <b>\n    (rgb color values 0-255)"
+    }
+    "xmenumsg_5"
+    {
+        "en"        "These other servers have been\nrecommended by the admin.\n\nHow to connect:\n  1: Click on a server name.\n  2: Press ESC to close menu.\n  3: Press F3 to confirm."
+    }
+    "xmenumsg_7"
+    {
+        "en"        "Message to send to admin:"
+    }
+    "xmenumsg_6"
+    {
+        "en"        "Admin superpowers.\nUse with caution!"
+    }
+
+    "xmenu0_team"
+    {
+        "en"        "Change Team            >"
+    }
+    "xmenu0_pause"
+    {
+        "en"        "Pause Match"
+    }
+    "xmenu0_vote"
+    {
+        "en"        "Call Vote                   >"
+    }
+    "xmenu0_players"
+    {
+        "en"        "Player Info                >"
+    }
+    "xmenu0_settings"
+    {
+        "en"        "Settings                    >"
+    }
+    "xmenu0_switch"
+    {
+        "en"        "Switch Server            >"
+    }
+    "xmenu0_admin"
+    {
+        "en"        "[Admin] Management >"
+    }
+    "xmenu0_report"
+    {
+        "en"        "Report Feedback        >"
+    }
+    "xmenu2_map"
+    {
+        "en"        "Change Map >"
+    }
+    "xmenu2_map_keep"
+    {
+        "en"        "[Keep current map]"
+    }
+    "xmenu2_map_sort"
+    {
+        "en"        "[Sort By Letter] >"
+    }
+    "xmenu2_map_now"
+    {
+        "en"        "Change now!"
+    }
+    "xmenu2_map_next"
+    {
+        "en"        "Set as next map"
+    }
+    "xmenu2_mode"
+    {
+        "en"        "Change Gamemode >"
+    }
+    "xmenu2_start"
+    {
+        "en"        "Start Match >"
+    }
+    "xmenu2_start_confirm"
+    {
+        "en"        "Confirm"
+    }
+    "xmenu2_start_deny"
+    {
+        "en"        "Not enough players!"
+    }
+    "xmenu2_cancel"
+    {
+        "en"        "Cancel Match"
+    }
+    "xmenu2_shuffle"
+    {
+        "en"        "Shuffle Teams"
+    }
+    "xmenu2_invert"
+    {
+        "en"        "Invert Teams"
+    }
+    "xmenu3_profile"
+    {
+        "en"        "View Steam Profile *"
+    }
+    "xmenu3_allow"
+    {
+        "en"        "[Admin] Allow Join"
+    }
+    "xmenu3_forcespec"
+    {
+        "en"        "[Admin] Force Spec"
+    }
+    "xmenu3_mute"
+    {
+        "en"        "[Admin] Mute"
+    }
+    "xmenu3_unmute"
+    {
+        "en"        "[Admin] Unmute"
+    }
+    "xmenu3_kick"
+    {
+        "en"        "[Admin] Kick"
+    }
+    "xmenu3_ban"
+    {
+        "en"        "[Admin] Ban for 24h"
+    }
+    "xmenu4_model"
+    {
+        "en"        "Player model >"
+    }
+    "xmenu4_fov"
+    {
+        "en"        "FOV >"
+    }
+    "xmenu4_hudcolor"
+    {
+        "en"        "HUD color >"
+    }
+    "xmenu4_hudcolor_yellow"
+    {
+        "en"        "Yellow (Default)"
+    }
+    "xmenu4_hudcolor_cyan"
+    {
+        "en"        "Cyan"
+    }
+    "xmenu4_hudcolor_blue"
+    {
+        "en"        "Blue"
+    }
+    "xmenu4_hudcolor_green"
+    {
+        "en"        "Green"
+    }
+    "xmenu4_hudcolor_red"
+    {
+        "en"        "Red"
+    }
+    "xmenu4_hudcolor_white"
+    {
+        "en"        "White"
+    }
+    "xmenu4_hudcolor_pink"
+    {
+        "en"        "Pink"
+    }
+    "xmenu4_music0"
+    {
+        "en"        "End Music: OFF *"
+    }
+    "xmenu4_music1"
+    {
+        "en"        "End Music: ON *"
+    }
+    "xmenu4_sound0"
+    {
+        "en"        "XMS sounds: OFF"
+    }
+    "xmenu4_sound1"
+    {
+        "en"        "XMS sounds: ON"
+    }
+    "xmenu6_specall"
+    {
+        "en"        "Forcespec All"
+    }
+    "xmenu6_reloadadmins"
+    {
+        "en"        "Reload Admins"
+    }
+    "xmenu6_reloadplugin"
+    {
+        "en"        "[!] Reload XMS"
+    }
+    "xmenu6_restart"
+    {
+        "en"        "[!] Restart Server"
+    }
+    "xmenu6_feedback"
+    {
+        "en"        "View Feedback/Reports"
+    }
+
+    "xms_menu_decision"
+    {
+        "#format"   "{1:s}"
+        "en"        "Place your vote for:\n \"{1}\""
+    }
+    "xms_menu_decision_multi"
+    {
+        "en"        "This is a multiple choice vote.\nPlease select your preferred option."
+    }
+    "xms_menu_decision_yes"
+    {
+        "en"        "Vote YES"
+    }
+    "xms_menu_decision_no"
+    {
+        "en"        "Vote NO"
+    }
+    "xms_menu_decision_abstain"
+    {
+        "en"        "Abstain"
+    }
+
+    "xms_menu_model"
+    {
+        "en"        "Select your desired player model.\n\nYour choice will take effect the\nnext time you spawn.\n\nCommand:  !model <name>"
+    }
+}

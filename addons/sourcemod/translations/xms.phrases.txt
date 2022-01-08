@@ -1,655 +1,397 @@
 "Phrases"
 {
-	"xms_join"
-	{
-		"#format" 	"{1:s}"
-		"en"		"{I}{1} joined the server."
-	}
-	"xms_welcome"
-	{
-		"#format" 	"{1:s}"
-		"en"		"\n{H}welcome to {1}"
-	}
-	"xms_disconnect"
-	{
-		"#format" 	"{1:s},{2:s}"
-		"en"		"{I}{1} disconnected ({2})"
-	}
-	"xms_disconnect_match"
-	{
-		"#format" 	"{1:s},{2:s}"
-		"en" 		"{E}[!] {N}{1} disconnected ({2})"
-	}
-	"xms_changename"
-	{
-		"#format" 	"{1:s},{2:s}"
-		"en" 		"{I}{1} changed name to \"{2}\""
-	}
-	
-	"xmsc_nextmap"
-	{
-		"#format" 	"{1:s},{2:s}"
-		"en" 		"{N}next map is {H}{1}{N}:{H}{2}{N}."
-	}
-	"xmsc_currentmap"
-	{
-		"#format" 	"{1:s},{2:s}"
-		"en" 		"{N}current map is {H}{1}{N}:{H}{2}{N}."
-	}	
-	"xmsc_ff"
-	{
-		"#format" 	"{1:s}"
-		"en"		"{N}friendly fire is {H}{1}{N}."
-	}
-	"xmsc_timeleft"
-	{
-		"#format" 	"{1:i},{2:i},{3:i}"
-		"en"		"{N}time remaining: {H}{1}h {2}m {3}s{N}."
-	}
-	"xmsc_timeleft_none"
-	{
-		"en"		"{N}no timelimit for map."
-	}
-	"xmsc_timeleft_over"
-	{
-		"#format" 	"{1:i}"
-		"en"		"{N}map will change in {H}{1} {N}seconds."
-	}	
-	
-	"xmsc_run_usage"
-	{
-		"en" 		"{I}usage: run <mode>:<map>, eg \"!run dm:lockdown\" or \"!run tdm:overwatch\""
-	}
-	"xmsc_run_notfound"
-	{
-		"#format" 	"{1:s}"
-		"en" 		"{E}[!] {I}invalid map or mode '{H}{1}{I}' - not found."
-	}
-	"xmsc_run_found"
-	{
-		"#format" 	"{1:s},{2:i}"
-		"en"		"{I}multiple results: {1}, and {H}{2} {I}others."
-	}
-	"xmsc_run_denymode"
-	{
-		"#format" 	"{1:s}"
-		"en"		"{E}[!] {I}already using gamemode '{H}{1}{I}'."
-	}
-	"xmsc_run_invalidmode"
-	{
-		"#format" 	"{1:s}"
-		"en" 		"{E}[!] {I}invalid gamemode. Valid modes: {N}{1}{I}."
-	}
-	"xmsc_run_tip1"
-	{
-		"en" 		"{N}TIP: {I}check your console for the full list of matching maps."
-	}
-	"xmsc_run_tip2"
-	{
-		"en" 		"{N}TIP: {I}view all available gamemodes and maps with the {H}!list {I}command."
-	}
-	"xmsc_run_results"
-	{
-		"#format" 	"{1:s},{2:s},{3:i}"
-		"en" 		"*** maps matching query `{1}`:\n {2}\n... total hits: {3}"
-	}
+    "xms_join"
+    {
+        "#format"   "{1:s}"
+        "en"        "{I}{1} joined the server."
+    }
+    "xms_welcome"
+    {
+        "#format"   "{1:s}"
+        "en"        "\nWelcome to {1}!"
+    }
+    "xms_disconnect"
+    {
+        "#format"   "{1:s},{2:s}"
+        "en"        "{I}{1} disconnected ({2})"
+    }
+    "xms_disconnect_match"
+    {
+        "#format"   "{1:s},{2:s}"
+        "en"        "{E}[!] {N}{1} disconnected ({2})"
+    }
+    "xms_changename"
+    {
+        "#format"   "{1:s},{2:s}"
+        "en"        "{I}{1} changed name to \"{2}\""
+    }
+    "xmsc_nextmap"
+    {
+        "#format"   "{1:s},{2:s}"
+        "en"        "{N}Next map is {H}{1}{N}:{H}{2}{N}."
+    }
+    "xmsc_currentmap"
+    {
+        "#format"   "{1:s},{2:s}"
+        "en"        "{N}Current map is {H}{1}{N}:{H}{2}{N}."
+    }
+    "xmsc_ff"
+    {
+        "#format"   "{1:s}"
+        "en"        "{N}Friendly fire is {H}{1}{N}."
+    }
+    "xmsc_timeleft"
+    {
+        "#format"   "{1:i},{2:i},{3:i}"
+        "en"        "{N}Time remaining: {H}{1}h {2}m {3}s{N}."
+    }
+    "xmsc_timeleft_none"
+    {
+        "en"        "{N}No timelimit for map."
+    }
+    "xmsc_timeleft_over"
+    {
+        "#format"   "{1:i}"
+        "en"        "{N}Map will change in {H}{1} {N}seconds."
+    }
+    "xmsc_run_usage"
+    {
+        "en"        "{I}Usage: !run <mode>:<map>\n Only one parameter is required. Examples:\n !run dm:lockdown\n !run tdm:overwatch\n !run tdm\n !run overwatch"
+    }
+    "xmsc_run_notfound"
+    {
+        "#format"   "{1:s}"
+        "en"        "{E}[!] {I}invalid map or mode '{H}{1}{I}' - not found."
+    }
+    "xmsc_run_denyparams"
+    {
+        "en"        "{E}[!] {I}Too many parameters in command. Maximum {H}5 {I}vote options."
+    }
+    "xmsc_run_found"
+    {
+        "#format"   "{1:s},{2:i}"
+        "en"        "{I}Multiple results: {1}, and {H}{2} {I}others."
+    }
+    "xmsc_run_found_multi"
+    {
+        "#format"   "{1:i},{2:s}"
+        "en"        "{E}[!] {H}{1}{I} maps match query `{H}{2}{I}` - please be more specific."
+    }
+    "xmsc_run_denymode"
+    {
+        "#format"   "{1:s}"
+        "en"        "{E}[!] {I}Already using gamemode '{H}{1}{I}'."
+    }
+    "xmsc_run_tip1"
+    {
+        "en"        "{N}TIP: {I}Check your console for the full list of matching maps."
+    }
+    "xmsc_run_tip2"
+    {
+        "en"        "{N}TIP: {I}View all available gamemodes and maps with the {H}!list {I}command."
+    }
+    "xmsc_run_results"
+    {
+        "#format"   "{1:s},{2:s},{3:i}"
+        "en"        "*** Maps matching query `{1}`:\n {2}\n... Total hits: {3}"
+    }
+    "xms_started"
+    {
+        "en"        "{N}Starting a competitive match. GLHF!"
+    }
+    "xms_starting"
+    {
+        "#format"   "{1:i}"
+        "en"        "~ match starting in {1} seconds ~"
+    }
+    "xms_cancelled"
+    {
+        "en"        "{N}Cancelled the match."
+    }
+    "xmsc_run_now"
+    {
+        "#format"   "{1:s},{2:s}"
+        "en"        "{N}Changing to {H}{1}{N}:{H}{2}{N}."
+    }
+    "xmsc_run_next"
+    {
+        "#format"   "{1:s},{2:s}"
+        "en"        "{N}Set next map to {H}{1}:{2}{N}."
+    }
+    "xms_loading"
+    {
+        "#format"   "{1:s},{2:s},{3:i}"
+        "en"        "~ loading {1}:{2} in {3} seconds ~"
+    }
+    "xmsc_list_pre"
+    {
+        "#format"   "{1:s}"
+        "en"        "{N}Listing all maps for gamemode {H}{1}{N}:"
+    }
+    "xmsc_list_pre_all"
+    {
+        "en"        "{N}Listing all maps on server:"
+    }
+    "xmsc_list_post"
+    {
+        "#format"   "{1:i}"
+        "en"        "{N}^ total: {H}{1} {N}maps ^"
+    }
+    "xmsc_list_invalid"
+    {
+        "#format"   "{1:s}"
+        "en"        "{E}[!] {I}Invalid gamemode \"{H}{1}{I}\""
+    }
+    "xmsc_list_modes"
+    {
+        "#format"   "{1:s}"
+        "en"        "{N}Available modes: {H}{1}{N}."
+    }
+    "xmsc_vote_deny"
+    {
+        "en"        "{E}[!] {I}A vote is already in progress."
+    }
+    "xmsc_vote_timeout"
+    {
+        "#format"   "{1:i}"
+        "en"        "{E}[!] {I}Please wait {H}{1} {I}more seconds before calling a vote."
+    }
+    "xmsc_deny_paused"
+    {
+        "en"        "{E}[!] {I}The game is paused. use {H}!unpause {I}first."
+    }
+    "xmsc_deny_match"
+    {
+        "en"        "{E}[!] {I}You can't use this command during a match. Use {H}!cancel {I}to cancel the match."
+    }
+    "xmsc_deny_changing"
+    {
+        "en"        "{E}[!] {I}Please wait for the current action to finish."
+    }
+    "xmsc_deny_over"
+    {
+        "en"        "{E}[!] {I}The game has ended. Wait for the next map, or call a map vote."
+    }
+    "xmsc_deny_spectator"
+    {
+        "en"        "{E}[!] {I}This command can't be used by spectators."
+    }
+    "xmsc_hudcolor_usage"
+    {
+        "en"        "{I}Usage: !hudcolor <r> <g> <b>\n (rgb values between 0-255)\n Note: Black is not supported due to game limitations."
+    }
+    "xmsc_allow_usage"
+    {
+        "en"        "{I}Usage: !allow <player name or userid>"
+    }
+    "xmsc_allow_success"
+    {
+        "#format"   "{1:s}"
+        "en"        "{N}Allowed {H}{1}{N} to join the match."
+    }
+    "xmsc_allow_fail"
+    {
+        "#format"   "{1:s}"
+        "en"        "{E}[!] {H}{1}{I} is already playing in this match!"
+    }
 
-	"xms_started"
-	{
-		"en" 		"{N}started a competitive match. GLHF!"
-	}
-	"xms_starting"
-	{
-		"#format" 	"{1:i}"
-		"en" 		"~ match starting in {1} seconds ~"
-	}
-	"xms_cancelled"
-	{
-		"en" 		"{N}cancelled the match."
-	}
-  
-	"xmsc_run_now"
-	{
-		"#format" 	"{1:s},{2:s}"
-		"en" 		"{N}changing to {H}{1}{N}:{H}{2}{N}."
-	}
-	"xmsc_run_next"
-	{
-		"#format" 	"{1:s},{2:s}"
-		"en" 		"{N}next map set to {H}{1}{N}:{H}{2}{N}."
-	}
-	"xms_loading"
-	{
-		"#format" 	"{1:s},{2:s},{3:i}"
-		"en" 		"~ loading {1}:{2} in {3} seconds ~"
-	}
-
-	"xmsc_list_pre"
-	{
-		"#format" 	"{1:s}"
-		"en" 		"{N}listing all maps for gamemode {H}{1}{N}:"
-	}
-	"xmsc_list_pre_all"
-	{
-		"en" 		"{N}listing all maps on server:"
-	}
-	"xmsc_list_post"
-	{
-		"#format" 	"{1:i}"
-		"en" 		"{N}^ total: {H}{1} {N}maps ^"
-	}
-	"xmsc_list_invalid"
-	{
-		"#format" 	"{1:s}"
-		"en" 		"{E}[!] {I}invalid gamemode \"{H}{1}{I}\""
-	}
-	"xmsc_list_modes"
-	{
-		"#format" 	"{1:s}"
-		"en" 		"{N}available modes: {H}{1}{N}."
-	}
-
-	"xmsc_vote_deny"
-	{
-		"en" 		"{E}[!] {I}a vote is already in progress."
-	}
-	"xmsc_vote_timeout"
-	{
-		"#format" 	"{1:i}"
-		"en" 		"{E}[!] {I}please wait {H}{1} {I}more seconds before calling a vote."
-	}
-	"xmsc_deny_paused"
-	{
-		"en" 		"{E}[!] {I}the game is paused. use {H}!unpause {I}first."
-	}
-	"xmsc_deny_match"
-	{
-		"en" 		"{E}[!] {I}match in progress. use {H}!cancel {I}first."
-	}
-	"xmsc_deny_changing"
-	{
-		"en" 		"{E}[!] {I}please wait for the current action to finish."
-	}
-	"xmsc_deny_over"
-	{
-		"en" 		"{E}[!] {I}the game has ended. wait for next map, or use {H}!run {I}to change."
-	}
-	"xmsc_deny_spectator"
-	{
-		"en" 		"{E}[!] {I}this command can't be used by spectators."
-	}
-	"xmsc_hudcolor_usage"
-	{
-		"en" 		"{I}usage: !hudcolor <red> <green> <blue>. rgb values between 0-255."
-	}
-
-	"xmsc_allow_usage"
-	{
-		"en" 		"{I}usage: !allow <player name or userid>"
-	}
-	"xmsc_allow_success"
-	{
-		"#format" 	"{1:s}"
-		"en" 		"{N}allowed {H}{1}{N} to join the match."
-	}
-	"xmsc_allow_fail"
-	{
-		"#format" 	"{1:s}"
-		"en" 		"{E}[!] {H}{1}{I} is already playing in this match!"
-	}
-
-	"xmsc_start_deny"
-	{
-		"en" 		"{E}[!] {I}at least 2 players are required to start a match."
-	}
-	"xmsc_start_denygamemode"
-	{
-		"#format" 	"{1:s}"
-		"en" 		"{E}[!] {I}current gamemode ({H}{1}{I}) does not allow matches."
-	}
-	"xmsc_deny_nomatch"
-	{
-		"en" 		"{E}[!] {I}a match is not in progress."
-	}
-	"xmsc_cancel_matchex"
-	{
-		"en" 		"{E}[!] {I}don't be a coward - win the game!"
-	}
-
-	"xmsc_forcespec_usage"
-	{
-		"en" 		"{I}usage: !forcespec <player name or userid>"
-	}
-	"xmsc_forcespec_fail"
-	{
-		"#format" 	"{1:s}"
-		"en" 		"{E}[!] {I}player {H}{1}{I} is already a spectator."
-	}
-	"xmsc_forcespec_success"
-	{
-		"#format" 	"{1:s}"
-		"en" 		"{N}moved {H}{1}{N} to spectators."
-	}
-	"xmsc_forcespec_warning"
-	{
-		"en" 		"{E}[!!] you have been moved to spectators. {I}follow admin instructions!"
-	}
-	"xmsc_forcespec_notfound"
-	{
-		"en" 		"{E}[!] {I}player not found."
-	}
-	"xms_match_resumed"
-	{
-		"en"		"{N}resumed the match."
-	}
-	"xms_match_paused"
-	{
-		"en"	"{N}paused the match."
-	}
-
-	"xmsc_teamchange_same"
-	{
-		"#format" 	"{1:s}"
-		"en"		"{E}[!] {I}you are already in Team {1}"
-	}
-	"xmsc_teamchange_deny"
-	{
-		"en"		"{E}[!] {I}a match is in progress. please wait your turn to play."
-	}
-
-	"xms_auto_spectate"
-	{
-		"en"		"{N}you are currently spectating. say {H}!join {I}to play."
-	}
-	"xms_auto_pause"
-	{
-		"en"		"{E}[!!] {N}The match was automatically paused."
-	}
-	
-	"xms_hud_spec1"
-	{
-		"en"		"[FIRE to switch player]"
-	}
-	"xms_hud_spec2"
-	{
-		"en"		"[JUMP to change view]"
-	}
-	"xms_hud_overtime"
-	{
-		"en"		"– Overtime –"
-	}
-	"xms_hud_gameover"
-	{
-		"en"		"– Game Over –"
-	}
-	
-	"xms_overtime_draw"
-	{
-		"en"		"{E}overtime: {N}nobody took the lead, so the game is a draw."
-	}
-	"xms_overtime_start1"
-	{
-		"#format" 	"{1:s}"
-		"en"		"{E}overtime: {N}the next {1} to score wins!"
-	}
-	"xms_overtime_start2"
-	{
-		"en"		"{E}overtime: {N}whoever takes the lead wins!"
-	}
-	"xms_overtime_teamwin"
-	{
-		"#format" 	"{1:s}"
-		"en"		"{E}overtime: {N}Team {H}{1} {N}took the lead and wins the game!"
-	}
-	"xms_overtime_win"
-	{
-		"#format" 	"{1:s}"
-		"en"		"{E}overtime: {H}{1} {N}took the lead and wins the game!"
-	}
-	
-	"xms_nextmap_announce"
-	{
-		"#format" 	"{1:s},{2:s},{3:i}"
-		"en"		"{I}next map is {H}{1}{I}:{H}{2} {I}in {H}{3} {I}seconds."
-	}
-	
-	"xmsc_profile_usage"
-	{
-		"en"		"{I}usage: !profile <player name or userid>"
-	}
-	
-	"xmsc_coinflip"
-	{
-		"#format" 	"{1:s}"
-		"en"		"{N}flipped a coin - it landed on {H}{1}{N}."
-	}
-	
-	"xmsc_callvote_usage"
-	{
-		"en"		"{I}usage: !vote <motion> - calls a custom yes/no vote"
-	}
-	"xmsc_callvote_deny"
-	{
-		"en"		"{E}[!] {I}a vote is already in progress."
-	}
-	"xmsc_callvote_denywait"
-	{
-		"#format" 	"{1:i}"
-		"en"		"{E}[!] {I}please wait {H}{1} {I}more seconds before calling a vote."
-	}
-	"xmsc_callvote"
-	{
-		"en"		"{N}called a vote. {H}vote now!"
-	}
-	
-	"xmsc_castvote_denyspec"
-	{
-		"en"		"{E}[!] {I}spectators can't participate in this vote."
-	}
-	"xmsc_castvote"
-	{
-		"#format" 	"{1:s},{2:s}"
-		"en"		"{1} voted {2}"
-	}
-
-	"xms_menu_announce"
-	{
-		"en"		"{I}press ESC to open the server menu"
-	}
-	"xms_menu_fail"
-	{
-		"en"		"{E}[!] cannot render server menu\n{E}[!] {I}please type {N}CL_ShowPluginMessages 1 {I}in your console!\n go to Options > Keyboard > Advanced > Enable Developer Console > OK > Press {N}~"
-	}
-	
-	"xms_menu_servers"
-	{
-		"en" 		"these other servers have been\nrecommended by the admin.\n\nsteps to connect:\n1) select a server\n2) press ESC to close menu\n3) press F3 to confirm."
-	}
-	"xms_menu_team"
-	{
-		"en" 		"select a team to switch to.\n(teams are locked during matches)"
-	}
-	
-	"xms_menu_start"
-	{
-		"en" 		"ARE YOU SURE?\nTHIS WILL RESTART THE GAME!\n\n teams will be locked, so make\n sure everyone is in the correct\n team before starting!"
-	}
-	"xms_menu_start_confirm"
-	{
-		"en" 		"START MATCH"
-	}
-	"xms_menu_start_denymode"
-	{
-		"en" 		"the current gamemode does not\n allow competitive matches."
-	}
-	"xms_menu_start_denycount"
-	{
-		"en" 		"can't start a match with\n less than 2 players!"
-	}
-	"xms_menu_start_cancel"
-	{
-		"en" 		"Back"
-	}
-	"xms_menu_decision"
-	{
-		"#format" 	"{1:s}"
-		"en" 		"place your vote:\n\"{1}\""
-	}
-	"xms_menu_decision_yes"
-	{
-		"en" 		"vote YES"
-	}
-	"xms_menu_decision_no"
-	{
-		"en" 		"vote NO"
-	}
-	"xms_menu_decision_abstain"
-	{
-		"en" 		"abstain"
-	}
-	
-	"xms_menu_mode"
-	{
-		"#format" 	"{1:s}"
-		"en" 		"select a mode to change to.\ncurrent mode is: {1}."
-	}
-	
-	"xms_menu_model"
-	{
-		"en" 		"choose your desired player model.\n\nyour choice will take effect when\n you next respawn."
-	}
-	"xms_menu_base_pre"
-	{
-		"en" 		"if you close this page, say: !menu"
-	}
-	"xms_menu_base_matchpre"
-	{
-		"en" 		"a competitive match is in progress.\nplease wait your turn to play."
-	}
-	"xms_menu_base"
-	{
-		"#format" 	"{1:s},{2:s},{3:s},{4:s},{5:s},{6:s},{7:i},{8:s},{9:s},{10:s},{11:s},{12:s},{13:s},{14:s},{15:i},{16:s}"
-		"en"		"------------------------\nmap:      {1}\nmode:    {2} {3}{4}{5}\n\nserver:  {6}\ntype:     {7} tick {8}\n{9}{10}{11}{12}{13}{14}------------------------\nversion: {15} [XMS v{16}]"
-	}
-	"xms_menu_base_team"
-	{
-		"en"		"change team"
-	}
-	"xms_menu_base_pause"
-	{
-		"en"		"pause/unpause"
-	}
-	"xms_menu_base_voting"
-	{
-		"en"		"voting"
-	}
-	"xms_menu_base_players"
-	{
-		"en"		"players"
-	}
-	"xms_menu_base_settings"
-	{
-		"en"		"settings"
-	}
-	"xms_menu_base_servers"
-	{
-		"en"		"other servers"
-	}
-	
-	"xms_menu_map_filter"
-	{
-		"en"		"select first letter of map"
-	}
-	"xms_menu_map_mode"
-	{
-		"#format" 	"{1:s}"
-		"en"		"choose map for mode: {1}"
-	}
-	"xms_menu_map_keepcurrent"
-	{
-		"en"		"KEEP CURRENT MAP"
-	}
-	"xms_menu_map_sort"
-	{
-		"en"		"SORT BY LETTER"
-	}
-	"xms_menu_map_sortnone"
-	{
-		"en"		"No maps found"
-	}
-	
-	"xms_menu_map_list"
-	{
-		"#format" 	"{1:i}"
-		"en" 		"listing {1} maps..."
-	}
-	"xms_menu_map_sortlist"
-	{
-		"#format" 	"{1:i},{2:s}"
-		"en" 		"listing {1} maps starting with \"{2}\"..."
-	}
-	
-	"xms_menu_run"
-	{
-		"#format" 	"{1:s}"
-		"en" 		"!run {1}\n change NOW, or after this map?"
-	}
-	"xms_menu_run_now"
-	{
-		"en" 		"CHANGE NOW"
-	}
-	"xms_menu_run_next"
-	{
-		"en" 		"AFTER THIS MAP"
-	}
-
-	"xms_menu_fov"
-	{
-		"en" 		"Set your desired field-of-view\n \"!fov <value>\""
-	}
-	
-	"xms_menu_players_admin"
-	{
-		"en" 		"select a player to view admin\nactions (kick, ban, etc)"
-	}
-	"xms_menu_players"
-	{
-		"en" 		"select a player to view their steam\n profile. (press ESC after choosing)\n \"!profile <player>\""
-	}
-	"xms_menu_players_profile"
-	{
-		"en" 		"View Profile*"
-	}
-	"xms_menu_players_allow"
-	{
-		"en" 		"Allow in Match"
-	}
-	"xms_menu_players_forcespec"
-	{
-		"en" 		"Force Spectate"
-	}
-	"xms_menu_players_mute"
-	{
-		"en" 		"MUTE"
-	}
-	"xms_menu_players_unmute"
-	{
-		"en" 		"UNMUTE"
-	}
-	"xms_menu_players_kick"
-	{
-		"en" 		"KICK"
-	}
-	"xms_menu_players_tempban"
-	{
-		"en" 		"BAN (24 hours)"
-	}
-	"xms_menu_players_player"
-	{
-		"#format" 	"{1:s},{2:i},{3:s}"
-		"en" 		"name:     {1}\nuserid:    {2}\nsteamid: {3}\n\n*press ESC after clicking to view"
-	}
-	
-	"xms_menu_voting"
-	{
-		"en" 		"from here, you can call a vote\n to change the game settings."
-	}
-	"xms_menu_voting_map"
-	{
-		"en" 		"change map"
-	}
-	"xms_menu_voting_mode"
-	{
-		"en" 		"change gamemode"
-	}
-	"xms_menu_voting_start"
-	{
-		"en" 		"start a match"
-	}
-	"xms_menu_voting_cancel"
-	{
-		"en" 		"cancel match"
-	}
-	
-	"xms_menu_settings"
-	{
-		"en" 		"set your player preferences.\n\nyour settings will be remembered\n by this server (except for model)"
-	}
-	"xms_menu_settings_model"
-	{
-		"en" 		"change player model"
-	}
-	"xms_menu_settings_fov"
-	{
-		"en" 		"change field-of-view"
-	}
-	"xms_menu_settings_hudcolor"
-	{
-		"en" 		"change HUD color"
-	}
-	"xms_menu_settings_endmusic0"
-	{
-		"en" 		"end music: OFF"
-	}
-	"xms_menu_settings_endmusic1"
-	{
-		"en" 		"end music: ON"
-	}
-	"xms_menu_settings_sounds0"
-	{
-		"en" 		"general sounds: OFF"
-	}
-	"xms_menu_settings_sounds1"
-	{
-		"en" 		"general sounds: ON"
-	}
-	
-	"xms_menu_hudcolor"
-	{
-		"en" 		"choose the color of HUD text.\n (timeleft, spectator hud, etc)\n\n!hudcolor <r> <g> <b>\n (rgb color values 0-255)"
-	}
-	"xms_menu_hudcolor_orange"
-	{
-		"en" 		"Orange (Default)"
-	}
-	"xms_menu_hudcolor_cyan"
-	{
-		"en" 		"Cyan"
-	}
-	"xms_menu_hudcolor_green"
-	{
-		"en" 		"Green"
-	}
-	"xms_menu_hudcolor_red"
-	{
-		"en" 		"Red"
-	}
-	"xms_menu_hudcolor_white"
-	{
-		"en" 		"White"
-	}
-	"xms_menu_hudcolor_grey"
-	{
-		"en" 		"Grey"
-	}
-	"xms_menu_hudcolor_violet"
-	{
-		"en" 		"Violet"
-	}
-	"xms_menu_hudcolor_pink"
-	{
-		"en" 		"Pink"
-	}
-	
-	"xms_serverad"
-	{
-		"#format" 	"{1:s}"
-		"en" 		"{N}Announcement: {I}{1}"
-	}
-
-	"xms_announcedemo"
-	{
-		"#format" 	"{1:s},{2:s},{3:s}"
-		"en" 		"{I}demo saved to: {1}/{2}{3}"
-	}
+    "xmsc_start_deny"
+    {
+        "en"        "{E}[!] {I}Minimum 2 players are required to start a match."
+    }
+    "xmsc_start_denygamemode"
+    {
+        "#format"   "{1:s}"
+        "en"        "{E}[!] {I}The current gamemode ({H}{1}{I}) does not allow matches."
+    }
+    "xmsc_deny_nomatch"
+    {
+        "en"        "{E}[!] {I}A match is not in progress."
+    }
+    "xmsc_deny_noteams"
+    {
+        "en"        "{E}[!] {I}Teams are not enabled in this mode."
+    }
+    "xmsc_cancel_matchex"
+    {
+        "en"        "{E}[!] {I}Don't be a coward - win the game!"
+    }
+    "xmsc_forcespec_usage"
+    {
+        "en"        "{I}Usage: !forcespec <player name or userid>\n Use @all to forcespec everyone."
+    }
+    "xmsc_forcespec_fail"
+    {
+        "#format"   "{1:s}"
+        "en"        "{E}[!] {I}Player {H}{1}{I} is already a spectator."
+    }
+    "xmsc_forcespec_success"
+    {
+        "#format"   "{1:s}"
+        "en"        "{N}Moved {H}{1}{N} to spectators."
+    }
+    "xmsc_forcespec_warning"
+    {
+        "en"        "{E}[!] You have been moved to spectators. {I}Follow admin instructions!"
+    }
+    "xms_match_resumed"
+    {
+        "en"        "{N}Resumed the match."
+    }
+    "xms_match_paused"
+    {
+        "en"        "{N}Paused the match."
+    }
+    "xms_team_assigned"
+    {
+        "#format"   "{1:s}"
+        "en"        "{I}You were assigned to Team {1}."
+    }
+    "xmsc_teamchange_same"
+    {
+        "#format"   "{1:s}"
+        "en"        "{E}[!] {I}You are already in Team {1}"
+    }
+    "xmsc_teamchange_deny"
+    {
+        "en"        "{E}[!] {I}A match is in progress. Please wait your turn to play."
+    }
+    "xms_auto_spectate"
+    {
+        "en"        "{N}You are currently spectating. Say {H}!join {I}to play."
+    }
+    "xms_auto_pause"
+    {
+        "en"        "{E}[!] {N}The match was automatically paused."
+    }
+    "xms_hud_spec1"
+    {
+        "en"        "[FIRE to change player]"
+    }
+    "xms_hud_spec2"
+    {
+        "en"        "[JUMP to change view]"
+    }
+    "xms_hud_overtime"
+    {
+        "en"        "– Overtime –"
+    }
+    "xms_hud_gameover"
+    {
+        "en"        "– Game Over –"
+    }
+    "xms_overtime_draw"
+    {
+        "en"        "{E}Overtime: {N}Nobody took the lead, so the game is a draw."
+    }
+    "xms_overtime_start1"
+    {
+        "#format"   "{1:s}"
+        "en"        "{E}Overtime: {N}The next {1} to score wins!"
+    }
+    "xms_overtime_start2"
+    {
+        "en"        "{E}Overtime: {N}Whoever takes the lead wins!"
+    }
+    "xms_overtime_teamwin"
+    {
+        "#format"   "{1:s}"
+        "en"        "{E}Overtime: {N}Team {H}{1} {N}took the lead and wins the game!"
+    }
+    "xms_overtime_win"
+    {
+        "#format"   "{1:s}"
+        "en"        "{E}Overtime: {H}{1} {N}took the lead and wins the game!"
+    }
+    "xms_nextmap_announce"
+    {
+        "#format"   "{1:s},{2:s},{3:i}"
+        "en"        "{I}Next map is {H}{1}{I}:{H}{2} {I}in {H}{3} {I}seconds."
+    }
+    "xmsc_profile_usage"
+    {
+        "en"        "{I}Usage: !profile <player name or userid>"
+    }
+    "xmsc_shuffle"
+    {
+        "en"        "{N}Shuffled the teams."
+    }
+    "xmsc_invert"
+    {
+        "en"        "{N}Inverted the teams."
+    }
+    "xmsc_coinflip"
+    {
+        "#format"   "{1:s}"
+        "en"        "{N}Flipped a coin - it landed on {H}{1}{N}."
+    }
+    "xmsc_callvote"
+    {
+        "en"        "{N}Called a vote. {H}Vote now!"
+    }
+    "xmsc_callvote_usage"
+    {
+        "en"        "{I}Usage: !vote <motion> - calls a custom yes/no vote"
+    }
+    "xmsc_callvote_deny"
+    {
+        "en"        "{E}[!] {I}A vote is already in progress."
+    }
+    "xmsc_callvote_denywait"
+    {
+        "#format"   "{1:i}"
+        "en"        "{E}[!] {I}Please wait {H}{1} {I}more seconds before calling a vote."
+    }
+    "xmsc_castvote"
+    {
+        "#format"   "{1:s},{2:s}"
+        "en"        "{1} voted: {2}"
+    }
+    "xmsc_castvote_deny"
+    {
+        "en"        "{E}[!] {I}A vote is not in progress."
+    }
+    "xmsc_castvote_denybinary"
+    {
+        "en"        "{E}[!] {I}This vote is multiple-choice. You must vote for a number."
+    }
+    "xmsc_castvote_denymulti"
+    {
+        "en"        "{E}[!] {I}This vote is single choice. Please vote yes or no."
+    }
+    "xmsc_castvote_denyspec"
+    {
+        "en"        "{E}[!] {I}Spectators can't participate in this vote."
+    }
+    "xms_serverad"
+    {
+        "#format"   "{1:s}"
+        "en"        "{N}Server Ad: {I}{1}"
+    }
+    "xms_announcedemo"
+    {
+        "#format"   "{1:s},{2:s},{3:s}"
+        "en"        "{I}Demo saved to: {1}/{2}{3}"
+    }
+    "xms_vote"
+    {
+        "en"        "ᴠᴏᴛᴇ"
+    }
+    "xms_autovote"
+    {
+        "en"        "ᴠᴏᴛᴇ ғᴏʀ ɴᴇxᴛ ᴍᴀᴘ"
+    }
+    "xms_vote_fail"
+    {
+        "en"        "{E}Vote failed."
+    }
+    "xms_vote_success"
+    {
+        "en"        "{H}Vote succeeded."
+    }
+    "xms_vote_draw"
+    {
+        "#format"   "{1:i},{2:s}"
+        "en"        "{I}Vote draw! The server chose {H}{1} {I}({H}{2}){I}."
+    }
 }

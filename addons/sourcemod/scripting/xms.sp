@@ -1,6 +1,10 @@
-#define PLUGIN_VERSION  "1.8"
+#pragma dynamic 2097152
+#pragma semicolon 1
+
+#define PLUGIN_VERSION  "1.9"
 #define PLUGIN_URL      "www.hl2dm.community"
 #define PLUGIN_UPDATE   "http://raw.githubusercontent.com/utharper/sourcemod-hl2dm/master/addons/sourcemod/xms.upd"
+
 public Plugin myinfo = {
     name              = "XMS (eXtended Match System)",
     version           = PLUGIN_VERSION,
@@ -8,11 +12,10 @@ public Plugin myinfo = {
     author            = "harper",
     url               = PLUGIN_URL
 };
-/*************************************************************************************************/
 
-#pragma dynamic 2097152
-#pragma semicolon 1
-#pragma newdecls optional
+/**************************************************************
+ * INCLUDES
+ *************************************************************/
 #include <sourcemod>
 #include <clientprefs>
 #include <steamtools>
@@ -23,37 +26,56 @@ public Plugin myinfo = {
 #include <basecomm>
 
 #undef REQUIRE_PLUGIN
-#include <updater>   
-#define REQUIRE_PLUGIN
+#include <updater>
+#tryinclude <gameme_hud>
 
+#define REQUIRE_PLUGIN
 #pragma newdecls required
 #include <jhl2dm>
 #include <xms>
 
-/*************************************************************************************************/
+/**************************************************************
+ * DEFINITIONS
+ *************************************************************/
+#define BITS_SPRINT          0x00000001
+#define OFFS_COLLISIONGROUP  500
+#define MENU_ROWLEN          32
 
-#define BITS_SPRINT             0x00000001
-#define OFFS_COLLISIONGROUP     500
+#define OVERTIME_TIME        1
+#define DELAY_ACTION         4
 
-#define OVERTIME_TIME           1
-#define DELAY_ACTION            4
+#define SOUND_CONNECT        "friends/friend_online.wav"
+#define SOUND_DISCONNECT     "friends/friend_join.wav"
+#define SOUND_ACTIONPENDING  "buttons/blip1.wav"
+#define SOUND_ACTIONCOMPLETE "hl1/fvox/beep.wav"
+#define SOUND_COMMANDFAIL    "resource/warning.wav"
+#define SOUND_ACTIVATED      "hl1/fvox/activated.wav"
+#define SOUND_DEACTIVATED    "hl1/fvox/deactivated.wav"
+#define SOUND_MENUACTION     "weapons/slam/buttonclick.wav"
 
-#define SOUND_CONNECT           "friends/friend_online.wav"
-#define SOUND_DISCONNECT        "friends/friend_join.wav"
-#define SOUND_ACTIONPENDING     "buttons/blip1.wav"
-#define SOUND_ACTIONCOMPLETE    "hl1/fvox/beep.wav"
-#define SOUND_VOTECALLED        "xms/votecall.wav"
-#define SOUND_VOTEFAILED        "xms/votefail.wav"
-#define SOUND_VOTESUCCESS       "xms/voteaccept.wav"
-#define SOUND_GG                "xms/gg.mp3"
+#define SOUND_VOTECALLED     "xms/votecall.wav"
+#define SOUND_VOTEFAILED     "xms/votefail.wav"
+#define SOUND_VOTESUCCESS    "xms/voteaccept.wav"
+#define SOUND_GG             "xms/gg.mp3"
 
-enum(+=1){
-    VOTE_RUN, VOTE_RUNNEXT, VOTE_MATCH, VOTE_CUSTOM
+enum(+=1)
+{
+    VOTE_RUN, VOTE_RUNNEXT, VOTE_RUNNEXT_AUTO, VOTE_RUNMULTI, VOTE_RUNMULTINEXT,
+    VOTE_MATCH, VOTE_SHUFFLE, VOTE_INVERT, VOTE_CUSTOM
 }
 
-/*************************************************************************************************/
+char gsMusicPath[6][PLATFORM_MAX_PATH] =
+{
+    "music/hl2_song14.mp3",
+    "music/hl2_song20_submix0.mp3",
+    "music/hl2_song15.mp3",
+    "music/hl1_song25_remix3.mp3",
+    "music/hl1_song10.mp3",
+    "music/hl2_song12_long.mp3"
+};
 
-char gsModelPath[19][70] = {
+char gsModelPath[19][70] =
+{
     "models/combine_soldier.mdl",
     "models/combine_soldier_prisonguard.mdl",
     "models/combine_super_soldier.mdl",
@@ -75,244 +97,484 @@ char gsModelPath[19][70] = {
     "models/humans/group03/male_09.mdl"
 };
 
-char gsMusicPath[6][PLATFORM_MAX_PATH] = {
-    "music/hl2_song14.mp3",
-    "music/hl2_song20_submix0.mp3",
-    "music/hl2_song15.mp3",
-    "music/hl1_song25_remix3.mp3",
-    "music/hl1_song10.mp3",
-    "music/hl2_song12_long.mp3"
-};
+/**************************************************************
+ * GLOBAL VARS
+ *************************************************************/
+int         giGamestate,
+            giOvertime,
+            giAllowClient,
+            giPauseClient,
+            giSpawnHealth,
+            giSpawnSuit,
+            giSpawnAmmo     [16][2],
+            giClientMenuType[MAXPLAYERS + 1],
+            giClientVote    [MAXPLAYERS + 1],
+            giClientVoteTick[MAXPLAYERS + 1],
+            giVoteMinPlayers,
+            giVoteMaxTime,
+            giVoteCooldown,
+            giVoteType,
+            giVoteStatus,
+            giAdFrequency;
 
-char gsConfigPath[PLATFORM_MAX_PATH];
-KeyValues ghConfig;
+bool        gbPluginReady,
+            gbModTags,
+            gbGameME,
+            gbClientInit    [MAXPLAYERS + 1],
+            gbClientKill    [MAXPLAYERS + 1],
+            gbAutoVoting,
+            gbTeamplay,
+            gbDisableProps,
+            gbDisableCollisions,
+            gbUnlimitedAux,
+            gbRecording,
+            gbShowKeys,
+            gbNextMapChosen,
+            gbStockMapsIfEmpty;
 
-bool gbPluginReady;
-bool gbModTags;
-float gfPretime;
-float gfEndtime;
+float       gfPretime,
+            gfEndtime;
 
-Handle ghForwardGamestateChanged;
-Handle ghForwardMatchStart;
-Handle ghForwardMatchEnd;
+char        gsConfigPath  [PLATFORM_MAX_PATH],
+            gsFeedbackPath[PLATFORM_MAX_PATH],
+            gsDemoPath    [PLATFORM_MAX_PATH],
+            gsGameId      [128],
+            gsMap         [MAX_MAP_LENGTH],
+            gsNextMap     [MAX_MAP_LENGTH],
+            gsMode        [MAX_MODE_LENGTH],
+            gsModeName    [32],
+            gsNextMode    [MAX_MODE_LENGTH],
+            gsValidModes  [512],
+            gsRetainModes [512],
+            gsDefaultMode [MAX_MODE_LENGTH],
+            gsVoteMotion  [5][192],
+            gsSpawnWeapon [16][32],
+            gsServerName  [32],
+            gsServerMsg   [192],
+            gsDemoURL     [PLATFORM_MAX_PATH],
+            gsDemoFileExt [8],
+            gsStripPrefix [512];
 
-Handle ghCookieMusic;
-Handle ghCookieSounds;
-Handle ghCookieColorR;
-Handle ghCookieColorG;
-Handle ghCookieColorB;
+Handle      ghForwardGamestateChanged,
+            ghForwardMatchStart,
+            ghForwardMatchEnd,
+            ghForwardFeedback,
+            ghTimeHud,
+            ghVoteHud,
+            ghKeysHud,
+            ghOvertimer = INVALID_HANDLE,
+            ghCookieMusic,
+            ghCookieSounds,
+            ghCookieColorR,
+            ghCookieColorG,
+            ghCookieColorB;
 
-Handle ghTimeHud;
-Handle ghVoteHud;
-Handle ghKeysHud;
-Handle ghOvertimer = INVALID_HANDLE;
+ConVar      ghConVarTags,
+            ghConVarTimelimit,
+            ghConVarTeamplay,
+            ghConVarChattime,
+            ghConVarFF,
+            ghConVarPausable,
+            ghConVarTv,
+            ghConVarNextmap,
+            ghConVarRestart;
 
-ConVar ghConVarTags;
-ConVar ghConVarTimelimit;
-ConVar ghConVarTeamplay;
-ConVar ghConVarChattime;
-ConVar ghConVarFriendlyfire;
-ConVar ghConVarPausable;
-ConVar ghConVarTv;
-ConVar ghConVarNextmap;
-ConVar ghConVarRestart;
+KeyValues   gkConfig;
 
-int giGamestate;
-int giOvertime;
-char gsGameId[128];
-char gsMap[MAX_MAP_LENGTH];
-char gsNextMap[MAX_MAP_LENGTH];
-char gsMode[MAX_MODE_LENGTH];
-char gsModeName[32];
-char gsNextMode[MAX_MODE_LENGTH];
-char gsValidModes[512];
-char gsRetainModes[512];
-char gsDefaultMode[MAX_MODE_LENGTH];
+StringMap   gmTeams,
+            gmMenu          [MAXPLAYERS + 1];
 
-int giAllowClient;
-int giPauseClient;
-bool gbClientInit[MAXPLAYERS + 1];
-bool gbClientNoRagdoll[MAXPLAYERS + 1];
-Menu ghMenuClient[MAXPLAYERS + 1];
-int giClientMenuType[MAXPLAYERS + 1];
-
-char gsVoteMotion[128];
-int giVoteMinPlayers;
-int giVoteMaxTime;
-int giVoteCooldown;
-int giVoteType;
-int giVoteStatus;
-int giClientVote[MAXPLAYERS + 1];
-int giClientVoteCallTick[MAXPLAYERS + 1];
-
-int giSpawnHealth;
-int giSpawnSuit;
-char gsSpawnWeapon[16][32];
-int giSpawnAmmo[16][2];
-
-bool gbTeamplay;
-bool gbDisableProps;
-bool gbDisableCollisions;
-bool gbUnlimitedAux;
-bool gbRecording;
-bool gbShowKeys;
-
-char gsServerName[32];
-char gsServerAdmin[32];
-char gsServerURL[32];
-char gsDemoPath[PLATFORM_MAX_PATH];
-char gsDemoURL[PLATFORM_MAX_PATH];
-char gsDemoExtension[8];
-
-char gsRemovePrefixes[512];
-int giAdFrequency;
-
-StringMap gsmTeams;
-
-/**************************************************************************************************/
-
-public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max)
+/**************************************************************
+ * NATIVES
+ *************************************************************/
+public int Native_GetConfigString(Handle hPlugin, int iParams)
 {
-    CreateNative("GetConfigKeys", Native_GetConfigKeys);
-    CreateNative("GetConfigString", Native_GetConfigString);
-    CreateNative("GetConfigInt", Native_GetConfigInt);
-    CreateNative("GetGamestate", Native_GetGamestate);
-    CreateNative("GetGamemode", Native_GetGamemode);
-    CreateNative("GetTimeRemaining", Native_GetTimeRemaining);
-    CreateNative("GetTimeElapsed", Native_GetTimeElapsed);
-    CreateNative("GetGameID", Native_GetGameID);
-    CreateNative("IsGamestate", Native_IsGamestate);
-    
-    ghForwardMatchStart = CreateGlobalForward("OnMatchStart", ET_Event);
-    ghForwardMatchEnd =     CreateGlobalForward("OnMatchEnd", ET_Event, Param_Cell);
-    ghForwardGamestateChanged = CreateGlobalForward("OnGamestateChanged", ET_Event, Param_Cell, Param_Cell);
+    char sValue[1024],
+         sKey  [32],
+         sInKey[32];
 
-    RegPluginLibrary("xms");
-}
+    gkConfig.Rewind();
+    GetNativeString(3, sKey, sizeof(sKey));
 
-public int Native_GetConfigString(Handle plugin, int params)
-{
-    char value[1024], key[32], inKey[32];
+    for (int i = 4; i <= iParams; i++)
+    {
+        GetNativeString(i, sInKey, sizeof(sInKey));
 
-    ghConfig.Rewind();
-    GetNativeString(3, key, sizeof(key));
-    for(int p = 4; p <= params; p++) {
-        GetNativeString(p, inKey, sizeof(inKey));
-        if(!strlen(inKey)) {
+        if (!strlen(sInKey)) {
             continue;
         }
-        
-        if(!ghConfig.JumpToKey(inKey)) {
+
+        if (!gkConfig.JumpToKey(sInKey)) {
             return -1;
         }
     }
 
-    if(ghConfig.GetString(key, value, sizeof(value))) {
-        if(StrEqual(value, NULL_STRING)) {
+    if (gkConfig.GetString(sKey, sValue, sizeof(sValue)))
+    {
+        if (!strlen(sValue)) {
             return 0;
         }
-        
-        SetNativeString(1, value, GetNativeCell(2));
+
+        SetNativeString(1, sValue, GetNativeCell(2));
         return 1;
     }
+
     return -1;
 }
 
-public int Native_GetConfigInt(Handle plugin, int params)
+public int Native_GetConfigInt(Handle hPlugin, int iParams)
 {
-    char value[32], key[32], inKey[4][32];
-    
-    GetNativeString(1, key, sizeof(key));
-    for(int p = 2; p <= params; p++) {
-        GetNativeString(p, inKey[p-2], sizeof(inKey[]));
+    char sValue[32],
+         sKey  [32],
+         sInKey[4][32];
+
+    GetNativeString(1, sKey, sizeof(sKey));
+
+    for (int i = 2; i <= iParams; i++) {
+        GetNativeString(i, sInKey[i - 2], sizeof(sInKey[]));
     }
 
-    if(GetConfigString(value, sizeof(value), key, inKey[0], inKey[1], inKey[2], inKey[3])) {
-        return StringToInt(value);
+    if (GetConfigString(sValue, sizeof(sValue), sKey, sInKey[0], sInKey[1], sInKey[2], sInKey[3])) {
+        return StringToInt(sValue);
     }
+
     return -1;
 }
 
-public int Native_GetConfigKeys(Handle plugin, int params)
+public int Native_GetConfigKeys(Handle hPlugin, int iParams)
 {
-    int count;
-    char subkeys[1024], inKey[32];
-    
-    ghConfig.Rewind();
-    for(int p = 3; p <= params; p++) {
-        GetNativeString(p, inKey, sizeof(inKey));
-        if(!ghConfig.JumpToKey(inKey)) {
+    char sKeys [1024],
+         sInKey[32];
+    int  iCount;
+
+    gkConfig.Rewind();
+
+    for (int i = 3; i <= iParams; i++)
+    {
+        GetNativeString(i, sInKey, sizeof(sInKey));
+        if (!gkConfig.JumpToKey(sInKey)) {
             return -1;
         }
     }
-    
-    if(ghConfig.GotoFirstSubKey(false)) {
+
+    if (gkConfig.GotoFirstSubKey(false))
+    {
         do {
-            ghConfig.GetSectionName(subkeys[strlen(subkeys)], sizeof(subkeys));
-            subkeys[strlen(subkeys)] = ',';
-            count++;
-        } while(ghConfig.GotoNextKey(false));
-        
-        subkeys[strlen(subkeys) - 1] = 0;
-        SetNativeString(1, subkeys, GetNativeCell(2));
-        return count;
+            gkConfig.GetSectionName(sKeys[strlen(sKeys)], sizeof(sKeys));
+            sKeys[strlen(sKeys)] = ',';
+            iCount++;
+        }
+        while (gkConfig.GotoNextKey(false));
+
+        sKeys[strlen(sKeys) - 1] = 0;
+        SetNativeString(1, sKeys, GetNativeCell(2));
+
+        return iCount;
     }
 
     return -1;
 }
 
-public int Native_GetGamestate(Handle plugin, int numParams)
+public int Native_GetGamestate(Handle hPlugin, int iParams)
 {
     return giGamestate;
 }
 
-public int Native_GetGamemode(Handle plugin, int numParams)
+public int Native_GetGamemode(Handle hPlugin, int iParams)
 {
-    int bytes;
-    SetNativeString(1, gsMode, GetNativeCell(2), true, bytes);
-    return bytes;
+    int iBytes;
+
+    SetNativeString(1, gsMode, GetNativeCell(2), true, iBytes);
+    return iBytes;
 }
 
-public int Native_GetTimeRemaining(Handle plugin, int numParams)
+public int Native_GetGameID(Handle hPlugin, int iParams)
 {
-    float t = ghConVarTimelimit.FloatValue * 60 - GetGameTime() + gfPretime;
-        
-    if(GetNativeCell(1)) {
-        if(IsGamestate(GAME_OVER)) {
+    int iBytes;
+
+    SetNativeString(1, gsGameId, GetNativeCell(2), true, iBytes);
+    return iBytes;
+}
+
+public int Native_GetTimeRemaining(Handle hPlugin, int iParams)
+{
+    float fTime = (ghConVarTimelimit.FloatValue * 60 - GetGameTime() + gfPretime);
+
+    if (GetNativeCell(1))
+    {
+        if (giGamestate == GAME_OVER) {
             return view_as<int>(ghConVarChattime.FloatValue - (GetGameTime() - gfEndtime));
         }
-        return view_as<int>(t + ghConVarChattime.FloatValue);
+        return view_as<int>(fTime + ghConVarChattime.FloatValue);
     }
-    
-    return view_as<int>(t);
+
+    return view_as<int>(fTime);
 }
 
-public int Native_GetTimeElapsed(Handle plugin, int numParams)
+public int Native_GetTimeElapsed(Handle hPlugin, int iParams)
 {
     return view_as<int>(GetGameTime() - gfPretime);
 }
 
-public int Native_IsGamestate(Handle plugin, int params)
+public int Native_XMenu(Handle hPlugin, int iParams)
 {
-    for(int p = 1; p <= params; p++) {
-        if(GetNativeCellRef(p) == giGamestate) {
-            return 1;
+    int         iClient     = GetNativeCell(1),
+                iPage       = 0,
+                iOptions[2] = 0;
+    bool        bBackButton = GetNativeCell(2),
+                bExitButton,
+                bNumbered   = GetNativeCell(3),
+                bNextButton;
+    char        sCommandBase[64],
+                sCommandBack[64],
+                sTitle      [64],
+                sMessage    [1024];
+    KeyValues   kPanel [64];
+    StringMap   mMenu       = CreateTrie();
+    DataPack    dOptions    = view_as<DataPack>(GetNativeCell(7));
+    DataPackPos dOptionsEnd = GetPackPosition(dOptions);
+
+    GetNativeString(4, sCommandBase, sizeof(sCommandBase));
+    GetNativeString(5, sTitle,   sizeof(sTitle));
+    GetNativeString(6, sMessage, sizeof(sMessage));
+
+    for (int i = strlen(sCommandBase); i > 0; i--)
+    {
+        if (IsCharSpace(sCommandBase[i]))
+        {
+            strcopy(sCommandBack, sizeof(sCommandBack), sCommandBase);
+            sCommandBack[i] = '\0';
+            break;
         }
     }
-    return 0;
+
+    dOptions.Reset();
+
+    do // Loop through pages
+    {
+        char sOption[256],
+             sCommand[128];
+
+        iOptions[0]   = 0;
+        kPanel[iPage] = new KeyValues("menu");
+
+        // Add back button at top of page:
+        if (iPage >= 1)
+        {
+            if (bBackButton) {
+                bExitButton = true;
+            }
+            bBackButton = true;
+        }
+
+        if (bExitButton)
+        {
+            Format(sOption, sizeof(sOption), "%T", bBackButton ? "xmenu_exit" : "xmenu_back", iClient);
+
+            kPanel[iPage].JumpToKey("1", true);
+            kPanel[iPage].SetString("msg", sOption);
+            kPanel[iPage].SetString("command", sCommandBack);
+            kPanel[iPage].Rewind();
+
+            iOptions[0]++;
+        }
+
+        if (bBackButton)
+        {
+            Format(sOption, sizeof(sOption), "%T", "xmenu_back", iClient);
+
+            kPanel[iPage].JumpToKey(bExitButton ? "2" : "1", true);
+            kPanel[iPage].SetString("msg", sOption);
+            kPanel[iPage].SetString("command", iPage >= 1 ? "sm_xmenu_back" : sCommandBack);
+            kPanel[iPage].Rewind();
+
+            iOptions[0]++;
+        }
+
+        // Loop through options:
+        for (int i = iOptions[0] + 1; i <= 8; i++)
+        {
+            if (GetPackPosition(dOptions) == dOptionsEnd)
+            {
+                // Pack is finished.
+                bNextButton = false;
+                break;
+            }
+
+            if (i == 8)
+            {
+                // Max number of options is reached, paginate:
+                bNextButton = true;
+                break;
+            }
+
+            // Fetch option from pack:
+            dOptions.ReadString(sOption, sizeof(sOption));
+
+            if (!strlen(sOption)) {
+                bNextButton = false;
+                break;
+            }
+
+            iOptions[0]++;
+            iOptions[1]++;
+
+            // Fetch or generate command:
+            int iPos = StrContains(sOption, ";");
+
+            if (iPos != -1) {
+                Format(sCommand, sizeof(sCommand), "%s %s", sCommandBase, sOption[iPos+1]);
+                sOption[iPos] = '\0';
+            }
+            else {
+                Format(sCommand, sizeof(sCommand), "%s %i" , sCommandBase, iOptions[1]);
+            }
+
+            // Append option number to name:
+            if (bNumbered) {
+                Format(sOption,  sizeof(sOption), "%i. %s", iOptions[1], sOption);
+            }
+
+            // Save values:
+            kPanel[iPage].JumpToKey(IntToChar(iOptions[0]), true);
+            kPanel[iPage].SetString("msg", sOption);
+            kPanel[iPage].SetString("command", sCommand);
+            kPanel[iPage].Rewind();
+        }
+
+        // Add next button at bottom of page:
+        if (bNextButton)
+        {
+            Format(sOption, sizeof(sOption), "%T", "xmenu_next", iClient);
+
+            kPanel[iPage].JumpToKey(IntToChar(iOptions[0] + 1), true);
+            kPanel[iPage].SetString("msg", sOption);
+            kPanel[iPage].SetString("command", "sm_xmenu_next");
+            kPanel[iPage].Rewind();
+        }
+
+        iPage++;
+    }
+    while (GetPackPosition(dOptions) != dOptionsEnd && iPage < 64);
+
+    dOptions.Close();
+
+    // Record the number of pages:
+    mMenu.SetValue("count", iPage);
+    mMenu.SetValue("type", DialogType_Menu);
+
+    // Set basic page options and add them to map:
+    for (int i = 0; i < iPage; i++)
+    {
+        char sPageTitle[64];
+
+        if (iPage > 1) {
+            Format(sPageTitle, sizeof(sPageTitle), "%s (%i/%i)", sTitle, i + 1, iPage);
+        }
+        else {
+            strcopy(sPageTitle, sizeof(sPageTitle), sTitle);
+        }
+
+        kPanel[i].SetString ("title", sPageTitle);
+        kPanel[i].SetNum    ("level", 1); // ?
+        kPanel[i].SetColor  ("color", 255, 100, 100, 255); // TODO
+        kPanel[i].SetString ("msg"  , sMessage);
+
+        // Save:
+        mMenu.SetValue(IntToChar(i + 1), kPanel[i]);
+    }
+
+    return view_as<int>(mMenu);
 }
 
-public int Native_GetGameID(Handle plugin, int numParams)
+public int Native_XMenuQuick(Handle hPlugin, int iParams)
 {
-    int bytes;
-    SetNativeString(1, gsGameId, GetNativeCell(2), true, bytes);
-    return bytes;
+    int      iClient    = GetNativeCell(1),
+             iTranslate = GetNativeCell(2);
+    char     sCommandBase[64],
+             sTitle      [64],
+             sMessage    [1024];
+    DataPack dOptions   = CreateDataPack();
+
+    GetNativeString(5, sCommandBase, sizeof(sCommandBase));
+    GetNativeString(6, sTitle, sizeof(sTitle));
+    GetNativeString(7, sMessage, sizeof(sMessage));
+
+    if (iTranslate >= 1)
+    {
+        if (iTranslate < 5) {
+            AttemptTranslation(sTitle, sizeof(sTitle), iClient);
+        }
+
+        if (iTranslate >= 2 && iTranslate != 4 && iTranslate != 7) {
+            AttemptTranslation(sMessage, sizeof(sMessage), iClient);
+        }
+    }
+
+    dOptions.Reset();
+
+    for (int i = 8; i <= iParams; i++)
+    {
+        char sOption[2][512];
+        GetNativeString(i, sOption[0], sizeof(sOption[]));
+
+        if (strlen(sOption[0]))
+        {
+            if (iTranslate >= 3 && iTranslate != 6)
+            {
+                int iPos = StrContains(sOption[0], ";");
+
+                if (iPos != -1) {
+                    strcopy(sOption[1], sizeof(sOption[]), sOption[0][iPos+1]);
+                    sOption[0][iPos] = '\0';
+                }
+
+                AttemptTranslation(sOption[0], sizeof(sOption[]), iClient);
+
+                if (iPos != -1) {
+                    Format(sOption[0], sizeof(sOption[]), "%s;%s", sOption[0], sOption[1]);
+                }
+            }
+
+            dOptions.WriteString(sOption[0]);
+        }
+    }
+
+    return view_as<int>(XMenu(iClient, GetNativeCell(3), GetNativeCell(4), sCommandBase, sTitle, sMessage, dOptions));
 }
 
-void Forward_OnGamestateChanged(int state)
+public int Native_XMenuBox(Handle hPlugin, int iParams)
+{
+    int       iType  = GetNativeCell(4);
+    char      sCommandBase[64],
+              sTitle      [64],
+              sMessage    [MAX_BUFFER_LENGTH];
+    StringMap mMenu  = CreateTrie();
+    KeyValues kPanel = new KeyValues("menu");
+
+    GetNativeString(1, sCommandBase, sizeof(sCommandBase));
+    GetNativeString(2, sTitle, sizeof(sTitle));
+    GetNativeString(3, sMessage, sizeof(sMessage));
+
+    kPanel.SetString("title", sTitle);
+    kPanel.SetString("msg", sMessage);
+    kPanel.SetString("command", sCommandBase);
+    kPanel.SetNum("level", 1);
+
+    mMenu.SetValue("count", 1);
+    mMenu.SetValue("type", iType);
+    mMenu.SetValue("1", kPanel);
+
+    return view_as<int>(mMenu);
+}
+
+/**************************************************************
+ * FORWARDS
+ *************************************************************/
+void Forward_OnGamestateChanged(int iState)
 {
     Call_StartForward(ghForwardGamestateChanged);
-    Call_PushCell(state);
+    Call_PushCell(iState);
     Call_PushCell(giGamestate);
     Call_Finish();
 }
@@ -323,205 +585,196 @@ void Forward_OnMatchStart()
     Call_Finish();
 }
 
-void Forward_OnMatchEnd(bool matchCompleted)
+void Forward_OnMatchEnd(bool bCompleted)
 {
     Call_StartForward(ghForwardMatchEnd);
-    Call_PushCell(view_as<int>(matchCompleted));
+    Call_PushCell(view_as<int>(bCompleted));
     Call_Finish();
 }
 
-/*************************************************************************************************/
+void Forward_OnClientFeedback(const char[] sFeedback, const char[] sName, const char[] sID, const char[] sGameID)
+{
+    Call_StartForward(ghForwardFeedback);
+    Call_PushString(sFeedback);
+    Call_PushString(sName);
+    Call_PushString(sID);
+    Call_PushString(sGameID);
+    Call_Finish();
+}
+
+/**************************************************************
+ * CORE
+ *************************************************************/
+public APLRes AskPluginLoad2(Handle hPlugin, bool bLate, char[] sError, int iLen)
+{
+    CreateNative("GetConfigKeys",    Native_GetConfigKeys);
+    CreateNative("GetConfigString",  Native_GetConfigString);
+    CreateNative("GetConfigInt",     Native_GetConfigInt);
+    CreateNative("GetGamestate",     Native_GetGamestate);
+    CreateNative("GetGamemode",      Native_GetGamemode);
+    CreateNative("GetTimeRemaining", Native_GetTimeRemaining);
+    CreateNative("GetTimeElapsed",   Native_GetTimeElapsed);
+    CreateNative("GetGameID",        Native_GetGameID);
+    CreateNative("XMenu",            Native_XMenu);
+    CreateNative("XMenuQuick",       Native_XMenuQuick);
+    CreateNative("XMenuBox",         Native_XMenuBox);
+
+    ghForwardMatchStart       = CreateGlobalForward("OnMatchStart",       ET_Event);
+    ghForwardMatchEnd         = CreateGlobalForward("OnMatchEnd",         ET_Event, Param_Cell);
+    ghForwardGamestateChanged = CreateGlobalForward("OnGamestateChanged", ET_Event, Param_Cell, Param_Cell);
+    ghForwardFeedback         = CreateGlobalForward("OnClientFeedback",   ET_Event, Param_String, Param_String, Param_String, Param_String);
+
+    RegPluginLibrary("xms");
+}
 
 public void OnPluginStart()
 {
-    BuildPath(Path_SM, gsConfigPath, PLATFORM_MAX_PATH, "configs/xms.cfg");
+    CreateConVar("xms_version", PLUGIN_VERSION, _, FCVAR_NOTIFY);
+    BuildPath(Path_SM, gsConfigPath,   PLATFORM_MAX_PATH, "configs/xms.cfg");
+    BuildPath(Path_SM, gsFeedbackPath, PLATFORM_MAX_PATH, "logs/xms_feedback.log");
     LoadTranslations("common.phrases.txt");
     LoadTranslations("xms.phrases.txt");
-    
-    // commands
-    RegConsoleCmd("run",         Cmd_Run, "[vote to] change the current map");
-    RegConsoleCmd("runnow",      Cmd_Run, "[vote to] change the current map");
-    RegConsoleCmd("runnext",     Cmd_Run, "[vote to] set the next map");
-    RegConsoleCmd("start",       Cmd_Start, "[vote to] start a match");
-    RegConsoleCmd("cancel",      Cmd_Cancel, "[vote to] cancel the match");
-    RegConsoleCmd("list",        Cmd_MapList, "view a list of available maps");
-    RegConsoleCmd("maplist",     Cmd_MapList, "view a list of available maps");
-    RegConsoleCmd("profile",     Cmd_Profile, "view a player's steam profile");
-    RegConsoleCmd("showprofile", Cmd_Profile, "view a player's steam profile");
-    RegConsoleCmd("info",        Cmd_Profile, "view a player's steam profile");
-    RegConsoleCmd("menu",        Cmd_Menu, "display the XMS menu");
-    RegConsoleCmd("model",       Cmd_Model, "change player model");
-    RegConsoleCmd("vote",        Cmd_CallVote, "call a custom vote");
-    RegConsoleCmd("yes",         Cmd_CastVote, "vote yes");
-    RegConsoleCmd("no",          Cmd_CastVote, "vote no");
-    RegConsoleCmd("hudcolor",    Cmd_HudColor, "set hud color");
-    RegAdminCmd("forcespec", AdminCmd_Forcespec, ADMFLAG_GENERIC, "force a player to spectate");
-    RegAdminCmd("allow",     AdminCmd_AllowJoin, ADMFLAG_GENERIC, "allow a player to join the match");
-    
-    AddCommandListener(ListenCmd_Fov,   "sm_fov");
-    AddCommandListener(ListenCmd_Team,  "jointeam");
-    AddCommandListener(ListenCmd_Team,  "spectate");
-    AddCommandListener(ListenCmd_Pause, "pause");
-    AddCommandListener(ListenCmd_Pause, "unpause");
-    AddCommandListener(ListenCmd_Pause, "setpause");
-    AddCommandListener(OnMapChanging,   "changelevel");
-    AddCommandListener(OnMapChanging,   "changelevel_next");
-    AddCommandListener(Listen_Basecommands, "timeleft");
-    AddCommandListener(Listen_Basecommands, "nextmap");
-    AddCommandListener(Listen_Basecommands, "currentmap");
-    AddCommandListener(Listen_Basecommands, "ff");
+    LoadTranslations("xms_menu.phrases.txt");
+    RegisterColors();
 
-    // cookies
-    ghCookieMusic =  RegClientCookie("xms_endmusic", "Enable game end music", CookieAccess_Public);
-    ghCookieSounds = RegClientCookie("xms_miscsounds", "Enable plugin alert sounds", CookieAccess_Public);
+    gmTeams   = CreateTrie();
+    ghKeysHud = CreateHudSynchronizer();
+    ghTimeHud = CreateHudSynchronizer();
+    ghVoteHud = CreateHudSynchronizer();
+
+    ghCookieMusic  = RegClientCookie("xms_endmusic", "Enable music at the end of each map", CookieAccess_Public);
+    ghCookieSounds = RegClientCookie("xms_miscsounds", "Enable beeps and other XMS command sounds", CookieAccess_Public);
     ghCookieColorR = RegClientCookie("hudcolor_r", "HUD color red value", CookieAccess_Public);
     ghCookieColorG = RegClientCookie("hudcolor_g", "HUD color green value", CookieAccess_Public);
     ghCookieColorB = RegClientCookie("hudcolor_b", "HUD color blue value", CookieAccess_Public);
 
-    // prepare vars
-    gsmTeams = CreateTrie();
-    ghKeysHud = CreateHudSynchronizer();
-    ghTimeHud = CreateHudSynchronizer();
-    ghVoteHud = CreateHudSynchronizer();
-    
-    // text colors
-    MC_AddColor("N", COLOR_NORMAL);
-    MC_AddColor("I", COLOR_INFORMATION);
-    MC_AddColor("H", COLOR_HIGHLIGHT);
-    MC_AddColor("E", COLOR_ERROR);
-    
-    // events
-    HookEvent("player_changename",     Event_GameMessage, EventHookMode_Pre);
-    HookEvent("player_connect_client", Event_GameMessage, EventHookMode_Pre);    
-    HookEvent("player_team",       Event_GameMessage, EventHookMode_Pre);
-    HookEvent("player_connect",    Event_GameMessage, EventHookMode_Pre);
-    HookEvent("player_disconnect", Event_GameMessage,EventHookMode_Pre);
-    HookEvent("round_start",   Event_RoundStart, EventHookMode_Post);
-    HookEvent("player_death",  Event_PlayerDeath, EventHookMode_Post);
-    HookEvent("player_spawn",  Event_PlayerSpawn, EventHookMode_Post);
-    HookUserMessage(GetUserMessageId("TextMsg"), UserMsg_TextMsg, true);
-    HookUserMessage(GetUserMessageId("VGUIMenu"), UserMsg_VGUIMenu, false);
-    
-    // convars
-    CreateConVar("xms_version", PLUGIN_VERSION, _, FCVAR_NOTIFY);
-    
-    ghConVarTv =       FindConVar("tv_enable");
+    ghConVarTv       = FindConVar("tv_enable");
     ghConVarPausable = FindConVar("sv_pausable");
     ghConVarTeamplay = FindConVar("mp_teamplay");
     ghConVarChattime = FindConVar("mp_chattime");
-    ghConVarRestart =  FindConVar("mp_restartgame");
-    ghConVarFriendlyfire = FindConVar("mp_friendlyfire");
-    ghConVarNextmap =   FindConVar("sm_nextmap");
-    ghConVarTags =      FindConVar("sv_tags");
+    ghConVarRestart  = FindConVar("mp_restartgame");
+    ghConVarFF       = FindConVar("mp_friendlyfire");
+    ghConVarNextmap  = FindConVar("sm_nextmap");
+    ghConVarTags     = FindConVar("sv_tags");
     ghConVarTimelimit = FindConVar("mp_timelimit");
-    ghConVarRestart  . AddChangeHook(OnGameRestarting);
-    ghConVarNextmap  . AddChangeHook(OnNextmapChanged);
-    ghConVarTags     . AddChangeHook(OnTagsChanged);
-    ghConVarTimelimit. AddChangeHook(OnTimelimitChanged);
 
-    // ready to go
+    ghConVarRestart.  AddChangeHook(OnGameRestarting);
+    ghConVarNextmap.  AddChangeHook(OnNextmapChanged);
+    ghConVarTags.     AddChangeHook(OnTagsChanged);
+    ghConVarTimelimit.AddChangeHook(OnTimelimitChanged);
+    HookEvents();
+    AddCommandListener(OnMapChanging, "changelevel");
+    AddCommandListener(OnMapChanging, "changelevel_next");
+
+    RegisterMainCommands();
+    // Internal use commands:
+    RegConsoleCmd("sm_xmenu",      XMenuAction);
+    RegConsoleCmd("sm_xmenu_back", XMenuBack);
+    RegConsoleCmd("sm_xmenu_next", XMenuNext);
+
     AddPluginTag();
     LoadConfigValues();
-    
+
     CreateTimer(0.1, T_KeysHud, _, TIMER_REPEAT);
     CreateTimer(0.1, T_TimeHud, _, TIMER_REPEAT);
-    CreateTimer(1.0, T_Voting, _, TIMER_REPEAT);
-    if(giAdFrequency) {
+    CreateTimer(1.0, T_Voting,  _, TIMER_REPEAT);
+
+    if (giAdFrequency) {
         CreateTimer(float(giAdFrequency), T_Adverts, _, TIMER_REPEAT);
     }
-    
-    if(LibraryExists("updater")) {
+
+    if (LibraryExists("updater")) {
         Updater_AddPlugin(PLUGIN_UPDATE);
     }
-}
 
-public void OnLibraryAdded(const char[] name)
-{
-    if(StrEqual(name, "updater")) {
-        Updater_AddPlugin(PLUGIN_UPDATE);
-    }
-}
-
-public void OnAllPluginsLoaded()
-{
-    if(!gbPluginReady) {
-        // on first load we will restart the map - avoids issues with sourcetv etc
-        CreateTimer(1.0, T_RestartMap, _, TIMER_FLAG_NO_MAPCHANGE);
-    }
+    #if defined _gameme_hud_included
+        if (LibraryExists("gameme_hud")) {
+            gbGameME = true;
+        }
+    #endif
 }
 
 void AddPluginTag()
 {
-    char tags[128];
-    ghConVarTags.GetString(tags, sizeof(tags));
-  
-    if(StrContains(tags, "xms") == -1)
+    char sTags[128];
+
+    ghConVarTags.GetString(sTags, sizeof(sTags));
+
+    if (StrContains(sTags, "xms") == -1)
     {
-        StrCat(tags, sizeof(tags), tags[0] != 0 ? ",xms" : "xms");
+        StrCat(sTags, sizeof(sTags), sTags[0] != 0 ? ",xms" : "xms");
         gbModTags = true;
-        ghConVarTags.SetString(tags);
+        ghConVarTags.SetString(sTags);
         gbModTags = false;
     }
 }
 
 void LoadConfigValues()
 {
-    ghConfig = new KeyValues("");
-    ghConfig.ImportFromFile(gsConfigPath);
-  
-    if(!GetConfigKeys(gsValidModes, sizeof(gsValidModes), "gamemodes") || !GetConfigString(gsDefaultMode, sizeof(gsDefaultMode), "defaultMode")) {
+    gkConfig = new KeyValues("xms");
+    gkConfig.ImportFromFile(gsConfigPath);
+
+    // Core settings:
+    if (!GetConfigKeys(gsValidModes, sizeof(gsValidModes), "Gamemodes") || !GetConfigString(gsDefaultMode, sizeof(gsDefaultMode), "DefaultMode")) {
         LogError("xms.cfg missing or corrupted!");
     }
-    GetConfigString(gsDemoPath, sizeof(gsDemoPath), "demoFolder");
-    GetConfigString(gsDemoURL, sizeof(gsDemoURL), "demoURL");
-    GetConfigString(gsDemoExtension, sizeof(gsDemoExtension), "demoExtension");
-    GetConfigString(gsServerName, sizeof(gsServerName), "serverName");
-    GetConfigString(gsServerAdmin, sizeof(gsServerAdmin), "serverAdmin");
-    GetConfigString(gsServerURL, sizeof(gsServerURL), "serverURL");
-    GetConfigString(gsRetainModes, sizeof(gsRetainModes), "retainModes");
-    GetConfigString(gsRemovePrefixes, sizeof(gsRemovePrefixes), "stripPrefix", "maps");
-  
-    if(!GetConfigString(gsModeName, sizeof(gsModeName), "name", "gamemodes", gsMode)) {
-        gsModeName = "";
+
+    if (GetConfigString(gsServerMsg,    sizeof(gsServerMsg),        "MenuMessage") == 1) {
+        FormatMenuMessage(gsServerMsg, gsServerMsg, sizeof(gsServerMsg));
     }
-  
-    giSpawnHealth = GetConfigInt("spawnHealth", "gamemodes", gsMode);
-    giSpawnSuit = GetConfigInt("spawnSuit", "gamemodes", gsMode);    
-    gbDisableCollisions = (GetConfigInt("noCollisions", "gamemodes", gsMode) == 1);
-    gbUnlimitedAux = (GetConfigInt("unlimitedAux", "gamemodes", gsMode) == 1);
-    gbDisableProps = (GetConfigInt("disableProps", "gamemodes", gsMode) == 1);
-    giOvertime = (GetConfigInt("overtime", "gamemodes", gsMode) == 1);
-    gbShowKeys = (GetConfigInt("selfkeys", "gamemodes", gsMode) == 1);
-    giAdFrequency = GetConfigInt("frequency", "serverAds");
-    giVoteMinPlayers = GetConfigInt("voteMinPlayers");
-    giVoteMaxTime = GetConfigInt("voteMaxTime");
-    giVoteCooldown = GetConfigInt("voteCooldown");
-    
-    char weapons[512], weapon[16][32];
-    if(GetConfigString(weapons, sizeof(weapons), "spawnWeapons", "gamemodes", gsMode))
+
+    GetConfigString(gsDemoPath,         sizeof(gsDemoPath),         "DemoFolder");
+    GetConfigString(gsDemoURL,          sizeof(gsDemoURL),          "DemoURL");
+    GetConfigString(gsDemoFileExt,    sizeof(gsDemoFileExt),    "DemoExtension");
+    GetConfigString(gsServerName,       sizeof(gsServerName),       "ServerName");
+    GetConfigString(gsRetainModes,      sizeof(gsRetainModes),      "RetainModes");
+    GetConfigString(gsStripPrefix,   sizeof(gsStripPrefix),   "StripPrefix", "Maps");
+    GetConfigString(gsModeName,         sizeof(gsModeName),         "Name", "Gamemodes", gsMode);
+
+    giAdFrequency       = GetConfigInt("Frequency", "ServerAds");
+    giVoteMinPlayers    = GetConfigInt("VoteMinPlayers");
+    giVoteMaxTime       = GetConfigInt("VoteMaxTime");
+    giVoteCooldown      = GetConfigInt("VoteCooldown");
+    gbAutoVoting        = GetConfigInt("AutoVoting") == 1;
+    gbStockMapsIfEmpty  = GetConfigInt("UseStockMapsIfEmpty") == 1;
+
+    // Gamemode settings:
+    giSpawnHealth       = GetConfigInt("SpawnHealth",   "Gamemodes", gsMode);
+    giSpawnSuit         = GetConfigInt("SpawnSuit",     "Gamemodes", gsMode);
+    gbDisableCollisions = GetConfigInt("NoCollisions",  "Gamemodes", gsMode) == 1;
+    gbUnlimitedAux      = GetConfigInt("UnlimitedAux",  "Gamemodes", gsMode) == 1;
+    gbDisableProps      = GetConfigInt("DisableProps",  "Gamemodes", gsMode) == 1;
+    giOvertime          = GetConfigInt("Overtime",      "Gamemodes", gsMode) == 1;
+    gbShowKeys          = GetConfigInt("Selfkeys",      "Gamemodes", gsMode) == 1;
+
+    // Weapon settings:
+    char sWeapons[512],
+         sWeapon [16][32],
+         sAmmo   [2][6];
+
+    if (GetConfigString(sWeapons, sizeof(sWeapons), "SpawnWeapons", "Gamemodes", gsMode))
     {
-        for(int i = 0; i < ExplodeString(weapons, ",", weapon, 16, 32); i++)
+        for (int i = 0; i < ExplodeString(sWeapons, ",", sWeapon, 16, 32); i++)
         {
-            char sAmmo[2][6];
-            int pos = SplitString(weapon[i], "(", gsSpawnWeapon[i], sizeof(gsSpawnWeapon[]));
-            if(pos != -1)
+            int pos = SplitString(sWeapon[i], "(", gsSpawnWeapon[i], sizeof(gsSpawnWeapon[]));
+            if (pos != -1)
             {
-                int pos2 = SplitString(weapon[i][pos], "-", sAmmo[0], sizeof(sAmmo[]));
-                if(pos2 == -1) {
-                    strcopy(sAmmo[0], sizeof(sAmmo[]), weapon[i][pos]);
+                int pos2 = SplitString(sWeapon[i][pos], "-", sAmmo[0], sizeof(sAmmo[]));
+                if (pos2 == -1) {
+                    strcopy(sAmmo[0], sizeof(sAmmo[]), sWeapon[i][pos]);
                     sAmmo[0][strlen(sAmmo[0])-1] = 0;
                 }
                 else {
-                    strcopy(sAmmo[1], sizeof(sAmmo[]), weapon[i][pos+pos2]);
+                    strcopy(sAmmo[1], sizeof(sAmmo[]), sWeapon[i][pos+pos2]);
                     sAmmo[1][strlen(sAmmo[1])-1] = 0;
                 }
             }
             else {
-                strcopy(gsSpawnWeapon[i], sizeof(gsSpawnWeapon[]), weapon[i]);
+                strcopy(gsSpawnWeapon[i], sizeof(gsSpawnWeapon[]), sWeapon[i]);
             }
-        
-            for(int z = 0; z < 2; z++) {
-                if(!StringToIntEx(sAmmo[z], giSpawnAmmo[i][z])) {
+
+            for (int z = 0; z < 2; z++) {
+                if (!StringToIntEx(sAmmo[z], giSpawnAmmo[i][z])) {
                     giSpawnAmmo[i][z] = -1;
                 }
             }
@@ -532,136 +785,510 @@ void LoadConfigValues()
     }
 }
 
-
-/**************************************************************************************************
- *** Commands
-**************************************************************************************************/
-public Action OnClientSayCommand(int client, const char[] command, const char[] sArgs)
+public void OnLibraryAdded(const char[] sName)
 {
-    if(client == 0) {
-        // spam be gone
+    if (StrEqual(sName, "updater")) {
+        Updater_AddPlugin(PLUGIN_UPDATE);
+    }
+
+    #if defined _gameme_hud_included
+        if (StrEqual(sName, "gameme_hud")) {
+            gbGameME = true;
+        }
+    #endif
+}
+
+public void OnLibraryRemoved(const char[] sName)
+{
+    #if defined _gameme_hud_included
+        if (StrEqual(sName, "gameme_hud")) {
+            gbGameME = false;
+        }
+    #endif
+}
+
+public void OnAllPluginsLoaded()
+{
+    if (!gbPluginReady) {
+        // Restart on first load - avoids issues with SourceTV (etc)
+        CreateTimer(1.0, T_RestartMap, _, TIMER_FLAG_NO_MAPCHANGE);
+    }
+    else if (!LibraryExists("hl2dmfix")) {
+        LogError("hl2dmfix is not loaded !");
+    }
+}
+
+/**************************************************************
+ * COMMANDS
+ *************************************************************/
+void RegisterMainCommands()
+{
+    RegConsoleCmd("menu",        Cmd_Menu,     "Display the XMS menu");
+    RegConsoleCmd("list",        Cmd_MapList,  "View list of available maps");
+    RegConsoleCmd("maplist",     Cmd_MapList,  "View list of available maps");
+    RegConsoleCmd("run",         Cmd_Run,      "[Vote to] change the current map");
+    RegConsoleCmd("runnow",      Cmd_Run,      "[Vote to] change the current map");
+    RegConsoleCmd("runnext",     Cmd_Run,      "[Vote to] set the next map");
+    RegConsoleCmd("start",       Cmd_Start,    "[Vote to] start a match");
+    RegConsoleCmd("cancel",      Cmd_Cancel,   "[Vote to] cancel the match");
+    RegConsoleCmd("shuffle",     Cmd_Shuffle,  "[Vote to] shuffle teams");
+    RegConsoleCmd("invert",      Cmd_Invert,   "[Vote to] invert the teams");
+    RegConsoleCmd("profile",     Cmd_Profile,  "View player's steam profile");
+    RegConsoleCmd("showprofile", Cmd_Profile,  "View player's steam profile");
+    RegConsoleCmd("model",       Cmd_Model,    "Change player model");
+    RegConsoleCmd("hudcolor",    Cmd_HudColor, "Change HUD color");
+    RegConsoleCmd("vote",        Cmd_Vote,     "Call a custom yes/no vote");
+
+    RegConsoleCmd("yes",         Cmd_CastVote, "Vote YES");
+    RegConsoleCmd("no",          Cmd_CastVote, "Vote NO");
+    for (int i = 1; i <= 5; i++) {
+        RegConsoleCmd(IntToChar(i), Cmd_CastVote, "Vote for option");
+    }
+
+    RegAdminCmd("forcespec", AdminCmd_Forcespec, ADMFLAG_GENERIC, "force a player to spectate");
+    RegAdminCmd("allow",     AdminCmd_AllowJoin, ADMFLAG_GENERIC, "allow a player to join the match");
+
+    // Listen for commands (overrides):
+    AddCommandListener(ListenCmd_Team,  "jointeam");
+    AddCommandListener(ListenCmd_Team,  "spectate");
+    AddCommandListener(ListenCmd_Pause, "pause");
+    AddCommandListener(ListenCmd_Pause, "unpause");
+    AddCommandListener(ListenCmd_Pause, "setpause");
+    AddCommandListener(Listen_Basecommands, "timeleft");
+    AddCommandListener(Listen_Basecommands, "nextmap");
+    AddCommandListener(Listen_Basecommands, "currentmap");
+    AddCommandListener(Listen_Basecommands, "ff");
+}
+
+// Command: menu
+// Open the XMS menu
+public Action Cmd_Menu(int iClient, int iArgs)
+{
+    giClientMenuType[iClient] = 0;
+    QueryClientConVar(iClient, "cl_showpluginmessages", ShowMenuIfVisible, iClient);
+    return Plugin_Handled;
+}
+
+// Command: maplist <mode or "all">
+// Display a list of available maps
+public Action Cmd_MapList(int iClient, int iArgs)
+{
+    char sMode[MAX_MODE_LENGTH],
+         sMapcycle[PLATFORM_MAX_PATH],
+         sMaps[512][MAX_MAP_LENGTH];
+    int  iCount;
+    bool bAll;
+
+    if (!iArgs) {
+        strcopy(sMode, sizeof(sMode), gsMode);
+    }
+    else
+    {
+        GetCmdArg(1, sMode, sizeof(sMode));
+        bAll = StrEqual(sMode, "all");
+
+        if (!bAll && !IsValidGamemode(sMode))
+        {
+            MC_ReplyToCommand(iClient, "%t", "xmsc_list_invalid", sMode);
+            IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
+            return Plugin_Handled;
+        }
+    }
+
+    GetModeMapcycle(sMapcycle, sizeof(sMapcycle), sMode);
+
+    if (bAll) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_list_pre_all");
+    }
+    else {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_list_pre", sMode);
+    }
+
+    iCount = GetMapsArray(sMaps, 512, MAX_MAP_LENGTH, sMapcycle, _, _, false, bAll);
+    SortStrings(sMaps, clamp(iCount, 0, 512), Sort_Ascending);
+
+    for (int i = 0; i < iCount; i++)
+    {
+        if (!strlen(sMaps[i])) {
+            break;
+        }
+
+        MC_ReplyToCommand(iClient, "> {I}%s", sMaps[i]);
+    }
+
+    MC_ReplyToCommand(iClient, "%t", "xmsc_list_post", iCount);
+    MC_ReplyToCommand(iClient, "%t", "xmsc_list_modes", gsValidModes);
+
+    return Plugin_Handled;
+}
+
+
+// Command: run[next] <mode>:<map>[,<mode>:<map>,<mode>:<map> ...]
+// Change the map and/or gamemode. Now supports multiple choice voting
+public Action Cmd_Run(int iClient, int iArgs)
+{
+    static int iFailCount [MAXPLAYERS+1],
+               iMultiCount[MAXPLAYERS+1];
+
+    int iVoteType;
+    bool bMulti,
+         bProceed;
+    char sParam     [5][512],               // <mode>:<map> OR <map>:<mode> OR <mode> OR <map>
+         sResultMode[5][MAX_BUFFER_LENGTH], // processed mode parameter(s)
+         sResultMap [5][MAX_BUFFER_LENGTH], // processed map parameter(s)
+         sCommand[16];
+
+    GetCmdArg(0, sCommand, sizeof(sCommand));
+
+    iVoteType = (
+        StrContains(sCommand, "runnext", false) == 0 ?
+            iClient == 0 ? VOTE_RUNNEXT_AUTO
+            : VOTE_RUNNEXT
+        : VOTE_RUN
+    );
+
+    // Initial checks
+    if (!iArgs) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_run_usage");
+    }
+    else if (giVoteStatus) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_vote_deny");
+    }
+    else if (VoteTimeout(iClient) && !IsClientAdmin(iClient)) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_vote_timeout", VoteTimeout(iClient));
+    }
+    else if (giGamestate == GAME_PAUSED) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_paused");
+    }
+    else if (giGamestate == GAME_MATCH) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_match");
+    }
+    else if (giGamestate == GAME_CHANGING) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_changing");
+    }
+    else {
+        bProceed = true;
+    }
+
+    if (!bProceed)
+    {
+        if (iArgs) {
+            IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
+        }
         return Plugin_Handled;
     }
-    
-    if(StrContains(sArgs, "!") == 0 || StrContains(sArgs, "/") == 0 || StrContains(sArgs, "#.#") == 0)
+
+    // Get and preformat params
+    GetCmdArgString(sParam[0], sizeof(sParam[]));
+    String_ToLower(sParam[0], sParam[0], sizeof(sParam[]));
+
+    int iPos[3];
+    do
     {
-        char args[MAX_SAY_LENGTH];
-        bool corrected;
-        
-        strcopy(args, sizeof(args), sArgs);
-        
-        // backwards compatibility for old PMS commands
-        if(StrContains(args, "cm") == 1) {
-            FakeClientCommandEx(client, "say !run%s", args[3]);
-        }
-        else if(StrContains(args, "run") == 1 && (StrEqual(args[5], "1v1") || StrEqual(args[5], "2v2") || StrEqual(args[5], "3v3") || StrEqual(args[5], "4v4") || StrEqual(args[5], "duel"))) {
-            FakeClientCommandEx(client, "say !start");
-        }
-        else if(StrContains(args, "tp ") == 1 || StrContains(args, "teamplay ") == 1)
+        iPos[0] = SplitString(sParam[0][iPos[2]], ",", sParam[iPos[1]], sizeof(sParam[]));
+        ReplaceString(sParam[iPos[1]], sizeof(sParam[]), " ", ":");
+
+        if (iPos[0] > 1)
         {
-            if(StrContains(args, " on") != -1 || StrContains(args, " 1") != -1) {
-                FakeClientCommandEx(client, "say !run tdm");
+            iPos[2] += iPos[0];
+            if (sParam[0][iPos[2]] == ' ') {
+                iPos[2]++;
             }
-            else if(StrContains(args, " off") != -1 || StrContains(args, " 0") != -1) {
-                FakeClientCommandEx(client, "say !run dm");
+
+            iPos[1]++;
+
+            if (iPos[1] < 5) {
+                strcopy(sParam[iPos[1]], sizeof(sParam[]), sParam[0][iPos[2]]);
+            }
+            else {
+                MC_ReplyToCommand(iClient, "%t", "xmsc_run_denyparams");
+                IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
+                return Plugin_Handled;
             }
         }
-        else if(StrEqual(args[1], "cf") || StrEqual(args[1], "coinflip") || StrEqual(args[1], "flip")) {
-            MC_PrintToChatAllFrom(client, false, "%t", "xmsc_coinflip", GetRandomInt(0, 1) ? "heads" : "tails");
+    }
+    while (iPos[0] > 1 && iPos[1] < 5);
+
+    bMulti = strlen(sParam[1]) > 0;
+
+    // Match params to results:
+    for (int i = 0; i < 5; i++)
+    {
+        if (!strlen(sParam[i])) {
+            break;
         }
-        else if(StrEqual(args[1], "stop")) {
-            FakeClientCommandEx(client, "say !cancel");
-        }
-        // more minor commands
-        else if(StrEqual(args[1], "pause") || StrEqual(args[1], "unpause")) {
-            FakeClientCommandEx(client, "pause");
-        }
-        else if(StrContains(args, "jointeam ") == 1) {
-            FakeClientCommandEx(client, "jointeam %s", args[10]);
-        }
-        else if(StrEqual(args[1], "join")) {
-            FakeClientCommand(client, "jointeam %i", GetOptimalTeam());
-        }        
-        else if(StrEqual(args[1], "spec") || StrEqual(args[1], "spectate")) {
-            FakeClientCommandEx(client, "spectate");
-        }
-        else if(corrected) {
-            // now cycle back in corrected form
-            FakeClientCommandEx(client, "say %s", args);
+
+        char sMode[MAX_MODE_LENGTH],
+             sMap [MAX_MAP_LENGTH];
+        bool bModeMatched,
+             bMapMatched;
+        int  iSplit = SplitString(sParam[i], ":", sMode, sizeof(sMode));
+
+        if (iSplit > 0) {
+            sMode[iSplit - 1] = '\0';
         }
         else {
-            return Plugin_Continue;
+            strcopy(sMode, sizeof(sMode), sParam[i]);
+        }
+
+        bModeMatched = IsValidGamemode(sMode);
+
+        if (!bModeMatched)
+        {
+            // Did not match, so the first part must be the map.
+            strcopy(sMap, sizeof(sMap), sMode);
+
+            if (iSplit > 0)
+            {
+                strcopy(sMode, sizeof(sMode), sParam[i][iSplit]);
+                if (!IsValidGamemode(sMode))
+                {
+                    // Fail - multiple params, but neither of them is a valid mode.
+                    MC_ReplyToCommand(iClient, "%t", "xmsc_run_notfound", sMode);
+                    IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
+                    return Plugin_Handled;
+                }
+
+                bModeMatched = true;
+            }
+        }
+        else if (iSplit > 0)
+        {
+            // Matched the mode, second part is the map.
+            strcopy(sMap, sizeof(sMap), sParam[i][iSplit]);
+        }
+        else
+        {
+            // Matched the mode but no map was provided.
+
+            if (StrEqual(gsMode, sMode) && !bMulti)
+            {
+                // Fail - same gamemode as current.
+                MC_ReplyToCommand(iClient, "%t", "xmsc_run_denymode", sMode);
+                IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
+                return Plugin_Handled;
+            }
+
+            // Detect map:
+            if (!(GetConfigString(sMap, sizeof(sMap), "DefaultMap", "Gamemodes", sMode) && IsMapValid(sMap) && !( IsItemDistinctInList(gsMode, gsRetainModes) && IsItemDistinctInList(sMode, gsRetainModes) ) )) {
+                strcopy(sMap, sizeof(sMap), gsMap);
+            }
+
+            bMapMatched = true;
+        }
+
+        if (!bMapMatched)
+        {
+            int iHits[2];
+            char sHits      [256][MAX_MAP_LENGTH],
+                 sOutput    [140],
+                 sFullOutput[600];
+
+            if (GetMapByAbbrev(sResultMap[i], MAX_MAP_LENGTH, sMap) && IsMapValid(sResultMap[i])) {
+                bMapMatched = true;
+            }
+            else
+            {
+                iHits[0] = GetMapsArray(sHits, 256, MAX_MAP_LENGTH, "", "", sMap, true, false);
+
+                if (iHits[0] == 1) {
+                    strcopy(sResultMap[i], sizeof(sResultMap[]), sHits[0]);
+                }
+                else if (!bMulti)
+                {
+                    for (int iHit = 0; iHit < iHits[0]; iHit++)
+                    {
+                        // pass more results to console
+                        Format(sFullOutput, sizeof(sFullOutput), "%s　%s", sFullOutput, sHits[iHit]);
+
+                        if (GetCmdReplySource() != SM_REPLY_TO_CONSOLE)
+                        {
+                            char sQuery2[256];
+                            Format(sQuery2, sizeof(sQuery2), "{H}%s{I}", sMap);
+                            ReplaceString(sHits[iHit], sizeof(sHits[]), sMap, sQuery2, false);
+
+                            if (strlen(sOutput) + strlen(sHits[iHit]) + (!iHits[1] ? 0 : 3) < 140) {
+                                Format(sOutput, sizeof(sOutput), "%s%s%s", sOutput, !iHits[1] ? "" : ", ", sHits[iHit]);
+                                iHits[1]++;
+                            }
+                        }
+                    }
+                }
+
+                bMapMatched = (iHits[0] == 1);
+            }
+
+            if (!bMapMatched)
+            {
+                if (iHits[0] == 0)
+                {
+                    iFailCount[iClient]++;
+                    MC_ReplyToCommand(iClient, "%t", "xmsc_run_notfound", sMap);
+                    IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
+                }
+                else if (bMulti) {
+                    MC_ReplyToCommand(iClient, "%t", "xmsc_run_found_multi", iHits[0], sMap);
+                }
+                else
+                {
+                    if (GetCmdReplySource() != SM_REPLY_TO_CONSOLE) {
+                        MC_ReplyToCommand(iClient, "%t", "xmsc_run_found", sOutput, iHits[0] - iHits[1]);
+                    }
+
+                    PrintToConsole(iClient, "%t", "xmsc_run_results", sMap, sFullOutput, iHits[0]);
+                    iMultiCount[iClient]++;
+                }
+
+                if (iMultiCount[iClient] >= 3 && iHits[0] != 1 && iHits[0] > iHits[1] && GetCmdReplySource() != SM_REPLY_TO_CONSOLE) {
+                    MC_ReplyToCommand(iClient, "%t", "xmsc_run_tip1");
+                    iMultiCount[iClient] = 0;
+                }
+                else if (iFailCount[iClient] >= 3) {
+                    MC_ReplyToCommand(iClient, "%t", "xmsc_run_tip2");
+                    iFailCount[iClient] = 0;
+                }
+
+                return Plugin_Handled;
+            }
+
+        }
+        else {
+            strcopy(sResultMap[i], sizeof(sResultMap[]), sMap);
+        }
+
+        if (!bModeMatched) {
+            GetModeForMap(sResultMode[i], sizeof(sResultMode[]), sResultMap[i]);
+            bModeMatched = true;
+        }
+        else {
+            strcopy(sResultMode[i], sizeof(sResultMode[]), sMode);
         }
     }
-    else if(giVoteStatus && (StrEqual(sArgs, "yes") || StrEqual(sArgs, "no"))) {
-        giClientVote[client] = StrEqual(sArgs, "yes") ? 1 : -1;
+
+    // Take action
+    if (!bMulti && ( GetRealClientCount() < giVoteMinPlayers || giVoteMinPlayers <= 0 || iClient == 0 ) )
+    {
+        // No vote required
+        strcopy(gsNextMode, sizeof(gsNextMode), sResultMode[0]);
+        ghConVarNextmap.SetString(sResultMap[0]);
+
+        if (iVoteType == VOTE_RUN)
+        {
+            MC_PrintToChatAllFrom(iClient, false, "%t", "xmsc_run_now", sResultMode[0], DeprefixMap(sResultMap[0]));
+
+            // Run:
+            SetGamestate(GAME_CHANGING);
+            CreateTimer(1.0, T_Run, _, TIMER_REPEAT);
+        }
+        else {
+            MC_PrintToChatAllFrom(iClient, false, "%t", "xmsc_run_next", sResultMode[0], DeprefixMap(sResultMap[0]));
+            gbNextMapChosen = true;
+        }
     }
-    else if(IsGamestate(GAME_PAUSED)) {
-        // fix chat when paused
-        MC_PrintToChatAllFrom(client, StrEqual(command, "say_team", false), sArgs);
-    }    
-    else if(StrEqual(sArgs, "gg", false) && IsGamestate(GAME_OVER, GAME_CHANGING)) {
-        IfCookiePlaySound(ghCookieSounds, SOUND_GG);
-        return Plugin_Continue;
+    else
+    {
+        // Vote required
+        for (int i = 0; i < 5; i++)
+        {
+            if (strlen(sResultMode[i])) {
+                Format(gsVoteMotion[i], sizeof(gsVoteMotion[]), "%s:%s", sResultMode[i], sResultMap[i]);
+            }
+        }
+
+        CallVote(iVoteType, iClient);
     }
-    else if(StrEqual(sArgs, "timeleft") || StrEqual(sArgs, "nextmap") || StrEqual(sArgs, "currentmap") || StrEqual(sArgs, "ff")) {
-        Basecommands_Override(client, sArgs, true);
+
+    return Plugin_Handled;
+}
+
+public Action T_Run(Handle hTimer)
+{
+    static char sMap[MAX_MAP_LENGTH];
+    static int  iTimer;
+
+    char sPreText[32];
+
+    if (!iTimer) {
+        strcopy(sMap, sizeof(sMap), DeprefixMap(gsNextMap));
     }
-    else {
-        return Plugin_Continue;
+    else if (iTimer == DELAY_ACTION)
+    {
+        PrintCenterTextAll("");
+        strcopy(gsMode, sizeof(gsMode), gsNextMode);
+        SetMapcycle();
+        ServerCommand("changelevel_next");
+        iTimer = 0;
+
+        return Plugin_Stop;
     }
-    
-    return Plugin_Stop;
+
+    for (int i = 0; i < iTimer; i++) {
+        StrCat(sPreText, sizeof(sPreText), "\n");
+    }
+
+    for (int iClient = 1; iClient <= MaxClients; iClient++)
+    {
+        if (!IsClientConnected(iClient) || !IsClientInGame(iClient) | IsFakeClient(iClient)) {
+            continue;
+        }
+
+        PrintCenterText(iClient, "%s%T", sPreText, "xms_loading", iClient, gsNextMode, sMap, DELAY_ACTION - iTimer);
+        IfCookiePlaySound(ghCookieSounds, iClient, ( DELAY_ACTION - iTimer > 1 ? SOUND_ACTIONPENDING : SOUND_ACTIONCOMPLETE ) );
+    }
+
+    iTimer++;
+
+    return Plugin_Continue;
 }
 
 
-
-
-// command: start
-// start a competitive match on supported gamemodes
-public Action Cmd_Start(int client, int args)
+// Command: start
+// Start a competitive match on supported gamemodes
+public Action Cmd_Start(int iClient, int iArgs)
 {
-    if(client == 0) {
+    if (iClient == 0)
+    {
         Start();
+        return Plugin_Handled;
     }
-    else if(GetRealClientCount(true, false, false) == 1) {
-        MC_ReplyToCommand(client, "%t", "xmsc_start_deny");
+    else if (GetRealClientCount(true, false, false) <= 1) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_start_deny");
     }
-    else if(giVoteStatus) {
-        MC_ReplyToCommand(client, "%t", "xmsc_vote_deny");
+    else if (giVoteStatus) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_vote_deny");
     }
-    else if(VoteTimeout(client)  && !IsClientAdmin(client)) {
-        MC_ReplyToCommand(client, "%t", "xmsc_vote_timeout", VoteTimeout(client));
+    else if (VoteTimeout(iClient)  && !IsClientAdmin(iClient)) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_vote_timeout", VoteTimeout(iClient));
     }
-    else if(IsClientObserver(client) && !IsClientAdmin(client)) {
-        MC_ReplyToCommand(client, "%t", "xmsc_deny_spectator");
+    else if (IsClientObserver(iClient) && !IsClientAdmin(iClient)) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_spectator");
     }
-    else if(!IsModeMatchable(gsMode)) {
-        MC_ReplyToCommand(client, "%t", "xmsc_start_denygamemode", gsMode);
+    else if (!IsModeMatchable(gsMode)) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_start_denygamemode", gsMode);
     }
-    else if(IsGamestate(GAME_MATCH, GAME_MATCHEX, GAME_PAUSED)) {
-        MC_ReplyToCommand(client, "%t", "xmsc_deny_match");
+    else if (giGamestate == GAME_MATCH || giGamestate == GAME_MATCHEX || giGamestate == GAME_PAUSED) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_match");
     }
-    else if(IsGamestate(GAME_CHANGING, GAME_MATCHWAIT)) {
-        MC_ReplyToCommand(client, "%t", "xmsc_deny_changing");
+    else if (giGamestate == GAME_CHANGING || giGamestate == GAME_MATCHWAIT) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_changing");
     }
-    else if(IsGamestate(GAME_OVER) || GetTimeRemaining(false) < 1) {
-        MC_ReplyToCommand(client, "%t", "xmsc_deny_over");
+    else if (giGamestate == GAME_OVER || GetTimeRemaining(false) < 1) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_over");
     }
-    else {
-        RequestStart(client);
+    else
+    {
+        if (GetRealClientCount(true, false, false) < giVoteMinPlayers || giVoteMinPlayers <= 0 || iClient == 0) {
+            MC_PrintToChatAllFrom(iClient, false, "%t", "xms_started");
+            Start();
+        }
+        else {
+            CallVoteFor(VOTE_MATCH, iClient, "start match");
+        }
+        return Plugin_Handled;
     }
-}
 
-void RequestStart(int client)
-{
-    if(GetRealClientCount(true, false, false) < giVoteMinPlayers || giVoteMinPlayers <= 0 || client == 0) {
-        MC_PrintToChatAllFrom(client, false, "%t", "xms_started");
-        Start();
-    }
-    else {
-        CallVote(VOTE_MATCH, client, "start match");
-    }
+    IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
+    return Plugin_Handled;
 }
 
 void Start()
@@ -671,75 +1298,77 @@ void Start()
     CreateTimer(1.0, T_Start, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 }
 
-public Action T_Start(Handle timer)
+public Action T_Start(Handle hTimer)
 {
-    static int iter;
+    static int iTimer;
 
-    if(iter == DELAY_ACTION - 1) {
+    if (iTimer == DELAY_ACTION - 1) {
         SetGamestate(GAME_MATCH);
         Game_Restart();
     }
-  
-    if(iter != DELAY_ACTION)
+    else if (iTimer == DELAY_ACTION)
     {
-        PrintCenterTextAll("%t", "xms_starting", DELAY_ACTION - iter);
-        IfCookiePlaySound(ghCookieSounds, SOUND_ACTIONPENDING);
-        iter++;
-        return Plugin_Continue;
+        PrintCenterTextAll("");
+        IfCookiePlaySoundAll(ghCookieSounds, SOUND_ACTIONCOMPLETE);
+        iTimer = 0;
+
+        return Plugin_Stop;
     }
-  
-    PrintCenterTextAll("");
-    IfCookiePlaySound(ghCookieSounds, SOUND_ACTIONCOMPLETE);
-    iter = 0;
-    return Plugin_Stop;
+
+    PrintCenterTextAll("%t", "xms_starting", DELAY_ACTION - iTimer);
+    IfCookiePlaySoundAll(ghCookieSounds, SOUND_ACTIONPENDING);
+    iTimer++;
+
+    return Plugin_Continue;
 }
 
 
-// command: cancel
-// cancel an ongoing competitive match
-public Action Cmd_Cancel(int client, int args)
+// Command: cancel
+// Cancel an ongoing competitive match
+public Action Cmd_Cancel(int iClient, int iArgs)
 {
-    if(client == 0) {
+    if (iClient == 0) {
         Cancel();
+        return Plugin_Handled;
     }
-    else if(giVoteStatus) {
-        MC_ReplyToCommand(client, "%t", "xmsc_vote_deny");
+    else if (giVoteStatus) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_vote_deny");
     }
-    else if(VoteTimeout(client)  && !IsClientAdmin(client)) {
-        MC_ReplyToCommand(client, "%t", "xmsc_vote_timeout", VoteTimeout(client));
+    else if (VoteTimeout(iClient)  && !IsClientAdmin(iClient)) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_vote_timeout", VoteTimeout(iClient));
     }
-    else if(IsClientObserver(client) && !IsClientAdmin(client)) {
-        MC_ReplyToCommand(client, "%t", "xmsc_deny_spectator");
+    else if (IsClientObserver(iClient) && !IsClientAdmin(iClient)) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_spectator");
     }
-    else if(IsGamestate(GAME_PAUSED)) {
-        MC_ReplyToCommand(client, "%t", "xmsc_deny_paused");
+    else if (giGamestate == GAME_PAUSED) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_paused");
     }
-    else if(IsGamestate(GAME_DEFAULT, GAME_OVERTIME)) {
-        MC_ReplyToCommand(client, "%t", "xmsc_deny_nomatch");
+    else if (giGamestate == GAME_DEFAULT || giGamestate == GAME_OVERTIME) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_nomatch");
     }
-    else if(IsGamestate(GAME_MATCHEX)) {
-        MC_ReplyToCommand(client, "%t", "xmsc_cancel_matchex");
+    else if (giGamestate == GAME_MATCHEX) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_cancel_matchex");
     }
-    else if(IsGamestate(GAME_CHANGING, GAME_MATCHWAIT)) {
-        MC_ReplyToCommand(client, "%t", "xmsc_deny_changing");
+    else if (giGamestate == GAME_CHANGING || giGamestate == GAME_MATCHWAIT) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_changing");
     }
-    else if(IsGamestate(GAME_OVER) || GetTimeRemaining(false) < 1) {
-        MC_ReplyToCommand(client, "%t", "xmsc_deny_over");
+    else if (giGamestate == GAME_OVER || GetTimeRemaining(false) < 1) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_over");
     }
     else {
-        RequestCancel(client);
+        if (GetRealClientCount() < giVoteMinPlayers || giVoteMinPlayers <= 0)
+        {
+            MC_PrintToChatAllFrom(iClient, false, "%t", "xms_cancelled");
+            Cancel();
+        }
+        else {
+            CallVoteFor(VOTE_MATCH, iClient, "cancel match");
+        }
+        return Plugin_Handled;
     }
-}
 
-void RequestCancel(int client)
-{
-    if(GetRealClientCount() < giVoteMinPlayers || giVoteMinPlayers <= 0) {
-        MC_PrintToChatAllFrom(client, false, "%t", "xms_cancelled");
-        Cancel();
-    }
-    else {
-        CallVote(VOTE_MATCH, client, "cancel match");
-    }
+    IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
+    return Plugin_Handled;
 }
 
 void Cancel()
@@ -749,915 +1378,1381 @@ void Cancel()
 }
 
 
-// command: run <mode>:<map>
-// change the map and/or gamemode
-public Action Cmd_Run(int client, int args)
+// Admin Command: forcespec <player>
+// Force a player to spectate
+public Action AdminCmd_Forcespec(int iClient, int iArgs)
 {
-    static int fail_iter[MAXPLAYERS+1], multi_iter[MAXPLAYERS+1];
-    char sQuery[MAX_MAP_LENGTH], sAbbrev[MAX_MAP_LENGTH], newMap[MAX_MAP_LENGTH], newMode[MAX_MODE_LENGTH]; 
-    
-    if(!args || args > 3) {
-        MC_ReplyToCommand(client, "%t", "xmsc_run_usage");
+    char sArg[5];
+
+    if (!iArgs) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_forcespec_usage");
         return Plugin_Handled;
-    }
-    if(giVoteStatus) {
-        MC_ReplyToCommand(client, "%t", "xmsc_vote_deny");
-        return Plugin_Handled;
-    }
-    if(VoteTimeout(client) && !IsClientAdmin(client)) {
-        MC_ReplyToCommand(client, "%t", "xmsc_vote_timeout", VoteTimeout(client));
-        return Plugin_Handled;
-    }
-    if(IsGamestate(GAME_PAUSED)) {
-        MC_ReplyToCommand(client, "%t", "xmsc_deny_paused");
-        return Plugin_Handled;
-    }
-    if(IsGamestate(GAME_MATCH)) {
-        MC_ReplyToCommand(client, "%t", "xmsc_deny_match");
-        return Plugin_Handled;
-    }
-    if(IsGamestate(GAME_CHANGING)) {
-        MC_ReplyToCommand(client, "%t", "xmsc_deny_changing");
-        return Plugin_Handled;
-    }
-    
-    GetCmdArg(0, sQuery, sizeof(sQuery));
-    bool delayed = StrContains(sQuery, "runnext", false) == 0;
-    
-    GetCmdArg(1, sQuery, sizeof(sQuery));
-    String_ToLower(sQuery, sQuery, sizeof(sQuery));
-    
-    if(IsValidGamemode(sQuery))
-    {
-        strcopy(newMode, sizeof(newMode), sQuery);
-        if(args == 1)
-        {
-            // only mode was specified, fetch map..
-            if(!StrEqual(gsMode, newMode))
-            {
-                if(!(GetConfigString(newMap, sizeof(newMap), "defaultmap", "gamemodes", newMode) && IsMapValid(newMap) && !(IsItemDistinctInList(gsMode, gsRetainModes) && IsItemDistinctInList(newMode, gsRetainModes)))) {
-                    strcopy(newMap, sizeof(newMap), gsMap);        
-                }
-                RequestRun(client, newMode, newMap, delayed);
-            }
-            else {
-                MC_ReplyToCommand(client, "%t", "xmsc_run_denymode", newMode);
-            }
-                    
-            return Plugin_Handled;
-        }
-        else
-        {
-            // client also specified the map
-            GetCmdArg(2, sQuery, sizeof(sQuery));
-            if(StrEqual(sQuery, ":")) {
-                GetCmdArg(3, sQuery, sizeof(sQuery));
-            }
-            String_ToLower(sQuery, sQuery, sizeof(sQuery));
-        }
-    }
-    else if(args > 1)
-    {
-        // first arg was not a valid mode, try second
-        GetCmdArg(2, newMode, sizeof(newMode));
-        String_ToLower(newMode, newMode, sizeof(newMode));
-                
-        if(!IsValidGamemode(newMode)) {
-            MC_ReplyToCommand(client, "%t", "xmsc_run_invalidmode", gsValidModes);
-            return Plugin_Handled;
-        }
     }
 
-    // de-abbreviate map if applicable
-    bool abbrev = GetMapByAbbrev(sAbbrev, sizeof(sAbbrev), sQuery);
-    
-    // we have all the info, time to do the work
-    Handle dir = OpenDirectory("maps");
-    FileType filetype;
-    bool matched, exact;
-    int hits, xhits;
-    char sFile[256], sOutput[140], sFullOutput[600];
-    
-    while(ReadDirEntry(dir, sFile, sizeof(sFile), filetype) && !exact)
+    GetCmdArg(1, sArg, sizeof(sArg));
+
+    if (StrEqual(sArg, "@all"))
     {
-        if(filetype == FileType_File && strlen(sFile) <= MAX_MAP_LENGTH && StrContains(sFile, ".ztmp") == -1 && ReplaceString(sFile, sizeof(sFile), ".bsp", ""))
+        for (int i = 1; i <= MaxClients; i++)
         {
-            if(StrContains(sFile, sQuery, false) >= 0 || (abbrev && StrContains(sFile, sAbbrev, false) >= 0))
-            {
-                exact = abbrev ? StrEqual(sFile, sAbbrev, false) : StrEqual(sFile, sQuery, false);
-                hits++;
-                    
-                if(hits == 1 || exact) {
-                    strcopy(newMap, sizeof(newMap), sFile);
-                    hits = 1;
-                    xhits = 0;
-                }
-                            
-                if(!exact)
-                {
-                    // pass more results to console
-                    if(strlen(sFullOutput) + strlen(sFile) < sizeof(sFullOutput)-1) {
-                        Format(sFullOutput, sizeof(sFullOutput), "%s　%s", sFullOutput, sFile);
-                    }
-                    
-                    if(GetCmdReplySource() != SM_REPLY_TO_CONSOLE)
-                    {                    
-                        // colorise results for chat
-                        char sQuery2[256];
-                        Format(sQuery2, sizeof(sQuery2), "{H}%s{I}", sQuery);
-                        ReplaceString(sFile, sizeof(sFile), sQuery, sQuery2, false);
-                        if(strlen(sOutput) + strlen(sFile) + (hits == 1 ? 0 : 3) < 140) {
-                            Format(sOutput, sizeof(sOutput), "%s%s%s", sOutput, hits == 1 ? "" : ", ", sFile);
-                            xhits++;
-                        }
-                    }
-                }
+            if (i == iClient || !IsClientConnected(i) || !IsClientInGame(i) || IsClientObserver(i)) {
+                continue;
             }
-        }
-    }
-    CloseHandle(dir);    
-    
-    switch(hits)
-    {
-        case 0: {
-            fail_iter[client]++;
-            MC_ReplyToCommand(client, "%t", "xmsc_run_notfound", sQuery);
-        }
-        case 1:
-        {
-            matched = true;
-            if(args == 1) {
-                GetModeForMap(newMode, sizeof(newMode), newMap);
-            }
-        }
-        default:
-        {
-            if(GetCmdReplySource() != SM_REPLY_TO_CONSOLE) {
-                MC_ReplyToCommand(client, "%t", "xmsc_run_found", sOutput, hits - xhits);
-            }
-            PrintToConsole(client, "%t", "xmsc_run_results", sQuery, sFullOutput, hits);
-            multi_iter[client]++; 
-        }
-    }
-        
-    if(!matched)
-    {
-        if(multi_iter[client] >= 3 && !exact && hits > xhits && GetCmdReplySource() != SM_REPLY_TO_CONSOLE) {
-            MC_ReplyToCommand(client, "%t", "xmsc_run_tip1");
-            multi_iter[client] = 0;                
-        }
-        else if(fail_iter[client] >= 3) {
-            MC_ReplyToCommand(client, "%t", "xmsc_run_tip2");
-            fail_iter[client] = 0;
-        }
-    }
-    else {
-        RequestRun(client, newMode, newMap, delayed);
-    }
-    
-    return Plugin_Handled;
-}
 
-void RequestRun(int client, const char[] mode, const char[] map, bool delayed)
-{
-    if(GetRealClientCount() < giVoteMinPlayers || giVoteMinPlayers <= 0 || client == 0)
-    {
-        strcopy(gsNextMode, sizeof(gsNextMode), mode);
-        ghConVarNextmap.SetString(map);
-        
-        if(!delayed) {
-            MC_PrintToChatAllFrom(client, false, "%t", "xmsc_run_now", mode, DeprefixMap(map));
-            Run();
+            ChangeClientTeam(i, TEAM_SPECTATORS);
+            MC_PrintToChat(i, "%t", "xmsc_forcespec_warning");
         }
-        else {
-            MC_PrintToChatAllFrom(client, false, "%t", "xmsc_run_next", mode, DeprefixMap(map));
-        }
-    }
-    else {
-        CallVote(delayed ? VOTE_RUNNEXT : VOTE_RUN, client, "%s:%s", mode, map);
-    }
-}
 
-void Run()
-{
-    DataPack dpack;
-    SetGamestate(GAME_CHANGING);
-    CreateTimer(1.0, T_Run, dpack, TIMER_REPEAT);
-}
-
-public Action T_Run(Handle timer, DataPack dpack)
-{
-    static int iter;
-    static char cmap[MAX_MAP_LENGTH];
-
-    if(!iter) {
-        strcopy(cmap, sizeof(cmap), DeprefixMap(gsNextMap));
-    }
-    
-    if(iter == DELAY_ACTION)
-    {
-        PrintCenterTextAll("");
-        
-        strcopy(gsMode, sizeof(gsMode), gsNextMode);
-        SetMapcycle();
-        ServerCommand("changelevel_next");
-        
-        iter = 0;
-        return Plugin_Stop;
+        MC_ReplyToCommand(iClient, "%t", "xmsc_forcespec_success", sArg);
     }
     else
     {
-        PrintCenterTextAll("%t", "xms_loading", gsNextMode, cmap, DELAY_ACTION - iter);
-        IfCookiePlaySound(ghCookieSounds, DELAY_ACTION-iter > 1 ? SOUND_ACTIONPENDING : SOUND_ACTIONCOMPLETE);
-    }
-    
-    iter++;
-    return Plugin_Continue;
-}
+        int iTarget = ClientArgToTarget(iClient, 1);
 
-
-// command: maplist <mode/all>
-// display list of available maps
-public Action Cmd_MapList(int client, int args)
-{
-    int count;
-    char sArg[MAX_MODE_LENGTH], path_mapcycle[PLATFORM_MAX_PATH];
-    
-    if(!args) {
-        strcopy(sArg, sizeof(sArg), gsMode);
-    }
-    else {
-        GetCmdArg(1, sArg, sizeof(sArg));
-    }
-    
-    if(StrEqual(sArg, "all"))
-    {
-        char sFile[PLATFORM_MAX_PATH];
-        Handle dir;
-        any filetype;
-        
-        MC_ReplyToCommand(client, "%t", "xmsc_list_pre_all");
-        
-        dir = OpenDirectory("maps");
-        while (ReadDirEntry(dir, sFile, sizeof(sFile), filetype))
+        if (iTarget != -1)
         {
-            if(filetype == FileType_File && strlen(sFile) <= MAX_MAP_LENGTH && StrContains(sFile, ".ztmp") == -1 && ReplaceString(sFile, sizeof(sFile), ".bsp", NULL_STRING))
+            char sName[MAX_NAME_LENGTH];
+            GetClientName(iTarget, sName, sizeof(sName));
+
+            if (!IsClientObserver(iTarget))
             {
-                count++;
-                MC_ReplyToCommand(client, "> {I}%s", DeprefixMap(sFile));
+                ChangeClientTeam(iTarget, TEAM_SPECTATORS);
+                MC_PrintToChat(iTarget, "%t", "xmsc_forcespec_warning");
+                MC_ReplyToCommand(iClient, "%t", "xmsc_forcespec_success", sName);
+                return Plugin_Handled;
+            }
+            else {
+                MC_ReplyToCommand(iClient, "%t", "xmsc_forcespec_fail", sName);
             }
         }
-        CloseHandle(dir);
-        
-        MC_ReplyToCommand(client, "%t", "xmsc_list_post", count);
-    }
-    else if(IsValidGamemode(sArg))
-    {
-        char map[MAX_MAP_LENGTH];
-        File file;
-        
-        GetConfigString(path_mapcycle, sizeof(path_mapcycle), "mapcycle", "gamemodes", sArg);
-        Format(path_mapcycle, sizeof(path_mapcycle), "cfg/%s", path_mapcycle);
-        
-        MC_ReplyToCommand(client, "%t", "xmsc_list_pre", sArg);
-        
-        file = OpenFile(path_mapcycle, "r");
-        while (!file.EndOfFile() && file.ReadLine(map, sizeof(map)))
-        {
-            int len = strlen(map);
-            
-            if(map[0] == ';' || !IsCharAlpha(map[0])) {
-                continue;
-            }
-            
-            for(int i = 0; i < len; i++)
-            {
-                if(IsCharSpace(map[i])) {
-                    map[i] = '\0';
-                    break;
-                }
-            }
-            
-            if(!IsMapValid(map)) {
-                LogError("map `%s` in mapcyclefile `%s` is invalid!", map, path_mapcycle);
-                continue;
-            }
-            
-            count++;
-            MC_ReplyToCommand(client, "> {I}%s", DeprefixMap(map));
-        }
-        CloseHandle(file);
-        
-        MC_ReplyToCommand(client, "%t", "xmsc_list_post", count);
-    }
-    else {
-        MC_ReplyToCommand(client, "%t", "xmsc_list_invalid", sArg);
-    }
-    
-    MC_ReplyToCommand(client, "%t", "xmsc_list_modes", gsValidModes);
-}
 
+        IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
+    }
 
-// admin command: forcespec <player>
-// force a player to spectate
-public Action AdminCmd_Forcespec(int client, int args)
-{
-    if(!args) {
-        MC_ReplyToCommand(client, "%t", "xmsc_forcespec_usage");
-        return Plugin_Handled;
-    }
-  
-    int target = ClientArgToTarget(client, 1);
-    if(target > 0)
-    {
-        char name[MAX_NAME_LENGTH];
-        GetClientName(target, name, sizeof(name));
-    
-        if(GetClientTeam(target) != TEAM_SPECTATORS)
-        {
-            ChangeClientTeam(target, TEAM_SPECTATORS);
-            MC_PrintToChat(target, "%t", "xmsc_forcespec_warning");
-            MC_ReplyToCommand(client, "%t", "xmsc_forcespec_success", name);
-        }
-        else {
-            MC_ReplyToCommand(client, "%t", "xmsc_forcespec_fail", name);
-        }
-    }
-    else {
-        MC_ReplyToCommand(client, "%t", "xmsc_forcespec_notfound");
-    }
-    
     return Plugin_Handled;
 }
 
 
-// admin command: allow <player>
-// allow a player into an ongoing match
-public Action AdminCmd_AllowJoin(int client, int args)
+// Admin Command: allow <player>
+// Allow a player into an ongoing match
+public Action AdminCmd_AllowJoin(int iClient, int iArgs)
 {
-    if(!IsGameMatch()) {
-        MC_ReplyToCommand(client, "%t", "xmsc_deny_nomatch");
+    if (!IsGameMatch()) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_nomatch");
     }
-    else if(args)
+    if (!iArgs) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_allow_usage");
+    }
+    else
     {
-        int target = ClientArgToTarget(client, 1);
-        if(target > 0)
+        int iTarget = ClientArgToTarget(iClient, 1);
+        if (iTarget > 0)
         {
-            char name[MAX_NAME_LENGTH];
-            GetClientName(target, name, sizeof(name));
-            
-            if(GetClientTeam(target) == TEAM_SPECTATORS)
+            char sName[MAX_NAME_LENGTH];
+            GetClientName(iTarget, sName, sizeof(sName));
+
+            if (GetClientTeam(iTarget) == TEAM_SPECTATORS)
             {
-                giAllowClient = target;
-                FakeClientCommand(target, "join");
-                MC_PrintToChatAllFrom(client, false, "%t", "xmsc_allow_success", name);
+                giAllowClient = iTarget;
+                FakeClientCommand(iTarget, "join");
+                MC_PrintToChatAllFrom(iClient, false, "%t", "xmsc_allow_success", sName);
             }
             else {
-                MC_ReplyToCommand(client, "%t", "xmsc_allow_fail", name);
+                MC_ReplyToCommand(iClient, "%t", "xmsc_allow_fail", sName);
+                IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
             }
         }
     }
-    else {
-        MC_ReplyToCommand(client, "%t", "xmsc_allow_usage");
-    }
+
+    return Plugin_Handled;
 }
 
 
-// command: pause
-// pause or unpause the match
-public Action ListenCmd_Pause(int client, const char[] command, int argc)
+// Command: pause
+// Pause (or unpause) the match
+public Action ListenCmd_Pause(int iClient, const char[] sCommand, int iArgs)
 {
-    if(!ghConVarPausable.BoolValue) {
+    if (!ghConVarPausable.BoolValue) {
         return Plugin_Handled;
     }
-    
-    if(client == 0)
+
+    if (iClient == 0)
     {
-        for(int i = 1; i <= MaxClients; i++)
+        for (int i = 1; i <= MaxClients; i++)
         {
-            if(IsClientInGame(i)) {
+            if (IsClientInGame(i)) {
                 giPauseClient = i;
                 break;
             }
         }
-        
-        if(!giPauseClient) {
+
+        if (!giPauseClient) {
             ReplyToCommand(0, "Cannot pause when no players are in the server!");
         }
         else {
             FakeClientCommand(giPauseClient, "pause");
         }
-        
+
         return Plugin_Handled;
     }
-    
-    if(client == giPauseClient) {
-        SetGamestate(IsGamestate(GAME_PAUSED) ? GAME_MATCH : GAME_PAUSED);
+
+    if (iClient == giPauseClient)
+    {
+        if (giGamestate == GAME_PAUSED) {
+            SetGamestate(GAME_MATCH);
+        }
+        else {
+            SetGamestate(GAME_PAUSED);
+        }
+
         return Plugin_Continue;
     }
-    
-    if(!IsClientAdmin(client))
+
+    if (!IsClientAdmin(iClient))
     {
-        if(IsClientObserver(client) && client != giPauseClient) {
-            MC_ReplyToCommand(client, "%t", "xmsc_deny_spectator");
+        if (IsClientObserver(iClient) && iClient != giPauseClient) {
+            MC_ReplyToCommand(iClient, "%t", "xmsc_deny_spectator");
             return Plugin_Handled;
         }
     }
-    
-    switch(giGamestate)
+
+    if (giGamestate == GAME_PAUSED) {
+        IfCookiePlaySoundAll(ghCookieSounds, SOUND_ACTIONCOMPLETE);
+        MC_PrintToChatAllFrom(iClient, false, "%t", "xms_match_resumed");
+        SetGamestate(GAME_MATCH);
+        return Plugin_Continue;
+    }
+    else if (giGamestate == GAME_MATCH) {
+        IfCookiePlaySoundAll(ghCookieSounds, SOUND_ACTIONCOMPLETE);
+        MC_PrintToChatAllFrom(iClient, false, "%t", "xms_match_paused");
+        SetGamestate(GAME_PAUSED);
+        return Plugin_Continue;
+    }
+    else if (giGamestate == GAME_MATCHWAIT) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_nomatch");
+    }
+    else if (giGamestate == GAME_MATCHEX) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_cancel_matchex");
+    }
+    else if (giGamestate == GAME_OVER) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_over");
+    }
+    else {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_nomatch");
+    }
+
+    IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
+
+    return Plugin_Handled;
+}
+
+
+// Command: model <name>
+// Change player model
+public Action Cmd_Model(int iClient, int iArgs)
+{
+    char sName[70];
+
+    if (!iArgs)
     {
-        case GAME_PAUSED:
-        {
-            IfCookiePlaySound(ghCookieSounds, SOUND_ACTIONCOMPLETE);
-            MC_PrintToChatAllFrom(client, false, "%t", "xms_match_resumed");
-            SetGamestate(GAME_MATCH);
-            return Plugin_Continue;
+        if (giClientMenuType[iClient] == 2) {
+            ModelMenu(iClient).Display(iClient, MENU_TIME_FOREVER);
         }
-        case GAME_MATCH:
-        {
-            IfCookiePlaySound(ghCookieSounds, SOUND_ACTIONCOMPLETE);
-            MC_PrintToChatAllFrom(client, false, "%t", "xms_match_paused");
-            SetGamestate(GAME_PAUSED);
-            return Plugin_Continue;
-        }
-        case GAME_MATCHWAIT: {
-            MC_ReplyToCommand(client, "%t", "xmsc_deny_nomatch");
-        }
-        case GAME_MATCHEX: {
-            MC_ReplyToCommand(client, "%t", "xmsc_cancel_matchex");
-        }
-        case GAME_OVER: {
-            MC_ReplyToCommand(client, "%t", "xmsc_deny_over");
-        }
-        default: {
-            MC_ReplyToCommand(client, "%t", "xmsc_deny_nomatch");
+        else {
+            MC_PrintToChat(iClient, "%t", "xmenu_fail");
         }
     }
-    
+    else
+    {
+        GetCmdArg(1, sName, sizeof(sName));
+
+        if (StrContains(sName, "/") == -1) {
+            Format(sName, sizeof(sName), "%s/%s", StrContains(sName, "male") > -1 ? "models/humans/group03" : "models", sName);
+        }
+
+        ClientCommand(iClient, "cl_playermodel %s%s", sName, StrContains(sName, ".mdl") == -1 ? ".mdl" : "");
+    }
+
     return Plugin_Handled;
 }
 
 
-// command: model <name>
-// change player model
-public Action Cmd_Model(int client, int args)
+// Command: jointeam / spectate
+public Action ListenCmd_Team(int iClient, const char[] sCommand, int iArgs)
 {
-    if(!args) {
-        if(giClientMenuType[client] == 2) {
-            ghMenuClient[client] = Menu_Model(client);
-            ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
+    int iTeam = TEAM_SPECTATORS;
+
+    if (StrEqual(sCommand, "jointeam", false))
+    {
+        if (!iArgs) {
+            return Plugin_Continue;
         }
-        return Plugin_Handled;
-    }
-    
-    char name[70];
-    GetCmdArg(1, name, sizeof(name));
-    
-    if(StrContains(name, "/") == -1) {
-        Format(name, sizeof(name), "%s/%s", StrContains(name, "male") > -1 ? "models/humans/group03" : "models", name);
-    }
-    ClientCommand(client, "cl_playermodel %s%s", name, StrContains(name, ".mdl") == -1 ? ".mdl" : "");
-    return Plugin_Handled;
-}
 
+        iTeam = GetCmdArgInt(1);
+    }
 
-// command: jointeam / spectate
-public Action ListenCmd_Team(int client, const char[] command, int args)
-{
-    int team = (StrEqual(command, "jointeam", false) ? GetCmdArgInt(1) : TEAM_SPECTATORS);
-    
-    if(giAllowClient == client) {
+    if (giAllowClient == iClient) {
         giAllowClient = 0;
     }
-    else if(GetClientTeam(client) == team) {
-        char name[MAX_TEAM_NAME_LENGTH];
-        GetTeamName(team, name, sizeof(name));
-        MC_PrintToChat(client, "%t", "xmsc_teamchange_same", name);
+    else if (GetClientTeam(iClient) == iTeam)
+    {
+        char sName[MAX_TEAM_NAME_LENGTH];
+
+        GetTeamName(iTeam, sName, sizeof(sName));
+        MC_PrintToChat(iClient, "%t", "xmsc_teamchange_same", sName);
+        IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
     }
-    else if(IsGameMatch()) {
-        MC_PrintToChat(client, "%t", "xmsc_teamchange_deny");
+    else if (IsGameMatch())
+    {
+        MC_PrintToChat(iClient, "%t", "xmsc_teamchange_deny");
+        IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
+
         return Plugin_Handled;
     }
-    else if(gbTeamplay && team == TEAM_COMBINE) {
-        ClientCommand(client, "cl_playermodel models/police.mdl");
+    else if (gbTeamplay && iTeam == TEAM_COMBINE)
+    {
+        // try to force police model
+        ClientCommand(iClient, "cl_playermodel models/police.mdl");
     }
-    
+
     return Plugin_Continue;
 }
 
 
-// basecommands overrides
-public Action Listen_Basecommands(int client, const char[] command, int args)
+// Command: profile <player>
+// Display a player's steam profile
+public Action Cmd_Profile(int iClient, int iArgs)
 {
-    if(IsClientConnected(client) && IsClientInGame(client)) {
-        Basecommands_Override(client, command, false);
+    if (!iArgs) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_profile_usage");
+        return Plugin_Handled;
     }
-    return Plugin_Stop; // doesn't work for timeleft, blocked in TextMsg
-}
 
-void Basecommands_Override(int client, const char[] command, bool broadcast)
-{
-    if(broadcast) {
-        MC_PrintToChatAllFrom(client, false, command);
-    }
-    
-    if(StrEqual(command, "timeleft"))
+    char sAddr[128];
+    int  iTarget = ClientArgToTarget(iClient, 1);
+
+    if (iTarget != -1)
     {
-        float t = GetTimeRemaining(IsGamestate(GAME_OVER));
-        int h = RoundToNearest(t) / 3600;
-        int s = RoundToNearest(t) % 60;
-        int m = RoundToNearest(t) / 60 - (h ? (h * 60) : 0);
+        Format(sAddr, sizeof(sAddr), "https://steamcommunity.com/profiles/%s", UnbufferedAuthId(iTarget, AuthId_SteamID64));
 
-        if(!IsGamestate(GAME_CHANGING))
-        {
-            if(IsGamestate(GAME_OVER))
-            {
-                if(broadcast) {
-                    MC_PrintToChatAll("%t", "xmsc_timeleft_over", s);
-                }
-                else {
-                    MC_PrintToChat(client, "%t", "xmsc_timeleft_over", s);
-                }
-            }
-            else if(ghConVarTimelimit.IntValue)
-            {
-                if(broadcast) {
-                    MC_PrintToChatAll("%t", "xmsc_timeleft", h, m, s);
-                }
-                else {
-                    MC_PrintToChat(client, "%t", "xmsc_timeleft", h, m, s);    
-                }
-            }
-            else
-            {
-                if(broadcast) {
-                    MC_PrintToChatAll("%t", "xmsc_timeleft_none");
-                }
-                else {
-                    MC_PrintToChat(client, "%t", "xmsc_timeleft_none");
-                }
-            }
-        }
-    }
-    else if(StrEqual(command, "nextmap"))
-    {
-        if(broadcast) {
-            MC_PrintToChatAll("%t", "xmsc_nextmap", gsNextMode, DeprefixMap(gsNextMap));
-        }
-        else {
-            MC_PrintToChat(client, "%t", "xmsc_nextmap", gsNextMode, DeprefixMap(gsNextMap));
-        }
-    }
-    else if(StrEqual(command, "currentmap"))
-    {
-        if(broadcast) {
-            MC_PrintToChatAll("%t", "xmsc_currentmap", gsMode, DeprefixMap(gsMap));
-        }
-        else {
-            MC_PrintToChat(client, "%t", "xmsc_currentmap", gsMode, DeprefixMap(gsMap));
-        }
-    }
-    else if(StrEqual(command, "ff"))
-    {
-        if(gbTeamplay)
-        {
-            if(broadcast) {
-                MC_PrintToChatAll("%t", "xmsc_ff", ghConVarFriendlyfire.BoolValue ? "enabled" : "disabled");
-            }
-            else {
-                MC_PrintToChat(client, "%t", "xmsc_ff", ghConVarFriendlyfire.BoolValue ? "enabled" : "disabled");
-            }
-        }
-    }
-}
-
-
-// command: fov <value>
-// change player field-of-view (requires extended fov plugin)
-public Action ListenCmd_Fov(int client, const char[] command, int args)
-{
-    if(CommandExists("sm_fov") && args < 1) {
-        if(giClientMenuType[client] == 2) {
-            ghMenuClient[client] = Menu_Fov(client);
-            ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
-        }
-    }
-}
-
-
-// command: menu
-// display the plugin menu
-public Action Cmd_Menu(int client, int args)
-{
-    giClientMenuType[client] = 0;
-    QueryClientConVar(client, "cl_showpluginmessages", ShowMenuIfVisible, client);
-}
-
-
-// command: profile <player>
-// display a player's steam profile
-public Action Cmd_Profile(int client, int args)
-{
-    if(args)
-    {
-        char url[128];
-        int target = ClientArgToTarget(client, 1);
-        if(target)
-        {
-            Format(url, sizeof(url), "https://steamcommunity.com/profiles/%s", GetClientSteamID(target, AuthId_SteamID64));
-            
-            // have to load a blank page first for it to work:
-            ShowMOTDPanel(client, "Loading", "about:blank", MOTDPANEL_TYPE_URL);
-            ShowMOTDPanel(client, "Steam Profile", url, MOTDPANEL_TYPE_URL);
-        }
+        // have to load a blank page first for it to work:
+        ShowMOTDPanel(iClient, "Loading", "about:blank", MOTDPANEL_TYPE_URL);
+        ShowMOTDPanel(iClient, "Steam Profile", sAddr, MOTDPANEL_TYPE_URL);
     }
     else {
-        MC_ReplyToCommand(client, "%t", "xmsc_profile_usage");
+        IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
     }
-}
 
-
-// command: hudcolor <rrr> <ggg> <bbb>
-// set color for hud text elements (timeleft, spectator hud, etc)
-public Action Cmd_HudColor(int client, int argc)
-{
-    if(argc == 3) {
-        char args[13], rgb[3][4];
-        GetCmdArgString(args, sizeof(args));
-        ExplodeString(args, " ", rgb, 3, 4);            
-        SetClientCookie(client, ghCookieColorR, rgb[0]);
-        SetClientCookie(client, ghCookieColorG, rgb[1]);
-        SetClientCookie(client, ghCookieColorB, rgb[2]);
-    }
-    else {
-        MC_ReplyToCommand(client, "%t", "xmsc_hudcolor_usage");
-        if(giClientMenuType[client] == 2) {
-            ghMenuClient[client] = Menu_HudColor(client);
-            ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
-        }        
-    }
-    
     return Plugin_Handled;
 }
 
 
-// command: vote <motion>
-// call a yes/no vote
-public Action Cmd_CallVote(int client, int args)
+// Command: hudcolor <rrr> <ggg> <bbb>
+// Set color for hud text elements (timeleft, spectator hud, etc)
+public Action Cmd_HudColor(int iClient, int iArgs)
 {
-    if(!args) {
-        MC_ReplyToCommand(client, "%t", "xmsc_callvote_usage");
+    if (iArgs != 3) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_hudcolor_usage");
     }
-    else if(giVoteStatus) {
-        MC_ReplyToCommand(client, "%t", "xmsc_callvote_deny");
-    }
-    else if(VoteTimeout(client)  && !IsClientAdmin(client)) {
-        MC_ReplyToCommand(client, "%t", "xmsc_callvote_denywait", VoteTimeout(client));
-    }
-    else {
-        char motion[64];
-        GetCmdArgString(motion, sizeof(motion));
-        
-        if(StrContains(motion, "run", false) == 0) {
-            bool next = StrContains(motion, "runnext", false) == 0;
-            FakeClientCommandEx(client, "%s %s", next ? "runnext" : "run", motion[next ? 8 : 4]);
+    else
+    {
+        char sArgs [13],
+             sColor[3][4];
+
+        GetCmdArgString(sArgs, sizeof(sArgs));
+        ExplodeString(sArgs, " ", sColor, 3, 4);
+
+        for (int i = 0; i < 3; i++) {
+            Format(sColor[i], sizeof(sColor[]), "%03i", StringToInt(sColor[i]));
         }
-        else if(StrContains(motion, "cancel") == 0) {
-            FakeClientCommandEx(client, "cancel");
+
+        SetClientCookie(iClient, ghCookieColorR, sColor[0]);
+        SetClientCookie(iClient, ghCookieColorG, sColor[1]);
+        SetClientCookie(iClient, ghCookieColorB, sColor[2]);
+    }
+
+    return Plugin_Handled;
+}
+
+
+// Command: vote <motion>
+// Call a custom yes/no vote
+public Action Cmd_Vote(int iClient, int iArgs)
+{
+    if (!iArgs) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_callvote_usage");
+    }
+    else if (giVoteStatus) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_callvote_deny");
+    }
+    else if (VoteTimeout(iClient)  && !IsClientAdmin(iClient)) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_callvote_denywait", VoteTimeout(iClient));
+    }
+    else
+    {
+        char sMotion[64];
+        GetCmdArgString(sMotion, sizeof(sMotion));
+
+        if (StrContains(sMotion, "run", false) == 0) {
+            bool bNext = StrContains(sMotion, "runnext", false) == 0;
+            FakeClientCommandEx(iClient, "say !%s %s", bNext ? "runnext" : "run", sMotion[bNext ? 8 : 4]);
+        }
+        else if (StrEqual(sMotion, "cancel") || StrEqual(sMotion, "shuffle") || StrEqual(sMotion, "invert")) {
+            FakeClientCommandEx(iClient, "say !%s", sMotion);
         }
         else {
-            CallVote(VOTE_CUSTOM, client, motion);
+            CallVoteFor(VOTE_CUSTOM, iClient, sMotion);
         }
     }
+
+    return Plugin_Handled;
 }
 
-void CallVote(int type, int caller, const char[] motion, any ...)
+
+// Command: [yes/no/1/2/3/4/5]
+// Vote on the current motion
+public Action Cmd_CastVote(int iClient, int iArgs)
 {
-    VFormat(gsVoteMotion, sizeof(gsVoteMotion), motion, 4);
-    giClientVoteCallTick[caller] = GetGameTickCount();
-    giVoteStatus = 1;
-    giVoteType = type;
-    giClientVote[caller] = 1;
-    
-    MC_PrintToChatAllFrom(caller, false, "%t", "xmsc_callvote");
-    IfCookiePlaySound(ghCookieSounds, SOUND_VOTECALLED);
-    
-    for(int i = 1; i <= MaxClients; i++)
+    char sVote[4];
+    GetCmdArg(0, sVote, sizeof(sVote));
+
+    int iVote;
+    bool bNumeric = String_IsNumeric(sVote),
+         bMulti   = (strlen(gsVoteMotion[1]) > 0);
+
+    iVote = (
+        bNumeric ? StringToInt(sVote) - 1
+        : view_as<int>(StrEqual(sVote, "yes", false))
+    );
+
+    if (giVoteStatus != 1) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_castvote_deny");
+    }
+    else if (IsClientObserver(iClient) && giVoteType == VOTE_MATCH) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_castvote_denyspec");
+    }
+    else if (!bMulti && bNumeric) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_castvote_denymulti");
+    }
+    else if (bMulti && !bNumeric) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_castvote_denybinary");
+    }
+    else
     {
-        if(!IsClientConnected(i) || !IsClientInGame(i) || IsFakeClient(i)) {
-            continue;
+        if (!(bNumeric && !strlen(gsVoteMotion[iVote])))
+        {
+            char sName[MAX_NAME_LENGTH];
+
+            GetClientName(iClient, sName, sizeof(sName));
+            giClientVote[iClient] = iVote;
+            PrintToConsoleAll("%t", "xmsc_castvote", sName, sVote);
         }
-        
-        if(i != caller && (!IsClientObserver(i) || type != VOTE_MATCH)) {
-            giClientVote[i] = 0;
-            ghMenuClient[i] = Menu_Decision(i);
-            ghMenuClient[i].Display(i, MENU_TIME_FOREVER);
-        }
+
+        return Plugin_Handled;
     }
+
+    IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
+
+    return Plugin_Handled;
 }
 
 
-// command: [yes/no]
-// vote for current motion
-public Action Cmd_CastVote(int client, int args)
+// Command: shuffle
+// Shuffle teams randomly
+public Action Cmd_Shuffle(int iClient, int iArgs)
 {
-    char vote[4];
-    GetCmdArg(0, vote, sizeof(vote));
-    
-    if(IsClientObserver(client) && giVoteType == VOTE_MATCH) {
-        MC_ReplyToCommand(client, "%t", "xmsc_castvote_denyspec");
+    if (!gbTeamplay) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_noteams");
     }
-    else {
-        giClientVote[client] = StrEqual(vote, "yes", false) ? 1 : -1;
-        
-        char name[MAX_NAME_LENGTH];
-        GetClientName(client, name, sizeof(name));
-        PrintToConsoleAll("%t", "xmsc_castvote", name, vote);
+    else if (iClient == 0)
+    {
+        ShuffleTeams();
+        return Plugin_Handled;
     }
+    else if (giVoteStatus) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_vote_deny");
+    }
+    else if (VoteTimeout(iClient)  && !IsClientAdmin(iClient)) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_vote_timeout", VoteTimeout(iClient));
+    }
+    else if (IsClientObserver(iClient) && !IsClientAdmin(iClient)) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_spectator");
+    }
+    else if (giGamestate == GAME_MATCH || giGamestate == GAME_MATCHEX || giGamestate == GAME_PAUSED) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_match");
+    }
+    else if (giGamestate == GAME_CHANGING || giGamestate == GAME_MATCHWAIT) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_changing");
+    }
+    else if (giGamestate == GAME_OVER || GetTimeRemaining(false) < 1) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_over");
+    }
+    else
+    {
+        if (GetRealClientCount(true, false, false) < giVoteMinPlayers || giVoteMinPlayers <= 0 || iClient == 0) {
+            MC_PrintToChatAllFrom(iClient, false, "%t", "xmsc_shuffle");
+            ShuffleTeams();
+        }
+        else {
+            CallVoteFor(VOTE_SHUFFLE, iClient, "shuffle teams");
+        }
+        return Plugin_Handled;
+    }
+
+    IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
+    return Plugin_Handled;
 }
 
 
-/**************************************************************************************************
- *** Main Functions
-**************************************************************************************************/
-public Action OnLevelInit(const char[] mapName, char mapEntities[2097152])
-{  
-    char keys[4096], ent[2][2048][512];
-  
-    if(!GetConfigKeys(keys, sizeof(keys), "gamemodes", gsNextMode, "replaceEntities")) {
+// Command: invert
+// Move all players to the opposite teams
+public Action Cmd_Invert(int iClient, int iArgs)
+{
+    if (!gbTeamplay) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_noteams");
+    }
+    else if (iClient == 0)
+    {
+        InvertTeams();
+        return Plugin_Handled;
+    }
+    else if (giVoteStatus) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_vote_deny");
+    }
+    else if (VoteTimeout(iClient)  && !IsClientAdmin(iClient)) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_vote_timeout", VoteTimeout(iClient));
+    }
+    else if (IsClientObserver(iClient) && !IsClientAdmin(iClient)) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_spectator");
+    }
+    else if (giGamestate == GAME_MATCH || giGamestate == GAME_MATCHEX || giGamestate == GAME_PAUSED) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_match");
+    }
+    else if (giGamestate == GAME_CHANGING || giGamestate == GAME_MATCHWAIT) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_changing");
+    }
+    else if (giGamestate == GAME_OVER || GetTimeRemaining(false) < 1) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_over");
+    }
+    else
+    {
+        if (GetRealClientCount(true, false, false) < giVoteMinPlayers || giVoteMinPlayers <= 0 || iClient == 0) {
+            MC_PrintToChatAllFrom(iClient, false, "%t", "xmsc_invert");
+            InvertTeams();
+        }
+        else {
+            CallVoteFor(VOTE_INVERT, iClient, "invert teams");
+        }
+        return Plugin_Handled;
+    }
+
+    IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
+    return Plugin_Handled;
+}
+
+
+// Command: say
+// Chat command overrides
+public Action OnClientSayCommand(int iClient, const char[] sCommand, const char[] sArgs)
+{
+    bool bCommand = (StrContains(sArgs, "!") == 0 || StrContains(sArgs, "/") == 0);
+
+    if (iClient == 0)
+    {
+        // spam be gone
+        return Plugin_Handled;
+    }
+    else if (giGamestate == GAME_PAUSED && !bCommand)
+    {
+        // fix chat when paused
+        MC_PrintToChatAllFrom(iClient, StrEqual(sCommand, "say_team", false), sArgs);
+
+        return Plugin_Stop;
+    }
+    else if (bCommand)
+    {
+        // backwards compatibility for PMS commands
+        if (StrContains(sArgs, "cm") == 1) {
+            FakeClientCommandEx(iClient, "say !run%s", sArgs[3]);
+        }
+        else if (StrContains(sArgs, "tp ") == 1 || StrContains(sArgs, "teamplay ") == 1)
+        {
+            if (StrContains(sArgs, " on") != -1 || StrContains(sArgs, " 1") != -1) {
+                FakeClientCommandEx(iClient, "say !run tdm");
+            }
+            else if (StrContains(sArgs, " off") != -1 || StrContains(sArgs, " 0") != -1) {
+                FakeClientCommandEx(iClient, "say !run dm");
+            }
+        }
+        else if (StrEqual(sArgs[1], "cf") || StrEqual(sArgs[1], "coinflip") || StrEqual(sArgs[1], "flip")) {
+            MC_PrintToChatAllFrom(iClient, false, "%t", "xmsc_coinflip", Math_GetRandomInt(0, 1) ? "Heads" : "Tails");
+        }
+
+        // VG run compatability
+        else if (StrContains(sArgs, "run") == 1 && (StrEqual(sArgs[5], "1v1") || StrEqual(sArgs[5], "2v2") || StrEqual(sArgs[5], "3v3") || StrEqual(sArgs[5], "4v4") || StrEqual(sArgs[5], "duel"))) {
+            FakeClientCommandEx(iClient, "say !start");
+        }
+
+        // more minor commands
+        else if (StrEqual(sArgs[1], "stop")) {
+            FakeClientCommandEx(iClient, "say !cancel");
+        }
+        else if (StrEqual(sArgs[1], "pause") || StrEqual(sArgs[1], "unpause")) {
+            FakeClientCommandEx(iClient, "pause");
+        }
+        else if (StrContains(sArgs, "jointeam ") == 1) {
+            FakeClientCommandEx(iClient, "jointeam %s", sArgs[10]);
+        }
+        else if (StrEqual(sArgs[1], "join")) {
+            FakeClientCommand(iClient, "jointeam %i", GetOptimalTeam());
+        }
+        else if (StrEqual(sArgs[1], "spec") || StrEqual(sArgs[1], "spectate")) {
+            FakeClientCommandEx(iClient, "spectate");
+        }
+        else {
+            return Plugin_Continue;
+        }
+
+        return Plugin_Stop;
+    }
+    else if (StrEqual(sArgs, "timeleft") || StrEqual(sArgs, "nextmap") || StrEqual(sArgs, "currentmap") || StrEqual(sArgs, "ff"))
+    {
+        Basecommands_Override(iClient, sArgs, true);
+
+        return Plugin_Stop;
+    }
+    else if (StrEqual(sArgs, "gg", false) && ( giGamestate == GAME_OVER || giGamestate == GAME_CHANGING ) )
+    {
+        IfCookiePlaySoundAll(ghCookieSounds, SOUND_GG);
+
         return Plugin_Continue;
     }
-  
-    for(int i = 0; i < ExplodeString(keys, ",", ent[0], 2048, 512); i++) {
-        if(GetConfigString(ent[1][i], 512, ent[0][i], "gamemodes", gsNextMode, "replaceEntities") != -1) {
-            ReplaceString(mapEntities, sizeof(mapEntities), ent[0][i], ent[1][i], false);
+    else if (giVoteStatus == 1)
+    {
+        if (StrEqual(sArgs, "yes") || StrEqual(sArgs, "no") || StrEqual(sArgs, "1") || StrEqual(sArgs, "2") || StrEqual(sArgs, "3") || StrEqual(sArgs, "4") || StrEqual(sArgs, "5"))
+        {
+            bool bMulti   = strlen(gsVoteMotion[1]) > 0,
+                 bNumeric = String_IsNumeric(sArgs);
+
+            if (!bMulti && !bNumeric || bMulti && bNumeric)
+            {
+                FakeClientCommandEx(iClient, sArgs);
+
+                return Plugin_Stop;
+            }
         }
     }
-    
+
+    return Plugin_Continue;
+}
+
+
+// Basecommands overrides
+public Action Listen_Basecommands(int iClient, const char[] sCommand, int iArgs)
+{
+    if (IsClientConnected(iClient) && IsClientInGame(iClient)) {
+        Basecommands_Override(iClient, sCommand, false);
+    }
+
+    return Plugin_Stop; // doesn't work for timeleft, blocked in TextMsg
+}
+
+void Basecommands_Override(int iClient, const char[] sCommand, bool bBroadcast)
+{
+    if (bBroadcast) {
+        MC_PrintToChatAllFrom(iClient, false, sCommand);
+    }
+
+    if (StrEqual(sCommand, "timeleft"))
+    {
+        float fTime  = GetTimeRemaining(giGamestate == GAME_OVER);
+        int   iHours = RoundToNearest(fTime) / 3600,
+              iSecs  = RoundToNearest(fTime) % 60,
+              iMins  = RoundToNearest(fTime) / 60 - (iHours ? (iHours * 60) : 0);
+
+        if (giGamestate != GAME_CHANGING)
+        {
+            if (giGamestate == GAME_OVER)
+            {
+                if (bBroadcast) {
+                    MC_PrintToChatAll("%t", "xmsc_timeleft_over", iSecs);
+                }
+                else {
+                    MC_PrintToChat(iClient, "%t", "xmsc_timeleft_over", iSecs);
+                }
+            }
+            else if (ghConVarTimelimit.IntValue)
+            {
+                if (bBroadcast) {
+                    MC_PrintToChatAll("%t", "xmsc_timeleft", iHours, iMins, iSecs);
+                }
+                else {
+                    MC_PrintToChat(iClient, "%t", "xmsc_timeleft", iHours, iMins, iSecs);
+                }
+            }
+            else
+            {
+                if (bBroadcast) {
+                    MC_PrintToChatAll("%t", "xmsc_timeleft_none");
+                }
+                else {
+                    MC_PrintToChat(iClient, "%t", "xmsc_timeleft_none");
+                }
+            }
+        }
+    }
+    else if (StrEqual(sCommand, "nextmap"))
+    {
+        if (bBroadcast) {
+            MC_PrintToChatAll("%t", "xmsc_nextmap", gsNextMode, DeprefixMap(gsNextMap));
+        }
+        else {
+            MC_PrintToChat(iClient, "%t", "xmsc_nextmap", gsNextMode, DeprefixMap(gsNextMap));
+        }
+    }
+    else if (StrEqual(sCommand, "currentmap"))
+    {
+        if (bBroadcast) {
+            MC_PrintToChatAll("%t", "xmsc_currentmap", gsMode, DeprefixMap(gsMap));
+        }
+        else {
+            MC_PrintToChat(iClient, "%t", "xmsc_currentmap", gsMode, DeprefixMap(gsMap));
+        }
+    }
+    else if (StrEqual(sCommand, "ff"))
+    {
+        if (gbTeamplay)
+        {
+            if (bBroadcast) {
+                MC_PrintToChatAll("%t", "xmsc_ff", ghConVarFF.BoolValue ? "enabled" : "disabled");
+            }
+            else {
+                MC_PrintToChat(iClient, "%t", "xmsc_ff", ghConVarFF.BoolValue ? "enabled" : "disabled");
+            }
+        }
+    }
+}
+
+/**************************************************************
+ * CLIENTS
+ *************************************************************/
+public void OnClientConnected(int iClient)
+{
+    if (!IsClientSourceTV(iClient)) {
+        TryForceModel(iClient);
+    }
+}
+
+public void OnClientPutInServer(int iClient)
+{
+    if (giGamestate == GAME_PAUSED)
+    {
+        giPauseClient = iClient;
+        CreateTimer(0.1, T_RePause, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+    }
+
+    if (giGamestate != GAME_MATCH && giGamestate != GAME_MATCHEX && giGamestate != GAME_MATCHWAIT)
+    {
+        char sName[MAX_NAME_LENGTH];
+        GetClientName(iClient, sName, sizeof(sName));
+        MC_PrintToChatAll("%t", "xms_join", sName);
+    }
+
+    if (!IsFakeClient(iClient))
+    {
+        CreateTimer(1.0, T_AnnouncePlugin, iClient, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+
+        // play connect sound
+        if (!(giGamestate == GAME_MATCH || giGamestate == GAME_MATCHEX || giGamestate == GAME_MATCHWAIT)) {
+            IfCookiePlaySoundAll(ghCookieSounds, SOUND_CONNECT);
+        }
+
+        // cancel sound fade in case of early map change
+        ClientCommand(iClient, "soundfade 0 0 0 0");
+    }
+
+    if (!IsClientSourceTV(iClient))
+    {
+        // instantly join spec before we determine the correct team
+        giAllowClient = iClient;
+        gbClientKill[iClient] = true;
+        FakeClientCommandEx(iClient, "jointeam %i", TEAM_SPECTATORS);
+    }
+}
+
+public void OnClientCookiesCached(int iClient)
+{
+    if (GetClientCookieInt(iClient, ghCookieMusic) != 0) {
+        return;
+    }
+
+    // Set default values
+    SetClientCookie(iClient, ghCookieMusic,  "1");
+    SetClientCookie(iClient, ghCookieSounds, "1");
+    SetClientCookie(iClient, ghCookieColorR, "255");
+    SetClientCookie(iClient, ghCookieColorG, "177");
+    SetClientCookie(iClient, ghCookieColorB, "0");
+}
+
+public void OnClientPostAdminCheck(int iClient)
+{
+    if (IsFakeClient(iClient)) {
+        return;
+    }
+
+    giClientMenuType[iClient] = 0;
+    CreateTimer(1.1, T_AttemptInitMenu, iClient, TIMER_FLAG_NO_MAPCHANGE);
+    CreateTimer(0.1, T_Welcome,         iClient, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+}
+
+public void OnClientDisconnect(int iClient)
+{
+    if (!IsFakeClient(iClient))
+    {
+        if (GetRealClientCount(IsGameMatch()) == 1 && giGamestate != GAME_CHANGING) {
+            // Last player has disconnected, revert to defaults
+            LoadDefaults();
+        }
+        else if (gbClientInit[iClient] && !IsGameMatch()) {
+            IfCookiePlaySoundAll(ghCookieSounds, SOUND_DISCONNECT);
+        }
+    }
+
+    gbClientInit[iClient] = false;
+    giClientMenuType[iClient] = 0;
+    giClientVoteTick[iClient] = 0;
+}
+
+public void OnClientDisconnect_Post(int iClient)
+{
+    if (iClient == giPauseClient || GetRealClientCount(false) == 0) {
+        giPauseClient = 0;
+    }
+}
+
+/**************************************************************
+ * MAP MANAGEMENT
+ *************************************************************/
+public Action T_RestartMap(Handle hTimer)
+{
+    SetGamemode(gsDefaultMode);
+    ghConVarNextmap.SetString(gsMap);
+    ServerCommand("changelevel_next");
+    gbPluginReady = true;
+}
+
+public Action OnLevelInit(const char[] sMap, char sEntities[2097152])
+{
+    char sKeys[4096],
+         sEntity[2][2048][512];
+
+    if (!strlen(sEntities) || !GetConfigKeys(sKeys, sizeof(sKeys), "Gamemodes", gsNextMode, "ReplaceEntities")) {
+        return Plugin_Continue;
+    }
+
+    for (int i = 0; i <= ExplodeString(sKeys, ",", sEntity[0], 2048, 512); i++)
+    {
+        if (GetConfigString(sEntity[1][i], 512, sEntity[0][i], "Gamemodes", gsNextMode, "ReplaceEntities") == 1) {
+            ReplaceString(sEntities, sizeof(sEntities), sEntity[0][i], sEntity[1][i], false);
+        }
+    }
+
     return Plugin_Changed;
 }
 
 public void OnMapStart()
 {
+    char sModeDesc[32];
+
+    if (!gbPluginReady) {
+        return;
+    }
+
+    GetCurrentMap(gsMap, sizeof(gsMap));
+    strcopy(gsNextMode, sizeof(gsNextMode), gsMode);
+    strcopy(sModeDesc, sizeof(sModeDesc), gsMode);
+    if (strlen(gsModeName)) {
+        Format(sModeDesc, sizeof(sModeDesc), "%s (%s)", sModeDesc, gsModeName);
+    }
+    Steam_SetGameDescription(sModeDesc);
+
     PrepareSound(SOUND_GG);
     PrepareSound(SOUND_VOTECALLED);
     PrepareSound(SOUND_VOTEFAILED);
     PrepareSound(SOUND_VOTESUCCESS);
-  
-    GetCurrentMap(gsMap, sizeof(gsMap));
+    for (int i = 0; i < 6; i++) {
+        PrepareSound(gsMusicPath[i]);
+    }
+
     LoadConfigValues();
-  
-    if(gbPluginReady)
-    {
-        char description[32];
-        strcopy(gsNextMode, sizeof(gsNextMode), gsMode);
-        strcopy(description, sizeof(description), gsMode);
-        if(strlen(gsModeName)) {
-            Format(description, sizeof(description), "%s (%s)", description, gsModeName);
-        }
-        Steam_SetGameDescription(description);
-    }
-  
-    if(giOvertime == 1) {
-        CreateOverTimer();
-    }
-  
-    if(gbTeamplay) {
-        Team_SetName(TEAM_SPECTATORS, strlen(gsModeName) ? gsModeName : gsMode);
-    }
-  
-    if(gbDisableProps) {
-        RequestFrame(ClearProps);
-    }
-  
     GenerateGameID();
-  
     SetGamestate(GAME_DEFAULT);
     SetGamemode(gsMode);
-    gfPretime = GetGameTime() - 1;
+
+    gfPretime = GetGameTime() - 1.0;
     giVoteStatus = 0;
+    gbNextMapChosen = false;
+
+    if (giOvertime == 1) {
+        CreateOverTimer();
+    }
+
+    if (gbDisableProps) {
+        RequestFrame(ClearProps);
+    }
 
     CreateTimer(0.1, T_CheckPlayerStates, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 }
 
-public void OnClientConnected(int client)
+void GenerateGameID()
 {
-    if(!IsClientSourceTV(client)) {
-        TryForceModel(client);
+    FormatTime(gsGameId, sizeof(gsGameId), "%y%m%d%H%M");
+    Format(gsGameId, sizeof(gsGameId), "%s-%s", gsGameId, gsMap);
+}
+
+public Action OnMapChanging(int iClient, const char[] sCommand, int iArgs)
+{
+    if (gbPluginReady && iClient == 0 && (iArgs || StrEqual(sCommand, "changelevel_next")) )
+    {
+        SetGamestate(GAME_CHANGING);
+        SetGamemode(gsNextMode);
     }
 }
 
-public void OnClientPutInServer(int client)
-{   
-    if(IsGamestate(GAME_PAUSED)) {
-        giPauseClient = client;
-        CreateTimer(0.1, T_RePause, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+public void OnMapEnd()
+{
+    gbTeamplay = ghConVarTeamplay.BoolValue;
+    giOvertime = 0;
+    ghOvertimer = INVALID_HANDLE;
+}
+
+bool GetMapByAbbrev(char[] sOutput, int iLen, const char[] sAbbrev)
+{
+    return view_as<bool>(GetConfigString(sOutput, iLen, sAbbrev, "Maps", "Abbreviations") > 0);
+}
+
+char DeprefixMap(const char[] sMap)
+{
+    char sPrefix[16],
+         sResult[MAX_MAP_LENGTH];
+    int  iPos = SplitString(sMap, "_", sPrefix, sizeof(sPrefix));
+
+    StrCat(sPrefix, sizeof(sPrefix), "_");
+
+    if (iPos && IsItemDistinctInList(sPrefix, gsStripPrefix)) {
+        strcopy(sResult, sizeof(sResult), sMap[iPos]);
     }
-  
-    if(!IsGamestate(GAME_MATCH, GAME_MATCHEX, GAME_MATCHWAIT)) {
-        char name[MAX_NAME_LENGTH];
-        GetClientName(client, name, sizeof(name));
-        MC_PrintToChatAll("%t", "xms_join", name);
+    else {
+        strcopy(sResult, sizeof(sResult), sMap);
     }
-  
-    if(!IsFakeClient(client))
+
+    return sResult;
+}
+
+int GetMapsArray(char[][] sArray, int iLen1, int iLen2, const char[] sMapcycle = "", const char[] sMustBeginWith = "", const char[] sMustContain = "", bool bStopIfExactMatch = true, bool bStripPrefixes = false, char[][] sArray2 = NULL_STRING)
+{
+    int  iHits;
+    bool bExact;
+
+    // search maps directory
+    if (!strlen(sMapcycle))
     {
-        CreateTimer(1.0, T_AnnouncePlugin, client, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
-    
-        // play connect sound
-        if(!IsGamestate(GAME_MATCH, GAME_MATCHEX, GAME_MATCHWAIT)) {
-            IfCookiePlaySound(ghCookieSounds, SOUND_CONNECT);
+        char             sFile[2][256];
+        DirectoryListing hDir = OpenDirectory("maps");
+        FileType         iType;
+
+        while (hDir.GetNext(sFile[0], sizeof(sFile[]), iType))
+        {
+            int iBsp = StrContains(sFile[0], ".bsp");
+
+            if (iBsp == -1 || StrContains(sFile[0][iBsp + 1], ".") != -1 || iType != FileType_File) {
+                continue;
+            }
+
+            sFile[0][iBsp] = '\0';
+
+            if (bStripPrefixes) {
+                strcopy(sFile[1], sizeof(sFile[]), DeprefixMap(sFile[0]));
+            }
+
+            if (strlen(sMustBeginWith) && StrContains(bStripPrefixes ? sFile[1] : sFile[0], sMustBeginWith, false) != 0) {
+                continue;
+            }
+
+            if (strlen(sMustContain))
+            {
+                if (StrContains(sFile[0], sMustContain, false) == -1) {
+                    continue;
+                }
+
+                if (StrEqual(sFile[0], sMustContain, false) || StrEqual(sFile[1], sMustContain, false))
+                {
+                    bExact = true;
+                    if (bStopIfExactMatch)
+                    {
+                        strcopy(sArray[0], iLen2, sFile[view_as<int>(bStripPrefixes)]);
+
+                        if (bStripPrefixes) {
+                            strcopy(sArray2[0], iLen2, sFile[0]);
+                        }
+
+                        break;
+                    }
+                }
+            }
+
+            iHits++;
+
+            if (iHits < iLen1)
+            {
+                strcopy(sArray[iHits - 1], iLen2, sFile[view_as<int>(bStripPrefixes)]);
+
+                if (bStripPrefixes) {
+                    strcopy(sArray2[iHits - 1], iLen2, sFile[0]);
+                }
+            }
         }
-    
-        // cancel sound fade in case of early map change
-        ClientCommand(client, "soundfade 0 0 0 0");
+
+        hDir.Close();
     }
-  
-    if(!IsClientSourceTV(client))
+
+    // search mapcyclefile
+    else
     {
-        // instantly join spec before we determine the correct team
-        giAllowClient = client;
-        gbClientNoRagdoll[client] = true;
-        FakeClientCommandEx(client, "jointeam %i", TEAM_SPECTATORS);
+        char sPath[PLATFORM_MAX_PATH],
+             sMap [2][MAX_MAP_LENGTH];
+        File hFile;
+
+        Format(sPath, sizeof(sPath), "cfg/%s", sMapcycle);
+
+        if (!FileExists(sPath, true)) {
+            LogError("Mapcyclefile `%s` is invalid!", sMapcycle);
+            return 0;
+        }
+
+        hFile = OpenFile(sPath, "r");
+
+        while (!hFile.EndOfFile() && hFile.ReadLine(sMap[0], sizeof(sMap[])))
+        {
+            if (sMap[0][0] == ';' || !IsCharAlpha(sMap[0][0])) {
+                continue;
+            }
+
+            for (int i = 0; i < strlen(sMap[0]); i++)
+            {
+                if (IsCharSpace(sMap[0][i])) {
+                    sMap[0][i] = '\0';
+                    break;
+                }
+            }
+
+            if (!IsMapValid(sMap[0])) {
+                LogError("Map `%s` in Mapcyclefile `%s` is invalid!", sMap, sPath);
+                continue;
+            }
+
+            if (bStripPrefixes) {
+                strcopy(sMap[1], sizeof(sMap[]), DeprefixMap(sMap[0]));
+            }
+
+            if (strlen(sMustBeginWith) && StrContains(bStripPrefixes ? sMap[1] : sMap[0], sMustBeginWith, false) != 0) {
+                continue;
+            }
+
+            if (strlen(sMustContain))
+            {
+                if (StrContains(sMap[0], sMustContain, false) == -1) {
+                    continue;
+                }
+
+                if (StrEqual(sMap[0], sMustContain, false) || StrEqual(sMap[1], sMustContain, false))
+                {
+                    bExact = true;
+                    if (bStopIfExactMatch)
+                    {
+                        strcopy(sArray[0], iLen2, sMap[view_as<int>(bStripPrefixes)]);
+
+                        if (bStripPrefixes) {
+                            strcopy(sArray2[0], iLen2, sMap[0]);
+                        }
+
+                        break;
+                    }
+                }
+            }
+
+            iHits++;
+
+            if (iHits < iLen1)
+            {
+                strcopy(sArray[iHits - 1], iLen2, sMap[view_as<int>(bStripPrefixes)]);
+
+                if (bStripPrefixes) {
+                    strcopy(sArray2[iHits - 1], iLen2, sMap[0]);
+                }
+            }
+        }
+
+        hFile.Close();
     }
-}
 
-public void OnClientCookiesCached(int client)
-{
-    // set default cookie values
-    if(GetClientCookieInt(client, ghCookieMusic) == 0) {
-        SetClientCookie(client, ghCookieMusic, "1");
-        SetClientCookie(client, ghCookieSounds, "1");
-        SetClientCookie(client, ghCookieColorR, "255");
-        SetClientCookie(client, ghCookieColorG, "177");
-        SetClientCookie(client, ghCookieColorB, "0");
+    if (bExact && bStopIfExactMatch) {
+        return 1;
     }
+
+    return iHits;
 }
 
-void PrepareSound(const char[] file)
+/**************************************************************
+ * MODE MANAGEMENT
+ *************************************************************/
+int GetModeForMap(char[] sOutput, int iLen, const char[] sMap)
 {
-    char path[PLATFORM_MAX_PATH];
-    Format(path, sizeof(path), "sound/%s", file);
-    PrecacheSound(file);
-    AddFileToDownloadsTable(path);
-}
-
-void IfCookiePlaySound(Handle cookie, const char[] sound, bool unset=true)
-{
-    for(int i = 1; i <= MaxClients; i++)
+    if (!GetConfigString(sOutput, iLen, sMap, "Maps", "DefaultModes"))
     {
-        if(!IsClientConnected(i) || !IsClientInGame(i) || IsFakeClient(i)) {
+        char sPrefix[16];
+
+        SplitString(sMap, "_", sPrefix, sizeof(sPrefix));
+        StrCat(sPrefix, sizeof(sPrefix), "_*");
+
+        if (!GetConfigString(sOutput, iLen, sPrefix, "Maps", "DefaultModes"))
+        {
+            if (!strlen(gsRetainModes)) {
+                return -1;
+            }
+
+            strcopy(sOutput, iLen, gsRetainModes);
+            if (!strlen(gsMode) || !IsItemDistinctInList(gsMode, sOutput))
+            {
+                if (StrContains(sOutput, ",")) {
+                    SplitString(sOutput, ",", sOutput, iLen);
+                    return 0;
+                }
+            }
+
+            strcopy(sOutput, iLen, gsMode);
+            return 0;
+        }
+    }
+    return 1;
+}
+
+int GetRandomMode(char[] sOutput, int iLen, bool bExcludeCurrent)
+{
+    char sModes[32][MAX_MODE_LENGTH];
+    bool bFound;
+    int  iCount = ExplodeString(gsValidModes, ",", sModes, 32, MAX_MODE_LENGTH),
+         iRan;
+
+    if (!iCount || (iCount == 1 && bExcludeCurrent)) {
+        return 0;
+    }
+
+    do {
+        iRan = Math_GetRandomInt(0, iCount);
+        if (strlen(sModes[iRan]))
+        {
+            if (!bExcludeCurrent || !StrEqual(sModes[iRan], gsMode)) {
+                bFound = true;
+            }
+        }
+    }
+    while (!bFound && iCount > 1);
+
+    strcopy(sOutput, iLen, sModes[iRan]);
+    return 1;
+}
+
+bool GetModeFullName(char[] sBuffer, int iLen, const char[] sMode)
+{
+    char sName[64];
+
+    if (GetConfigString(sName, sizeof(sName), "Name", "Gamemodes", sMode) == 1)
+    {
+        strcopy(sBuffer, iLen, sName);
+        return true;
+    }
+
+    return false;
+}
+
+bool GetModeMapcycle(char[] sBuffer, int iLen, const char[] sMode)
+{
+    char sMapcycle[PLATFORM_MAX_PATH];
+
+    if (GetConfigString(sMapcycle, sizeof(sMapcycle), "Mapcycle", "Gamemodes", sMode))
+    {
+        strcopy(sBuffer, iLen, sMapcycle);
+        return true;
+    }
+
+    return false;
+}
+
+void SetGamemode(const char[] sMode)
+{
+    char sCommand[MAX_BUFFER_LENGTH];
+
+    strcopy(gsNextMode, sizeof(gsNextMode), sMode);
+    strcopy(gsMode, sizeof(gsMode), sMode);
+
+    if (GetConfigString(sCommand, sizeof(sCommand), "Command", "Gamemodes", gsMode)) {
+        ServerCommand(sCommand);
+    }
+}
+
+void SetMapcycle()
+{
+    char sMapcycle[PLATFORM_MAX_PATH];
+
+    if (!GetModeMapcycle(sMapcycle, sizeof(sMapcycle), gsMode) || (gbStockMapsIfEmpty && GetRealClientCount(false, false) <= 1 && StrEqual(gsDefaultMode, gsMode)) ) {
+        Format(sMapcycle, sizeof(sMapcycle), "mapcycle_default.txt");
+    }
+
+    ServerCommand("mapcyclefile %s", sMapcycle);
+}
+
+/**************************************************************
+ * TEAM MANAGEMENT
+ *************************************************************/
+int GetOptimalTeam()
+{
+    int iTeam = TEAM_REBELS;
+
+    if (gbTeamplay)
+    {
+        int iCount[2];
+
+        iCount[0] = GetTeamClientCount(TEAM_REBELS);
+        iCount[1] = GetTeamClientCount(TEAM_COMBINE);
+
+        iTeam = (
+            iCount[0] > iCount[1] ? TEAM_COMBINE
+            : iCount[1] > iCount[0] ? TEAM_REBELS
+            : Math_GetRandomInt(0,1) ? TEAM_REBELS : TEAM_COMBINE
+        );
+    }
+
+    return iTeam;
+}
+
+void ForceTeamSwitch(int iClient, int iTeam)
+{
+    giAllowClient = iClient;
+    gbClientKill[iClient] = IsPlayerAlive(iClient);
+    FakeClientCommandEx(iClient, "jointeam %i", iTeam);
+}
+
+void TryForceModel(int iClient)
+{
+    if (gbTeamplay) {
+        ClientCommand(iClient, "cl_playermodel models/police.mdl");
+    }
+    else {
+        ClientCommand(iClient, "cl_playermodel models/humans/group03/%s_%02i.mdl", (Math_GetRandomInt(0, 1) ? "male" : "female"), Math_GetRandomInt(1, 7));
+    }
+}
+
+void InvertTeams(bool bBroadcast=true)
+{
+    for (int iClient = 1; iClient <= MaxClients; iClient++)
+    {
+        if (!IsClientConnected(iClient) || !IsClientInGame(iClient) || IsClientObserver(iClient)) {
             continue;
         }
-        
-        if(AreClientCookiesCached(i)) {
-            if(!GetClientCookieInt(i, cookie)) {
+
+        int iTeam = GetClientTeam(iClient) == TEAM_REBELS ? TEAM_COMBINE
+                                            : TEAM_REBELS;
+
+        if (IsGameOver() && !IsFakeClient(iClient))
+        {
+            char sId[32];
+
+            GetClientAuthId(iClient, AuthId_Engine, sId, sizeof(sId));
+            gmTeams.SetValue(sId, iTeam);
+        }
+        else
+        {
+            ForceTeamSwitch(iClient, iTeam);
+
+            if (bBroadcast)
+            {
+                char sName[MAX_TEAM_NAME_LENGTH];
+
+                GetTeamName(iTeam, sName, sizeof(sName));
+                MC_PrintToChat(iClient, "%t", "xms_team_assigned", sName);
+            }
+        }
+    }
+}
+
+void ShuffleTeams(bool bBroadcast=true)
+{
+    int iCount = GetRealClientCount(true, true, false),
+        iClient,
+        iTeam [MAXPLAYERS + 1],
+        iTeams[2];
+
+    do
+    {
+        do
+        {
+            iClient = Math_GetRandomInt(1, MaxClients);
+
+            if (!IsClientConnected(iClient) || !IsClientInGame(iClient) || IsClientObserver(iClient)) {
+                iTeam[iClient] = -1;
+            }
+            else
+            {
+                iTeam[iClient] = (
+                    iTeams[0] > iTeams[1] ? TEAM_COMBINE
+                    : iTeams[1] > iTeams[0] ? TEAM_REBELS
+                    : Math_GetRandomInt(TEAM_COMBINE, TEAM_REBELS)
+                );
+
+                iTeams[0] += view_as<int>(iTeam[iClient] == TEAM_REBELS);
+                iTeams[1] += view_as<int>(iTeam[iClient] == TEAM_COMBINE);
+                iCount--;
+
+                if (IsGameOver() && !IsFakeClient(iClient))
+                {
+                    char sId[32];
+
+                    GetClientAuthId(iClient, AuthId_Engine, sId, sizeof(sId));
+                    gmTeams.SetValue(sId, iTeam[iClient]);
+                }
+                else
+                {
+                    if (iTeam[iClient] != GetClientTeam(iClient)) {
+                        ForceTeamSwitch(iClient, iTeam[iClient]);
+                    }
+
+                    if (bBroadcast) {
+                        char sName[MAX_TEAM_NAME_LENGTH];
+                        GetTeamName(iTeam[iClient], sName, sizeof(sName));
+                        MC_PrintToChat(iClient, "%t", "xms_team_assigned", sName);
+                    }
+                }
+            }
+        }
+        while (iTeam[iClient] == 0);
+    }
+    while (iCount);
+}
+
+public Action T_CheckPlayerStates(Handle hTimer)
+{
+    static int iWasTeam[MAXPLAYERS + 1] = -1;
+
+    if (giGamestate == GAME_CHANGING) {
+        return Plugin_Continue;
+    }
+
+    for (int iClient = 1; iClient <= MaxClients; iClient++)
+    {
+        int iTeam;
+
+        if (!IsClientInGame(iClient))
+        {
+            if (iWasTeam[iClient] > TEAM_SPECTATORS && IsGameMatch())
+            {
+                // Participant in match disconnected
+                if (giGamestate != GAME_PAUSED)
+                {
+                    ServerCommand("pause");
+                    MC_PrintToChatAll("%t", "xms_auto_pause");
+                    IfCookiePlaySoundAll(ghCookieSounds, SOUND_COMMANDFAIL);
+                }
+            }
+
+            iWasTeam[iClient] = -1;
+            continue;
+        }
+
+        if (IsClientSourceTV(iClient)) {
+            continue;
+        }
+
+        iTeam = GetClientTeam(iClient);
+
+        if (iWasTeam[iClient] == -1)
+        {
+            // New player. Auto assign a team.
+            CreateTimer(1.0, T_TeamAutoAssign, iClient, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+        }
+        else if (iTeam != iWasTeam[iClient])
+        {
+            if (giAllowClient != iClient && ( IsGameMatch() || giGamestate == GAME_OVER || ( iTeam == TEAM_SPECTATORS && !IsClientObserver(iClient) ) || ( iTeam != TEAM_SPECTATORS && IsClientObserver(iClient) ) ) )
+            {
+                // Client has changed teams during match, or is a bugged spectator
+                // Usually caused by changing playermodel
+                ForceTeamSwitch(iClient, iWasTeam[iClient]);
                 continue;
             }
         }
-        else if(!unset) {
-            continue;
+
+        iWasTeam[iClient] = iTeam;
+
+        if (gbClientInit[iClient] && !IsGameOver()) {
+            gmTeams.SetValue(UnbufferedAuthId(iClient), iTeam);
         }
-        
-        ClientCommand(i, "playgamesound %s", sound);
     }
+
+    return Plugin_Continue;
 }
 
-public void OnClientPostAdminCheck(int client)
+public Action T_TeamAutoAssign(Handle hTimer, int iClient)
 {
-    if (!IsFakeClient(client)) {
-        giClientMenuType[client] = 0;
-        CreateTimer(1.1, T_AttemptInitMenu, client, TIMER_FLAG_NO_MAPCHANGE);
-        CreateTimer(0.1, T_Welcome, client, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+    int iTeam;
+
+    if (!IsClientInGame(iClient)) {
+        return Plugin_Stop;
     }
+
+    if (giGamestate == GAME_PAUSED || IsGameOver()) {
+        return Plugin_Continue;
+    }
+
+    gmTeams.GetValue(UnbufferedAuthId(iClient), iTeam);
+
+    if (IsGameMatch()) {
+        MC_PrintToChat(iClient, "%t", "xmsc_teamchange_deny");
+    }
+    else if (iTeam)
+    {
+        if (iTeam == TEAM_SPECTATORS) {
+            MC_PrintToChat(iClient, "%t", "xms_auto_spectate");
+        }
+        else {
+            ForceTeamSwitch(iClient, iTeam);
+        }
+    }
+    else {
+        ForceTeamSwitch(iClient, GetOptimalTeam());
+    }
+
+    gbClientInit[iClient] = true;
+    return Plugin_Stop;
 }
 
+/**************************************************************
+ * GAME ROUND STUFF
+ *************************************************************/
 void OnMatchPre()
 {
-    char status[MAX_BUFFER_LENGTH], servercmd[MAX_BUFFER_LENGTH];
-      
-    ServerCommandEx(status, sizeof(status), "status");
-    PrintToConsoleAll("\n\n\n%s\n\n\n", status);
-      
-    if(GetConfigString(servercmd, sizeof(servercmd), "serverCommand_prematch")) {
-        ServerCommand(servercmd);
+    char sStatus[MAX_BUFFER_LENGTH],
+         sCommand[MAX_BUFFER_LENGTH];
+
+    ServerCommandEx(sStatus, sizeof(sStatus), "status");
+    PrintToConsoleAll("\n\n\n%s\n\n\n", sStatus);
+
+    if (GetConfigString(sCommand, sizeof(sCommand), "PreMatchCommand")) {
+        ServerCommand(sCommand);
     }
 }
 
 void OnMatchStart()
 {
-    for(int i = 1; i <= MaxClients; i++)
-    {
-        if(!IsClientConnected(i) || !IsClientInGame(i) || IsFakeClient(i)) {
-            continue;
-        }
-        
-        if(giClientMenuType[i] == 2) {
-            ghMenuClient[i] = Menu_Base(i);
-            ghMenuClient[i].Display(i, MENU_TIME_FOREVER);
-        }
-    }
-
     Forward_OnMatchStart();
 }
 
@@ -1668,361 +2763,158 @@ void OnMatchCancelled()
     Forward_OnMatchEnd(false);
 }
 
-void OnRoundEnd(bool match)
+void OnRoundEnd(bool bMatch)
 {
     gfEndtime = GetGameTime();
-    
-    if(match)
+
+    if (bMatch)
     {
-        char servercmd[MAX_BUFFER_LENGTH];
-    
-        if(GetConfigString(servercmd, sizeof(servercmd), "serverCommand_postmatch")) {
-            ServerCommand(servercmd);
+        char sCommand[MAX_BUFFER_LENGTH];
+
+        if (GetConfigString(sCommand, sizeof(sCommand), "PostMatchCommand")) {
+            ServerCommand(sCommand);
         }
-    
+
         Forward_OnMatchEnd(true);
     }
-  
-    if(giOvertime == 2) {
+
+    if (giOvertime == 2)
+    {
         MC_PrintToChatAll("%t", "xms_overtime_draw");
         giOvertime = 1;
     }
-  
-    CreateTimer(ghConVarChattime.IntValue < 20 ? 5.0 : 15.0, T_AnnounceNextmap, _, TIMER_FLAG_NO_MAPCHANGE);
-    PlayRoundEndMusic();
-}
 
-public void OnGameRestarting(Handle convar, const char[] oldVal, const char[] newVal)
-{
-    if(StrEqual(newVal, "15")) {
-        // trigger for some CTF maps
-        Game_End();
-    }
-}
-
-public Action OnMapChanging(int client, const char[] command, int args)
-{
-    if(gbPluginReady && client == 0 && (args || StrEqual(command, "changelevel_next")) ) {
-        SetGamestate(GAME_CHANGING);
-        SetGamemode(gsNextMode);
-    }
-}
-
-public void OnMapEnd() {   
-    gbTeamplay = ghConVarTeamplay.BoolValue;
-    giOvertime = 0;
-    ghOvertimer = INVALID_HANDLE;
-}
-
-public void OnClientDisconnect(int client)
-{
-    if(!IsFakeClient(client))
+    if (giGamestate != GAME_CHANGING)
     {
-        if(GetRealClientCount(IsGameMatch()) == 1 && !IsGamestate(GAME_CHANGING)) {
-            // Last player has disconnected, revert to defaults
-            LoadDefaults();
-        }
-        else if(gbClientInit[client] && !IsGameMatch()) {
-            IfCookiePlaySound(ghCookieSounds, SOUND_DISCONNECT);
-        }
-    }
-  
-    gbClientInit[client] = false;
-    giClientMenuType[client] = 0;
-    giClientVoteCallTick[client] = 0;
-}
-
-public void OnClientDisconnect_Post(int client)
-{
-    if(client == giPauseClient || GetRealClientCount(false) == 0) {
-        giPauseClient = 0;
-    }
-}
-
-public Action T_CheckPlayerStates(Handle timer)
-{
-    static int wasTeam[MAXPLAYERS + 1] = -1;
-
-    if(!IsGamestate(GAME_CHANGING))
-    {
-        for(int i = 1; i <= MaxClients; i++)
+        if (gbAutoVoting && !gbNextMapChosen && giVoteStatus != 1)
         {
-            if(!IsClientInGame(i))
-            {
-                if(wasTeam[i] != -1) // Client has just DC'd
-                {
-                    if(IsGameMatch() && wasTeam[i] != TEAM_SPECTATORS) {
-                        // Client was participant in match
-                        if(!IsGamestate(GAME_PAUSED)) {
-                            ServerCommand("pause");
-                            MC_PrintToChatAll("%t", "xms_auto_pause");
-                        }
-                    }
-                }
-                
-                wasTeam[i] = -1;
-                continue;
-            }
-            
-            if(IsClientSourceTV(i)) {
-                continue;
-            }
-            
-            int team = GetClientTeam(i);
-
-            if(wasTeam[i] == -1) {
-                CreateTimer(1.0, T_TeamChange, i, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
-            }
-            
-            else if(team != wasTeam[i])
-            {
-                if(giAllowClient != i && (IsGameMatch() || IsGamestate(GAME_OVER) || (team == TEAM_SPECTATORS && !IsClientObserver(i)) || (IsClientObserver(i) && team != TEAM_SPECTATORS)))
-                {
-                    // Client has changed teams during match, or is a bugged spectator
-                    // Usually caused by changing playermodel
-                    ForceTeamSwitch(i, wasTeam[i]);
-                }
-            }
-            
-            wasTeam[i] = team;
-            
-            if(gbClientInit[i] && !IsGameOver())
-            {
-                // Save player states
-                gsmTeams.SetValue(GetClientSteamID(i), (gbTeamplay ? GetClientTeam(i) : IsClientObserver(i) ? TEAM_SPECTATORS : TEAM_REBELS));
-            }
-        }
-    }
-    
-    return Plugin_Continue;
-}
-
-public Action T_TeamChange(Handle timer, int client)
-{
-    if(IsClientInGame(client))
-    {
-        if(IsGamestate(GAME_PAUSED) || IsGameOver()) {
-            return Plugin_Continue;
-        }
-        
-        int team;
-        gsmTeams.GetValue(GetClientSteamID(client), team);
-        
-        if(team > TEAM_SPECTATORS) {
-            ForceTeamSwitch(client, team);
-        }
-        else if(!IsGameMatch())
-        {
-            if(team == TEAM_SPECTATORS) {
-                MC_PrintToChat(client, "%t", "xms_auto_spectate");
+            if (ghConVarChattime.IntValue <= giVoteMaxTime) {
+                LogError("\"mp_chattime\" must be more than xms.cfg:\"VoteMaxTime\" !");
             }
             else {
-                CreateTimer(1.0 + client, T_JoinOptimalTeam, client, TIMER_FLAG_NO_MAPCHANGE);
-                //ForceTeamSwitch(client, GetOptimalTeam());
+                CallRandomMapVote();
             }
         }
-        else {
-            MC_PrintToChat(client, "%t", "xmsc_teamchange_deny");
+        else if (strlen(gsNextMap)) {
+            MC_PrintToChatAll("%t", "xms_nextmap_announce", gsNextMode, DeprefixMap(gsNextMap), ghConVarChattime.IntValue);
         }
-        
-        gbClientInit[client] = true;
     }
-    
-    return Plugin_Stop;
-}
 
-void GenerateGameID()
-{
-    FormatTime(gsGameId, sizeof(gsGameId), "%y%m%d%H%M");
-    Format(gsGameId, sizeof(gsGameId), "%s-%s", gsGameId, gsMap);
-}
-
-void SetGamestate(int newstate)
-{
-    if(newstate == giGamestate) {
-        return;
-    }
-    else if(newstate == GAME_MATCHWAIT) {
-        OnMatchPre();
-        if(giOvertime == 2) {
-            giOvertime = 1;
-        }
-    }
-    else if(newstate == GAME_MATCH && giGamestate != GAME_PAUSED) {
-        OnMatchStart();
-    }
-    else if(newstate == GAME_OVER) {
-        OnRoundEnd(IsGameMatch());
-        ServerCommand("sv_allow_point_servercommand disallow");
-    }
-    else if(newstate == GAME_DEFAULT) {
-        ServerCommand("sv_allow_point_servercommand always");
-        if(IsGameMatch()) {
-            OnMatchCancelled();
-        }
-    }
-    else if(newstate == GAME_CHANGING) {
-        if(IsGamestate(GAME_OVER)) {
-            CreateTimer(0.1, T_SoundFadeTrigger, _, TIMER_FLAG_NO_MAPCHANGE);
-        }
-        if(gbTeamplay) {
-            InvertTeams();
-        }
-    }
- 
-    if(giOvertime == 1) {
-        if(newstate == GAME_DEFAULT || newstate == GAME_MATCH && giGamestate != GAME_PAUSED) {
-            CreateOverTimer(newstate == GAME_DEFAULT ? 0.0 : 2.9);
-        }
-    }
-      
-    if(gbRecording)
-    {
-        if(newstate == GAME_OVER) {
-            CreateTimer(10.0, T_StopRecord, false, TIMER_FLAG_NO_MAPCHANGE);
-        }
-        else if(IsGamestate(GAME_OVER) && newstate == GAME_CHANGING) {
-            StopRecord(false);
-        }
-        else if(newstate == GAME_DEFAULT || newstate == GAME_CHANGING) {
-            StopRecord(true);
-        }
-    }
-    else if(newstate == GAME_MATCHWAIT) {
-        GenerateGameID();
-        CreateTimer(1.1, T_StartRecord, _, TIMER_FLAG_NO_MAPCHANGE);
-    }
-  
-    giGamestate = newstate;
-    Forward_OnGamestateChanged(newstate);
-}
-
-void SetGamemode(const char[] mode)
-{
-    char servercmd[MAX_BUFFER_LENGTH];
-    strcopy(gsNextMode, sizeof(gsNextMode), mode);
-    strcopy(gsMode, sizeof(gsMode), mode);
-  
-    if(GetConfigString(servercmd, sizeof(servercmd), "command", "gamemodes", gsMode)) {
-        ServerCommand(servercmd);
-    }
-}
-
-void SetMapcycle()
-{
-    char mapcycle[PLATFORM_MAX_PATH];
-    
-    if((GetRealClientCount(false, false) <= 1 && StrEqual(gsDefaultMode, gsMode)) || !GetConfigString(mapcycle, sizeof(mapcycle), "mapcycle", "gamemodes", gsMode)) {
-        // use default mapcycle when server is unpopulated on default mode (or if mapcycle for gamemode is undefined)
-        Format(mapcycle, sizeof(mapcycle), "mapcycle_default.txt");
-    }
-    ServerCommand("mapcyclefile %s", mapcycle);
+    PlayRoundEndMusic();
 }
 
 void ClearProps()
 {
-    for(int i = MaxClients; i < GetMaxEntities(); i++)
+    for (int iEnt = MaxClients; iEnt < GetMaxEntities(); iEnt++)
     {
-        if(IsValidEntity(i))
+        if (!IsValidEntity(iEnt)) {
+            continue;
+        }
+
+        char sClass[64];
+        GetEntityClassname(iEnt, sClass, sizeof(sClass));
+
+        if (StrContains(sClass, "prop_physics") == 0) {
+            AcceptEntityInput(iEnt, "kill");
+        }
+    }
+}
+
+void SetNoCollide(int iClient)
+{
+    SetEntData(iClient, OFFS_COLLISIONGROUP, 2, 4, true);
+}
+
+void Game_Restart(int iTime = 1)
+{
+    ghConVarRestart.SetInt(iTime);
+    PrintCenterTextAll("");
+}
+
+void SetGamestate(int iState)
+{
+    if (iState == giGamestate) {
+        return;
+    }
+
+    // pre actions
+    switch(iState)
+    {
+        case GAME_DEFAULT:
         {
-            char class[64];
-            GetEntityClassname(i, class, sizeof(class));
-      
-            if(StrContains(class, "prop_physics") == 0) {
-                AcceptEntityInput(i, "kill");
+            ServerCommand("sv_allow_point_servercommand always");
+            if (IsGameMatch()) {
+                OnMatchCancelled();
+            }
+
+            if (gbRecording) {
+                StopRecord(true);
+            }
+
+            if (giOvertime == 1) {
+                CreateOverTimer(0.0);
             }
         }
-    }
-}
 
-void SetNoCollide(int client)
-{
-    SetEntData(client, OFFS_COLLISIONGROUP, 2, 4, true);
-}
-
-void TryForceModel(int client)
-{
-    if(gbTeamplay) {
-        ClientCommand(client, "cl_playermodel models/police.mdl");
-    }
-    else {
-        ClientCommand(client, "cl_playermodel models/humans/group03/%s_%02i.mdl", (GetRandomInt(0, 1) ? "male" : "female"), GetRandomInt(1, 7));
-    }
-}
-
-void ForceTeamSwitch(int client, int team)
-{
-    giAllowClient = client;
-    gbClientNoRagdoll[client] = IsPlayerAlive(client);
-    FakeClientCommandEx(client, "jointeam %i", team);
-}
-
-public Action T_JoinOptimalTeam(Handle timer, int client)
-{
-    if(IsClientConnected(client) && IsClientInGame(client)) {
-        ForceTeamSwitch(client, GetOptimalTeam());
-    }
-}
-
-void InvertTeams()
-{
-    for(int i = 1; i <= MaxClients; i++)
-    {
-        if(IsClientConnected(i) && IsClientInGame(i) && !IsClientObserver(i) && !IsFakeClient(i))
+        case GAME_MATCHWAIT:
         {
-            int wasTeam;
-            char id[32];
-            GetClientAuthId(i, AuthId_Engine, id, sizeof(id));
-            
-            gsmTeams.GetValue(id, wasTeam);
-            gsmTeams.SetValue(id, (wasTeam == TEAM_REBELS ? TEAM_COMBINE : TEAM_REBELS));
+            OnMatchPre();
+
+            if (giOvertime == 2) {
+                giOvertime = 1;
+            }
+
+            if (!gbRecording) {
+                GenerateGameID();
+                CreateTimer(1.1, T_StartRecord, _, TIMER_FLAG_NO_MAPCHANGE);
+            }
+        }
+
+        case GAME_MATCH:
+        {
+            if (giGamestate != GAME_PAUSED) {
+                OnMatchStart();
+                CreateOverTimer(2.9);
+            }
+
+        }
+
+        case GAME_OVER:
+        {
+            OnRoundEnd(IsGameMatch());
+            ServerCommand("sv_allow_point_servercommand disallow");
+
+            if (gbRecording) {
+                CreateTimer(10.0, T_StopRecord, false, TIMER_FLAG_NO_MAPCHANGE);
+            }
+        }
+
+        case GAME_CHANGING:
+        {
+            if (giGamestate == GAME_OVER) {
+                CreateTimer(0.1, T_SoundFadeTrigger, _, TIMER_FLAG_NO_MAPCHANGE);
+
+                if (gbRecording) {
+                    StopRecord(false);
+                }
+            }
+            else if (gbRecording) {
+                StopRecord(true);
+            }
+
+            //if (gbTeamplay) {
+            //    InvertTeams();
+            //}
         }
     }
-}
 
-int GetOptimalTeam()
-{
-    int team = TEAM_REBELS;
-    
-    if(gbTeamplay) {
-        int r = GetTeamClientCount(TEAM_REBELS), c = GetTeamClientCount(TEAM_COMBINE);
-        team = r > c ? TEAM_COMBINE : c > r ? TEAM_REBELS : GetRandomInt(0, 1) ? TEAM_REBELS : TEAM_COMBINE;
+    giGamestate = iState;
+    Forward_OnGamestateChanged(iState);
+
+    // post actions
+    if (giGamestate == GAME_CHANGING && gbTeamplay) {
+        InvertTeams();
     }
-    
-    return team;
-}
-
-public void OnTagsChanged(Handle convar, const char[] oldValue, const char[] newValue)
-{
-    if(!gbModTags) {
-        AddPluginTag();
-    }
-}
-
-public void OnTimelimitChanged(Handle convar, const char[] oldValue, const char[] newValue)
-{
-    if(giOvertime == 1) {
-        CreateOverTimer();
-    }
-}
-
-public void OnNextmapChanged(Handle convar, const char[] oldValue, const char[] newValue)
-{
-    strcopy(gsNextMap, sizeof(gsNextMap), newValue);
-}
-
-public Action T_RestartMap(Handle timer)
-{
-    SetGamemode(gsDefaultMode);
-    ghConVarNextmap.SetString(gsMap);
-    ServerCommand("changelevel_next");
-    gbPluginReady = true;
-}
-
-void Game_Restart(int time = 1)
-{
-    ghConVarRestart.SetInt(time);
-    PrintCenterTextAll("");
 }
 
 void LoadDefaults()
@@ -2033,750 +2925,963 @@ void LoadDefaults()
     ServerCommand("changelevel_next");
 }
 
-bool GetMapByAbbrev(char[] buffer, int maxlen, const char[] abbrev)
+public Action T_RePause(Handle hTimer)
 {
-    return view_as<bool>(GetConfigString(buffer, maxlen, abbrev, "maps", "abbreviations") > 0);
-}
+    static int i;
 
-char DeprefixMap(const char[] map)
-{
-    char prefix[16], result[MAX_MAP_LENGTH];
-    int pos = SplitString(map, "_", prefix, sizeof(prefix));
-  
-    StrCat(prefix, sizeof(prefix), "_");
-  
-    if(pos && IsItemDistinctInList(prefix, gsRemovePrefixes)) {
-        strcopy(result, sizeof(result), map[pos]);
-    }
-    else {
-        strcopy(result, sizeof(result), map);
-    }
-  
-    return result;
-}
-
-int GetModeForMap(char[] buffer, int maxlen, const char[] map)
-{
-    if(!GetConfigString(buffer, maxlen, map, "maps", "defaultModes"))
-    {
-        char prefix[16];
-        SplitString(map, "_", prefix, sizeof(prefix));
-        StrCat(prefix, sizeof(prefix), "_*");
-        
-        if(!GetConfigString(buffer, maxlen, prefix, "maps", "defaultModes"))
-        {
-            if(!strlen(gsRetainModes)) {
-                return -1;
-            }
-        
-            strcopy(buffer, maxlen, gsRetainModes);
-            if(!strlen(gsMode) || !IsItemDistinctInList(gsMode, buffer))
-            {
-                if(StrContains(buffer, ",")) {
-                    SplitString(buffer, ",", buffer, maxlen);
-                    return 0;
-                }
-            }
-        
-            strcopy(buffer, maxlen, gsMode);
-            return 0;
-        }
-    }
-    return 1;
-}
-
-int VoteTimeout(int client)
-{
-    if(GetRealClientCount(true, false, true) > giVoteMinPlayers)
-    {  
-        int t = (giVoteCooldown * Tickrate() + giClientVoteCallTick[client] - GetGameTickCount()) / Tickrate();
-        if(t > 0) {
-            return t;
-        }
-    }
-    return 0;
-}
-
-public Action T_RemoveWeapons(Handle timer, int client)
-{
-    Client_RemoveAllWeapons(client);
-}
-
-public Action T_SetWeapons(Handle timer, int client)
-{
-    Client_RemoveAllWeapons(client);
-
-    for(int i = 0; i < 16; i++)
-    {
-        if(!strlen(gsSpawnWeapon[i])) {
-            break;
-        }
-    
-        if(giSpawnAmmo[i][0] == -1 && giSpawnAmmo[i][1] == -1) {
-            Client_GiveWeapon(client, gsSpawnWeapon[i], false);
-        }
-        else if(StrEqual(gsSpawnWeapon[i], "weapon_rpg") || StrEqual(gsSpawnWeapon[i], "weapon_frag")) {
-            Client_GiveWeaponAndAmmo(client, gsSpawnWeapon[i], false, giSpawnAmmo[i][0], giSpawnAmmo[i][1], -1, -1);
-        }
-        else if(StrEqual(gsSpawnWeapon[i], "weapon_slam")) {
-            Client_GiveWeaponAndAmmo(client, gsSpawnWeapon[i], false, -1, giSpawnAmmo[i][0], -1, -1);
-        }
-        else {
-            Client_GiveWeaponAndAmmo(client, gsSpawnWeapon[i], false, giSpawnAmmo[i][0], giSpawnAmmo[i][1], 0, 0);  
-        }
-    }
-}
-
-public Action T_RePause(Handle timer)
-{
-    static int iter;
-  
-    if(giPauseClient > 0 && IsClientConnected(giPauseClient)) {
+    if (giPauseClient > 0 && IsClientConnected(giPauseClient)) {
         FakeClientCommand(giPauseClient, "pause");
     }
-  
-    iter++;
-    if(iter == 2) {
+
+    i++;
+
+    if (i == 2)
+    {
         giPauseClient = 0;
-        iter = 0;
+        i = 0;
         return Plugin_Stop;
     }
-    
+
     return Plugin_Continue;
 }
 
-public Action T_Welcome(Handle timer, int client)
+public Action T_RemoveWeapons(Handle hTimer, int iClient)
 {
-    static int iter = 0;
-    iter++;
-    if(!IsClientInGame(client)) {
-        if(iter >= 100) {
-            return Plugin_Stop;
+    Client_RemoveAllWeapons(iClient);
+}
+
+public Action T_SetWeapons(Handle hTimer, int iClient)
+{
+    Client_RemoveAllWeapons(iClient);
+
+    for (int i = 0; i < 16; i++)
+    {
+        if (!strlen(gsSpawnWeapon[i])) {
+            break;
         }
-    }
-    else {
-        char sWelcome[MAX_SAY_LENGTH];
-        Format(sWelcome, sizeof(sWelcome), "%T", "xms_welcome", client, gsServerName);
-        MC_PrintToChat(client, "%s {I}[XMS v%s]", sWelcome, PLUGIN_VERSION);
-        return Plugin_Stop;
-    }
-    return Plugin_Continue;
-}
 
-public Action T_Adverts(Handle timer)
-{
-    static int iter = 1;
-    char buffer[MAX_SAY_LENGTH];
-  
-    if(!GetRealClientCount() || IsGameMatch()) {
-        return Plugin_Continue;
-    }
-  
-    IntToString(iter, buffer, sizeof(buffer));
-    if(!GetConfigString(buffer, sizeof(buffer), buffer, "serverAds"))
-    {
-        if(iter != -1 && !GetConfigString(buffer, sizeof(buffer), "1", "serverAds")) {
-            return Plugin_Stop;
+        if (giSpawnAmmo[i][0] == -1 && giSpawnAmmo[i][1] == -1) {
+            Client_GiveWeapon(iClient, gsSpawnWeapon[i], false);
         }
-        iter = 1;
-    }
-  
-    MC_PrintToChatAll("%t", "xms_serverad", buffer);
-    iter++;
-  
-    return Plugin_Continue;
-}
-
-public Action T_AnnouncePlugin(Handle timer, int client)
-{
-    static int iter;
-    
-    if(IsClientInGame(client) && iter < 5)
-    {
-        PrintCenterText(client, "eXtended Match System - %s", PLUGIN_URL);
-        iter++;
-        return Plugin_Continue;
-    }
-    
-    iter = 0;
-    return Plugin_Stop;
-}
-
-public Action T_AnnounceNextmap(Handle timer)
-{
-    if(strlen(gsNextMap) && !IsGamestate(GAME_CHANGING)) {
-        MC_PrintToChatAll("%t", "xms_nextmap_announce", gsNextMode, DeprefixMap(gsNextMap), RoundFloat(GetTimeRemaining(true)));
-    }
-}
-
-void PlayRoundEndMusic()
-{
-    static int last_rand = -1;
-    int rand;
-    float fadetime;
-  
-    do(rand = GetRandomInt(0, 5)); while(last_rand == rand);
-    last_rand = rand;
-    fadetime = ghConVarChattime.IntValue - 4.5;
-  
-    IfCookiePlaySound(ghCookieMusic, gsMusicPath[rand]);
-    CreateTimer(fadetime < 5 ? 0.1 : fadetime, T_SoundFadeTrigger, _, TIMER_FLAG_NO_MAPCHANGE);
-}
-  
-public Action T_SoundFadeTrigger(Handle timer)
-{
-    ClientCommandAll("soundfade 100 1 0 5");
-    SetGamestate(GAME_CHANGING);
-}
-
-
-/**************************************************************************************************
- *** SourceTV
-**************************************************************************************************/
-public Action T_StartRecord(Handle timer)
-{
-    StartRecord();
-}
-
-void StartRecord()
-{
-    if(!ghConVarTv.BoolValue) {
-        LogError("SourceTV is not active!");
-    }
-    
-    if(!gbRecording) {
-        ServerCommand("tv_name \"%s - %s\";tv_record %s/incomplete/%s", gsServerName, gsGameId, gsDemoPath, gsGameId);
-        gbRecording = true;
-    }
-}
-
-public Action T_StopRecord(Handle timer, bool isEarly)
-{
-    StopRecord(isEarly);
-}
-
-void StopRecord(bool discard)
-{
-    if(gbRecording)
-    {
-        char oldPath[PLATFORM_MAX_PATH], newPath[PLATFORM_MAX_PATH];
-        Format(oldPath, PLATFORM_MAX_PATH, "%s/incomplete/%s.dem", gsDemoPath, gsGameId);
-
-        ServerCommand("tv_stoprecord");
-        gbRecording = false;
-        
-        if(!discard)
-        {
-            Format(newPath, PLATFORM_MAX_PATH, "%s/%s.dem", gsDemoPath, gsGameId);
-            GenerateDemoTxt(newPath);
-            RenameFile(newPath, oldPath, true);
-
-            if(strlen(gsDemoURL)) {
-                MC_PrintToChatAll("%t", "xms_announcedemo", gsDemoURL, gsGameId, gsDemoExtension);
-            }
-            
+        else if (StrEqual(gsSpawnWeapon[i], "weapon_rpg") || StrEqual(gsSpawnWeapon[i], "weapon_frag")) {
+            Client_GiveWeaponAndAmmo(iClient, gsSpawnWeapon[i], false, giSpawnAmmo[i][0], giSpawnAmmo[i][1], -1, -1);
+        }
+        else if (StrEqual(gsSpawnWeapon[i], "weapon_slam")) {
+            Client_GiveWeaponAndAmmo(iClient, gsSpawnWeapon[i], false, -1, giSpawnAmmo[i][0], -1, -1);
         }
         else {
-            DeleteFile(oldPath, true);
+            Client_GiveWeaponAndAmmo(iClient, gsSpawnWeapon[i], false, giSpawnAmmo[i][0], giSpawnAmmo[i][1], 0, 0);
         }
     }
 }
 
-void GenerateDemoTxt(const char[] demopath)
+/**************************************************************
+ * EVENTS
+ *************************************************************/
+void HookEvents()
 {
-    static char ip[16];
-    static int port = -1;
-    
-    if(!strlen(ip)) {
-        FindConVar("ip").GetString(ip, sizeof(ip));       
-        port = FindConVar("hostport").IntValue;        
-    }
-    
-    char path[PLATFORM_MAX_PATH], time[32], title[256], players[2][2048];
-    bool duel = GetRealClientCount(true, false, false) == 2;
-    File meta;
-    
-    Format(path, PLATFORM_MAX_PATH, "%s.txt", demopath);
-    FormatTime(time, sizeof(time), "%d %b %Y");
+    HookEvent("player_changename",     Event_GameMessage, EventHookMode_Pre);
+    HookEvent("player_connect_client", Event_GameMessage, EventHookMode_Pre);
+    HookEvent("player_team",           Event_GameMessage, EventHookMode_Pre);
+    HookEvent("player_connect",        Event_GameMessage, EventHookMode_Pre);
+    HookEvent("player_disconnect",     Event_GameMessage, EventHookMode_Pre);
+    HookEvent("round_start",           Event_RoundStart,  EventHookMode_Post);
+    HookEvent("player_death",          Event_PlayerDeath, EventHookMode_Post);
+    HookEvent("player_spawn",          Event_PlayerSpawn, EventHookMode_Post);
 
-    if(gbTeamplay) {
-        Format(players[0], sizeof(players[]), "THE COMBINE [Score: %i]:\n", GetTeamScore(TEAM_COMBINE));
-        Format(players[1], sizeof(players[]), "REBEL FORCES [Score: %i]:\n", GetTeamScore(TEAM_REBELS));
-    }
-    
-    for(int i = 1; i <= MaxClients; i++)
+    HookUserMessage(GetUserMessageId("TextMsg"),  UserMsg_TextMsg,  true);
+    HookUserMessage(GetUserMessageId("VGUIMenu"), UserMsg_VGUIMenu, false);
+}
+
+public Action OnPlayerRunCmd(int iClient, int &iButtons, int &iImpulse, float fVel[3], float fAngles[3], int &iWeapon)
+{
+    if (gbUnlimitedAux)
     {
-        if(!IsClientConnected(i) || !IsClientInGame(i) || IsFakeClient(i) || IsClientObserver(i)) {
-            continue;
-        }
-        
-        int z = gbTeamplay ? GetClientTeam(i) - 2 : 0;
-        Format(players[z], sizeof(players[]), "%s\"%N\" %s [%i kills, %i deaths]\n", players[z], i, GetClientSteamID(i), GetClientFrags(i), GetClientDeaths(i));
-                
-        if(duel) {
-            Format(title, sizeof(title), "%s%N%s", title, i, !strlen(title) ? " vs " : "");
+        int iBits = GetEntProp(iClient, Prop_Send, "m_bitsActiveDevices");
+
+        if (iBits & BITS_SPRINT) {
+            SetEntPropFloat(iClient, Prop_Data, "m_flSuitPowerLoad", 0.0);
+            SetEntProp(iClient, Prop_Send, "m_bitsActiveDevices", iBits & ~BITS_SPRINT);
         }
     }
 
-    if(gbTeamplay) {
-        Format(title, sizeof(title), "%s %iv%i - %s - %s", gsMode, GetTeamClientCount(TEAM_REBELS), GetTeamClientCount(TEAM_COMBINE), gsMap, time);
-    }
-    else if(duel) {
-        Format(title, sizeof(title), "%s 1v1 (%s) - %s - %s", gsMode, title, gsMap, time);
-    }
-    else {
-        Format(title, sizeof(title), "%s ffa - %s - %s", gsMode, gsMap, time);
-    }
-    
-    meta = OpenFile(path, "w", true);
-    meta.WriteLine(title);
-    meta.WriteLine("");
-    meta.WriteLine(players[0]);
-    if(gbTeamplay) {
-        meta.WriteLine(players[1]);
-    }
-    meta.WriteLine("Server: \"%s\" [%s:%i]", gsServerName, ip, port);
-    meta.WriteLine("Version: %i [XMS v%s]", GameVersion(), PLUGIN_VERSION);
-                
-    CloseHandle(meta);
-}
-
-
-/**************************************************************************************************
- *** Events
-**************************************************************************************************/
-public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon)
-{
-    if(gbUnlimitedAux) {
-        int bits = GetEntProp(client, Prop_Send, "m_bitsActiveDevices");
-        if(bits & BITS_SPRINT) {
-            SetEntPropFloat(client, Prop_Data, "m_flSuitPowerLoad", 0.0);
-            SetEntProp(client, Prop_Send, "m_bitsActiveDevices", bits & ~BITS_SPRINT);
-        }
-    }
-    
     return Plugin_Changed;
 }
 
-public Action Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
+public Action Event_PlayerSpawn(Event hEvent, const char[] sEvent, bool bDontBroadcast)
 {
-    int client = GetClientOfUserId(GetEventInt(event, "userid"));
-    
-    if(IsFakeClient(client)) {
-        return Plugin_Continue;
-    }
-        
-    if(IsGamestate(GAME_MATCHWAIT)) {
-        SetEntityMoveType(client, MOVETYPE_NONE);
-        CreateTimer(0.1, T_RemoveWeapons, client);
+    int iClient = GetClientOfUserId(GetEventInt(hEvent, "userid"));
+
+    if (IsFakeClient(iClient)) {
         return Plugin_Continue;
     }
 
-    if(giSpawnHealth != -1) {
-        SetEntProp(client, Prop_Data, "m_iHealth", giSpawnHealth > 0 ? giSpawnHealth : 1);
+    if (giGamestate == GAME_MATCHWAIT)
+    {
+        SetEntityMoveType(iClient, MOVETYPE_NONE);
+        CreateTimer(0.1, T_RemoveWeapons, iClient);
+        return Plugin_Continue;
     }
-    if(giSpawnSuit != -1) {
-        SetEntProp(client, Prop_Data, "m_ArmorValue", giSpawnSuit > 0 ? giSpawnSuit : 0);
+
+    if (giSpawnHealth != -1) {
+        SetEntProp(iClient, Prop_Data, "m_iHealth", giSpawnHealth > 0 ? giSpawnHealth : 1);
     }
-    if(gbDisableCollisions) {
-        RequestFrame(SetNoCollide, client);
+    if (giSpawnSuit != -1) {
+        SetEntProp(iClient, Prop_Data, "m_ArmorValue", giSpawnSuit > 0 ? giSpawnSuit : 0);
     }
-    if(!StrEqual(gsSpawnWeapon[0], "default")) {
-        CreateTimer(0.1, T_SetWeapons, client);
+    if (gbDisableCollisions) {
+        RequestFrame(SetNoCollide, iClient);
+    }
+    if (!StrEqual(gsSpawnWeapon[0], "default")) {
+        CreateTimer(0.1, T_SetWeapons, iClient);
     }
 
     return Plugin_Continue;
 }
-    
-public Action Event_PlayerDeath(Handle event, const char[] name, bool dontBroadcast)
+
+public Action Event_PlayerDeath(Event hEvent, const char[] sEvent, bool bDontBroadcast)
 {
-    int client = GetClientOfUserId(GetEventInt(event, "userid"));
-        
-    if(gbClientNoRagdoll[client])
+    int iClient = GetClientOfUserId(GetEventInt(hEvent, "userid"));
+
+    if (gbClientKill[iClient])
     {
-        int ragdoll = GetEntPropEnt(client, Prop_Send, "m_hRagdoll");
-        if(ragdoll >= 0 && IsValidEntity(ragdoll)) {
-            RemoveEdict(ragdoll);
+        int iRagdoll = GetEntPropEnt(iClient, Prop_Send, "m_hRagdoll");
+
+        if (iRagdoll >= 0 && IsValidEntity(iRagdoll)) {
+            // remove ragdoll if plugin has killed the player
+            RemoveEdict(iRagdoll);
         }
-        
-        gbClientNoRagdoll[client] = false;
+
+        gbClientKill[iClient] = false;
     }
-        
+
     return Plugin_Continue;
 }
-    
-public Action Event_GameMessage(Event event, const char[] eventname, bool dontBroadcast)
+
+public Action Event_GameMessage(Event hEvent, const char[] sEvent, bool bDontBroadcast)
 {
-    int client = GetClientOfUserId(GetEventInt(event, "userid"));
-    if(client && IsClientInGame(client))
+    int iClient = GetClientOfUserId(GetEventInt(hEvent, "userid"));
+
+    if (iClient && IsClientInGame(iClient))
     {
-        if(!IsGameMatch() || GetClientTeam(client) != TEAM_SPECTATORS)
+        if (!IsGameMatch() || GetClientTeam(iClient) != TEAM_SPECTATORS)
         {
-            char name[MAX_NAME_LENGTH];
-            GetClientName(client, name, sizeof(name));
-            
-            if(StrEqual(eventname, "player_disconnect"))
+            char sName[MAX_NAME_LENGTH];
+            GetClientName(iClient, sName, sizeof(sName));
+
+            if (StrEqual(sEvent, "player_disconnect"))
             {
-                char reason[32];
-                GetEventString(event, "reason", reason, sizeof(reason));
-                MC_PrintToChatAll("%t", IsGameMatch() ? "xms_disconnect_match" : "xms_disconnect", name, reason);
+                char sReason[32];
+                GetEventString(hEvent, "reason", sReason, sizeof(sReason));
+                MC_PrintToChatAll("%t", IsGameMatch() ? "xms_disconnect_match" : "xms_disconnect", sName, sReason);
             }
-            else if(StrEqual(eventname, "player_changename"))
+            else if (StrEqual(sEvent, "player_changename"))
             {
-                char newname[MAX_NAME_LENGTH];
-                GetEventString(event, "newname", newname, sizeof(newname));
-                MC_PrintToChatAll("%t", "xms_changename", name, newname);
+                char sNew[MAX_NAME_LENGTH];
+                GetEventString(hEvent, "newname", sNew, sizeof(sNew));
+                MC_PrintToChatAll("%t", "xms_changename", sName, sNew);
             }
         }
     }
-        
+
     // block other messages
-    event.BroadcastDisabled = true;
-        
+    hEvent.BroadcastDisabled = true;
+
     return Plugin_Continue;
 }
-    
-public Action Event_RoundStart(Handle event, const char[] name, bool noBroadcast)
+
+public Action Event_RoundStart(Event hEvent, const char[] sEvent, bool bDontBroadcast)
 {
     gfPretime = GetGameTime();
-        
-    if(IsGamestate(GAME_MATCHWAIT))
+
+    if (giGamestate == GAME_MATCHWAIT)
     {
-        for(int i = MaxClients; i < GetMaxEntities(); i++)
+        for (int i = MaxClients; i < GetMaxEntities(); i++)
         {
-            if(IsValidEntity(i) && Phys_IsPhysicsObject(i)) {
+            if (IsValidEntity(i) && Phys_IsPhysicsObject(i)) {
                 Phys_EnableMotion(i, false); // Lock props on matchwait
             }
         }
     }
 }
 
-public Action UserMsg_TextMsg(UserMsg msg_id, BfRead msg, const int[] players, int playersNum, bool reliable, bool init)
+public Action UserMsg_TextMsg(UserMsg msg, Handle hMsg, const int[] iPlayers, int iNumPlayers, bool bReliable, bool bInit)
 {
-    char message[70];
-    BfReadString(msg, message, sizeof(message), true);
-    
-    // block game chat spam
+    char sMsg[70];
 
-    if(StrContains(message, "[SM] Time remaining for map") != -1 || StrContains(message, "[SM] No timelimit for map") != -1 || StrContains(message, "[SM] This is the last round!!") != -1)
+    BfReadString(hMsg, sMsg, sizeof(sMsg), true);
+    if (StrContains(sMsg, "[SM] Time remaining for map") != -1 || StrContains(sMsg, "[SM] No timelimit for map") != -1 || StrContains(sMsg, "[SM] This is the last round!!") != -1)
     {
+        // block game chat spam
         return Plugin_Handled;
     }
-    
+
     return Plugin_Continue;
 }
 
-public Action UserMsg_VGUIMenu(UserMsg msg_id, Handle msg, const players[], int playersNum, bool reliable, bool init)
+public Action UserMsg_VGUIMenu(UserMsg msg, Handle hMsg, const int[] iPlayers, int iNumPlayers, bool bReliable, bool bInit)
 {
-    char buffer[10];
-    
-    BfReadString(msg, buffer, sizeof(buffer));
-    if(StrEqual(buffer, "scores")) {
+    char sMsg[10];
+
+    BfReadString(hMsg, sMsg, sizeof(sMsg));
+    if (StrEqual(sMsg, "scores")) {
         RequestFrame(SetGamestate, GAME_OVER);
     }
+
     return Plugin_Continue;
 }
 
-
-/**************************************************************************************************
- *** HUD stuff
-**************************************************************************************************/
-public Action T_KeysHud(Handle timer)
+public void OnGameRestarting(Handle hConvar, const char[] sOldValue, const char[] sNewValue)
 {
-    if(!IsGamestate(GAME_OVER, GAME_CHANGING, GAME_PAUSED))
-    {
-        for(int i = 1; i <= MaxClients; i++)
-        {
-            if(!IsClientConnected(i) || !IsClientInGame(i) || IsFakeClient(i)) {
-                continue;
-            }
-            
-            if(GetClientButtons(i) & IN_SCORE || (!IsClientObserver(i) && !gbShowKeys)) {
-                continue;
-            }
-
-            char hudtext[1024];
-            int target = IsClientObserver(i) ? GetEntPropEnt(i, Prop_Send, "m_hObserverTarget") : i;
-                
-            if(GetEntProp(i, Prop_Send, "m_iObserverMode") != 7 && target > 0 && IsClientConnected(target) && IsClientInGame(target))
-            {
-                int buttons = GetClientButtons(target);
-                float angles[3];
-                GetClientAbsAngles(i, angles);
-                    
-                Format(hudtext, sizeof(hudtext), "health: %i   suit: %i\nvel: %03i  %s   %0.1fº\n%s         %s          %s\n%s     %s     %s",
-                  GetClientHealth(target),
-                  GetClientArmor(target),
-                  GetClientVelocity(target),
-                  (buttons & IN_FORWARD)   ? "↑"       : "  ", 
-                  angles[1],
-                  (buttons & IN_MOVELEFT)  ? "←"       : "  ", 
-                  (buttons & IN_SPEED)     ? "+SPRINT" : "        ", 
-                  (buttons & IN_MOVERIGHT) ? "→"       : "  ",
-                  (buttons & IN_DUCK)      ? "+DUCK"   : "    ",
-                  (buttons & IN_BACK)      ? "↓"       : "  ",
-                  (buttons & IN_JUMP)      ? "+JUMP"   : "    "
-                );
-                SetHudTextParams(-1.0, 0.7, 0.3, GetClientCookieInt(i, ghCookieColorR, 0, 255), GetClientCookieInt(i, ghCookieColorG, 0, 255), GetClientCookieInt(i, ghCookieColorB, 0, 255), 255, 0, 0.0, 0.0, 0.0);            
-            }
-            else {
-                SetHudTextParams(-1.0, -0.02, 0.3, GetClientCookieInt(i, ghCookieColorR, 0, 255), GetClientCookieInt(i, ghCookieColorG, 0, 255), GetClientCookieInt(i, ghCookieColorB, 0, 255), 255, 0, 0.0, 0.0, 0.0);
-                Format(hudtext, sizeof(hudtext), "%T\n%T", "xms_hud_spec1", i, "xms_hud_spec2", i);
-            }
-        
-            ShowSyncHudText(i, ghKeysHud, hudtext);
-        }
+    if (StrEqual(sNewValue, "15")) {
+        // trigger for some CTF maps
+        Game_End();
     }
 }
 
-public Action T_TimeHud(Handle timer)
+public void OnTagsChanged(Handle hConvar, const char[] sOldValue, const char[] sNewValue)
 {
-    static int iter;
-    bool red = (giOvertime == 2);
-    char hudtext[24];
-
-    if(IsGamestate(GAME_MATCHWAIT, GAME_CHANGING, GAME_PAUSED))
-    {
-        Format(hudtext, sizeof(hudtext), ". . %s%s%s", iter >= 20 ? ". " : "", iter >= 15 ? ". " : "", iter >= 10 ? "." : "");
-        iter++;
-        if(iter >= 25) {
-            iter = 0;
-        }
-    }
-    
-    else if(!IsGamestate(GAME_OVER) && ghConVarTimelimit.BoolValue)
-    {
-        float t = GetTimeRemaining(false);
-        int h = RoundToNearest(t) / 3600,
-          s = RoundToNearest(t) % 60,
-         m = RoundToNearest(t) / 60 - (h ? (h * 60) : 0);
-        red = (t < 60);
-            
-        if(!h)
-        {
-            if(t >= 10)
-            {
-                if(t >= 60) {
-                    Format(hudtext, sizeof(hudtext), "%s%i:%02i", hudtext, m, s);
-                }
-                else {
-                    Format(hudtext, sizeof(hudtext), "%s%i", hudtext, RoundToNearest(t));
-                }
-            }
-            else {
-                Format(hudtext, sizeof(hudtext), "%s%.1f", hudtext, t);
-            }
-        }
-        else {
-            Format(hudtext, sizeof(hudtext), "%s%ih %i:%02i", hudtext, h, m, s);
-        }
-    }
-    
-    for(int i = 1; i <= MaxClients; i++)
-    {
-        if(!IsClientConnected(i) || !IsClientInGame(i) || (IsFakeClient(i) && !IsClientSourceTV(i)) ) {
-            continue;
-        }
-        
-        char itext[24];
-        bool margin = IsClientObserver(i) && !IsClientSourceTV(i);
-
-        if(IsGamestate(GAME_OVER)) {
-            Format(itext, sizeof(itext), "%T", "xms_hud_gameover", i);
-        }
-        else if(IsGamestate(GAME_MATCHEX, GAME_OVERTIME)) {
-            Format(itext, sizeof(itext), "%T\n%s", "xms_hud_overtime", i, hudtext);    
-        }
-        else {
-            strcopy(itext, sizeof(itext), hudtext);
-        }
-        
-        if(strlen(itext))
-        {
-            if(red) {
-                SetHudTextParams(-1.0, margin ? 0.03 : 0.01, 0.3, 220, 10, 10, 255, 0, 0.0, 0.0, 0.0);
-            }
-            else {
-                SetHudTextParams(-1.0, margin ? 0.03 : 0.01, 0.3, GetClientCookieInt(i, ghCookieColorR, 0, 255), GetClientCookieInt(i, ghCookieColorG, 0, 255), GetClientCookieInt(i, ghCookieColorB, 0, 255), 255, 0, 0.0, 0.0, 0.0);
-            }
-            ShowSyncHudText(i, ghTimeHud, itext);            
-        }
+    if (!gbModTags) {
+        AddPluginTag();
     }
 }
 
-public Action T_Voting(Handle timer)
+public void OnTimelimitChanged(Handle hConvar, const char[] sOldValue, const char[] sNewValue)
 {
-    static int iter;
-    static char motion[128];
-    int votes, yays, nays, lead, lose;
-    int yaypercent, naypercent;
-    char text[1024];
-    
-    if(!giVoteStatus) {
-        iter = 0;
+    if (giOvertime == 1) {
+        CreateOverTimer();
+    }
+}
+
+public void OnNextmapChanged(Handle hConvar, const char[] sOldValue, const char[] sNewValue)
+{
+    strcopy(gsNextMap, sizeof(gsNextMap), sNewValue);
+}
+
+/**************************************************************
+ * ANNOUNCEMENT TIMERS
+ *************************************************************/
+public Action T_AnnouncePlugin(Handle hTimer, int iClient)
+{
+    static int i;
+
+    if (IsClientInGame(iClient) && i < 4)
+    {
+        PrintCenterText(iClient, "~ eXtended Match System by harper ~");
+        i++;
         return Plugin_Continue;
     }
 
-    if(!iter)
-    {
-        strcopy(motion, sizeof(motion), gsVoteMotion);
-        if(giVoteType == VOTE_RUN) {
-            int pos = SplitString(gsVoteMotion, ":", motion, sizeof(motion));
-            Format(motion, sizeof(motion), "%s:%s", motion, DeprefixMap(gsVoteMotion[pos]));
-        }
-    }
+    i = 0;
+    return Plugin_Stop;
+}
 
-    // tally votes
-    for(int i = 1; i <= MaxClients; i++)
-    {
-        if(!IsClientConnected(i) || !IsClientInGame(i) || IsFakeClient(i)) {
-            continue;
-        }
-        
-        if((giVoteType != VOTE_MATCH || !IsClientObserver(i)) && giClientVote[i] != 0) {
-            giClientVote[i] == 1 ? yays++ : nays++;
-            votes++;
-        }
-    }
+public Action T_Welcome(Handle hTimer, int iClient)
+{
+    static int i;
 
-    lead = yays >= nays ? yays : nays;
+    i++;
 
-    if(votes && yays == nays) {
-        yaypercent = 50;
-        naypercent = 50;
+    if (!IsClientInGame(iClient)) {
+        if (i >= 100) {
+            return Plugin_Stop;
+        }
     }
     else {
-        yaypercent = RoundToNearest(yays ? yays / votes * 100.0 : 0.0);
-        naypercent = RoundToNearest(nays ? nays / votes * 100.0 : 0.0);
+        MC_PrintToChat(iClient, "%T", "xms_welcome", iClient, gsServerName);
+        return Plugin_Stop;
     }
 
-    lose = votes - lead;
-    
-    // format hud
-    Format(text, sizeof(text), "ᴠᴏᴛᴇ - %s%s\n▪ %s: %i (%i%%%%)\n▪ %s:  %i (%i%%%%)\n▪ abstain: %i",
-      giVoteType == VOTE_RUN ? "run " : giVoteType == VOTE_RUNNEXT ? "runNext " : "", motion,
-      lead == yays ? "YES" : "yes", yays, yaypercent,
-      lead == nays ? "NO" : "no", nays, naypercent,
-      GetRealClientCount(true, false, giVoteType != VOTE_MATCH) - votes
-    );
-    
-    // calc result
-    if(GetRealClientCount(true, false, giVoteType != VOTE_MATCH) - votes + lose <= lead || iter >= giVoteMaxTime) {
-        giVoteStatus = yays > nays ? 2 : -1;
+    return Plugin_Continue;
+}
+
+public Action T_Adverts(Handle hTimer)
+{
+    static int i = 1;
+
+    char sText[MAX_SAY_LENGTH];
+
+    if (!GetRealClientCount() || IsGameMatch()) {
+        return Plugin_Continue;
     }
-    else
+
+    IntToString(i, sText, sizeof(sText));
+    if (!GetConfigString(sText, sizeof(sText), sText, "ServerAds"))
     {
-        // hud dance
-        Format(text, sizeof(text), "%s\n%is remaining..", text, giVoteMaxTime - iter);
-        for(int i = 5; i <= giVoteMaxTime; i += 5) {
-            if(giVoteMaxTime - i >= iter) {
-                StrCat(text, sizeof(text), ".");
+        if (i != -1 && !GetConfigString(sText, sizeof(sText), "1", "ServerAds")) {
+            return Plugin_Stop;
+        }
+        i = 1;
+    }
+
+    MC_PrintToChatAll("%t", "xms_serverad", sText);
+    i++;
+
+    return Plugin_Continue;
+}
+
+/**************************************************************
+ * ENDMUSIC
+ *************************************************************/
+void PlayRoundEndMusic()
+{
+    static int iRan;
+
+    float fTime = ghConVarChattime.IntValue - 4.5;
+
+    iRan = Math_GetRandomIntNot(0, 5, iRan);
+
+    for (int iClient = 1; iClient <= MaxClients; iClient++) {
+        if (IsCookieEnabled(ghCookieMusic, iClient)) {
+            QueryClientConVar(iClient, "snd_musicvolume", PlayMusicAtClientVolume, iRan);
+        }
+    }
+    CreateTimer(fTime < 5 ? 0.1 : fTime, T_SoundFadeTrigger, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+public void PlayMusicAtClientVolume(QueryCookie cookie, int iClient, ConVarQueryResult result, const char[] sName, const char[] sValue, int iPos)
+{
+    float fVolume = StringToFloat(sValue);
+
+    if (fVolume < 0 || fVolume > 1) {
+        fVolume = 0.5;
+    }
+
+    EmitSoundToClient(iClient, gsMusicPath[iPos], _, _, _, _, fVolume);
+}
+
+public Action T_SoundFadeTrigger(Handle hTimer)
+{
+    ClientCommandAll("soundfade 100 1 0 5");
+    SetGamestate(GAME_CHANGING);
+}
+
+/**************************************************************
+ * MISC SOUNDS
+ *************************************************************/
+void PrepareSound(const char[] sName)
+{
+    char sPath[PLATFORM_MAX_PATH];
+
+    Format(sPath, sizeof(sPath), "sound/%s", sName);
+    PrecacheSound(sName);
+    AddFileToDownloadsTable(sPath);
+}
+
+void IfCookiePlaySound(Handle hCookie, int iClient, const char[] sFile, bool bUnset=true)
+{
+    if (IsCookieEnabled(hCookie, iClient, bUnset)) {
+        ClientCommand(iClient, "playgamesound %s", sFile);
+    }
+}
+
+void IfCookiePlaySoundAll(Handle hCookie, const char[] sFile, bool bUnset=true)
+{
+    for (int iClient = 1; iClient <= MaxClients; iClient++) {
+        IfCookiePlaySound(hCookie, iClient, sFile, bUnset);
+    }
+}
+
+/**************************************************************
+ * VOTING
+ *************************************************************/
+public Action T_Voting(Handle hTimer)
+{
+    static int  iSeconds;
+    static bool bMultiChoice;
+    static char sMotion[5][192];
+
+    char sHud[1024];
+    bool bContested,
+         bDraw;
+    int  iVotes,
+         iAbstains,
+         iTally[5],
+         iPercent[5],
+         iLead,
+         iHighest;
+
+    if (!giVoteStatus)
+    {
+        if (iSeconds)
+        {
+            for (int i = 0; i < 5; i++) {
+                sMotion[i] = "";
+                gsVoteMotion[i] = "";
+            }
+
+            iSeconds = 0;
+        }
+
+        return Plugin_Continue;
+    }
+
+    if (!iSeconds)
+    {
+        // Prepare vote motion(s)
+        bMultiChoice = view_as<bool>(strlen(gsVoteMotion[1]));
+
+        if (giVoteType == VOTE_RUN || giVoteType == VOTE_RUNNEXT || giVoteType == VOTE_RUNNEXT_AUTO)
+        {
+            bool bCurrentModeOnly = true;
+            int  iDisplayLen      = 32,
+                 iCount,
+                 iPos[5];
+
+            for (int i = 0; i < 5; i++)
+            {
+                if (strlen(gsVoteMotion[i]))
+                {
+                    iPos[i] = SplitString(gsVoteMotion[i], ":", sMotion[i], sizeof(sMotion[]));
+
+                    if (!StrEqual(gsMode, sMotion[i])) {
+                        bCurrentModeOnly = false;
+                    }
+
+                    iCount++;
+                }
+            }
+
+            for (int i = 0; i < iCount; i++)
+            {
+                char sMap[MAX_MAP_LENGTH];
+                strcopy(sMap, sizeof(sMap), DeprefixMap(gsVoteMotion[i][iPos[i]]));
+
+                if (bCurrentModeOnly) {
+                    strcopy(sMotion[i], sizeof(sMotion[]), sMap);
+                }
+                else if (!StrEqual(gsMode, sMotion[i])) {
+                    Format(sMotion[i], sizeof(sMotion[]), "%s:%s", sMotion[i], sMap);
+                }
+                else {
+                    strcopy(sMotion[i], sizeof(sMotion[]), sMap);
+                }
+            }
+
+            if (bMultiChoice) {
+                iDisplayLen -= (iCount * 4);
+            }
+
+            for (int i = 0; i < iCount; i++)
+            {
+                if (strlen(sMotion[i]) > iDisplayLen) {
+                    sMotion[i][iDisplayLen - 2] = '.';
+                    sMotion[i][iDisplayLen - 1] = '.';
+                    sMotion[i][iDisplayLen] = '\0';
+                }
+            }
+        }
+        else {
+            for (int i = 0; i < 5; i++) {
+                strcopy(sMotion[i], sizeof(sMotion[]), gsVoteMotion[i]);
             }
         }
     }
-        
+
+    // Tally votes:
+    for (int iClient = 1; iClient <= MaxClients; iClient++)
+    {
+        if (!IsClientConnected(iClient) || !IsClientInGame(iClient) || IsFakeClient(iClient)) {
+            continue;
+        }
+
+        if (giVoteType != VOTE_MATCH || !IsClientObserver(iClient))
+        {
+            if (giClientVote[iClient] != -1) {
+                iTally[giClientVote[iClient]]++;
+                iVotes++;
+            }
+            else {
+                iAbstains++;
+            }
+        }
+    }
+
+    for (int i = 0; i < 5; i++)
+    {
+        if (!bMultiChoice && i > 1) {
+            break;
+        }
+
+        if (iTally[i] > iHighest) {
+            iHighest = iTally[i];
+            iLead = i;
+            bDraw = false;
+        }
+        else if (iTally[i] == iHighest) {
+            iLead = -1; // draw
+            bDraw = true;
+        }
+
+        iPercent[i] = RoundToNearest(iTally[i] ? iTally[i] / iVotes * 100.0 : 0.0);
+    }
+
+    for (int i = 0; i < 5; i++)
+    {
+        if (i != iLead) {
+            if (iLead < 0 || iAbstains + iTally[i] + (iAbstains ? 1 : 0) > iTally[iLead]) {
+                bContested = true;
+            }
+        }
+    }
+
+    // Calculate result:
+    if ((iLead > -1 && !bContested) || iSeconds >= giVoteMaxTime)
+    {
+        if (bMultiChoice && bDraw)
+        {
+            if (!iVotes && !IsGameOver()) {
+                // Nobody voted. Fail.
+                iLead = -1;
+            }
+            else {
+                // Draw. Pick winner at random from the first 2 equal choices
+                int iWinner[2] = -1;
+
+                for (int i = 0; i < 6; i++)
+                {
+                    if (iTally[i] == iHighest)
+                    {
+                        if (iWinner[0] == -1) {
+                            iWinner[0] = i;
+                        }
+                        else if (iWinner[1] == -1) {
+                            iWinner[1] = i;
+                        }
+                        else {
+                            break;
+                        }
+                    }
+                }
+
+                iLead = iWinner[Math_GetRandomInt(0, 1)];
+                MC_PrintToChatAll("%t", "xms_vote_draw", iLead + 1, sMotion[iLead]);
+            }
+        }
+
+        giVoteStatus = iLead > -1 ? 2 : -1;
+    }
+
+    // Format HUD :
+    if (giVoteType == VOTE_RUN || giVoteType == VOTE_RUNNEXT) {
+        Format(sHud, sizeof(sHud), "!run%s ", giVoteType == VOTE_RUNNEXT ? "Next" : "");
+    }
+
+    if (!bMultiChoice) {
+        Format(sHud, sizeof(sHud), "%s%s (%i)\n▪ %s: %i (%i%%%%)\n▪ %s:  %i (%i%%%%)",
+            sHud, sMotion[0], giVoteMaxTime - iSeconds,
+            iTally[1] >= iTally[0] ? "YES" : "yes", iTally[1], iPercent[1],
+            iTally[0] > iTally[1]  ? "NO"  : "no" , iTally[0], iPercent[0]
+        );
+    }
+    else
+    {
+        Format(sHud, sizeof(sHud), "%s(%i)", sHud, giVoteMaxTime - iSeconds);
+        for (int i = 0; i < 5; i++)
+        {
+            if (strlen(sMotion[i])) {
+                Format(sHud, sizeof(sHud), "%s\n▪ %s %s - %i (%i%%%%)", sHud, BigNumber(i+1), iLead == i ? Char_Uppify(sMotion[i]) : sMotion[i], iTally[i], iPercent[i]);
+            }
+        }
+    }
+
+    /*
+    Format(sHud, sizeof(sHud), "%s\n▪ abstain: %i", sHud, iAbstains);
+
+    if (giVoteStatus == 1) {
+        Format(sHud, sizeof(sHud), "%s\n%is remaining..", sHud, giVoteMaxTime - iSeconds);
+        for (int i = 5; i <= giVoteMaxTime; i += 5) {
+            if (giVoteMaxTime - i >= iSeconds) {
+                StrCat(sHud, sizeof(sHud), ".");
+            }
+        }
+    }
+    */
+
+    // Take action :
     switch(giVoteStatus)
     {
-        case -1: {
+        case -1:
+        {
             // vote failed
-            SetHudTextParams(0.01, 0.11, 1.01, 255, 0, 0, 255, 0, 0.0, 0.0, 0.0);                
+            SetHudTextParams(0.01, 0.11, 1.01, 255, 0, 0, 255, 0, 0.0, 0.0, 0.0);
         }
+
         case 2:
         {
             // vote succeeded
             SetHudTextParams(0.01, 0.11, 1.01, 0, 255, 0, 255, 0, 0.0, 0.0, 0.0);
 
-            if(giVoteType != VOTE_CUSTOM)
+            switch(giVoteType)
             {
-                if(giVoteType == VOTE_MATCH)
+                case VOTE_SHUFFLE: {
+                    ShuffleTeams();
+                }
+
+                case VOTE_INVERT: {
+                    InvertTeams();
+                }
+
+                case VOTE_MATCH:
                 {
-                    if(!IsGameMatch()) {
+                    if (!IsGameMatch()) {
                         Start();
                     }
                     else {
                         Cancel();
-                    }                        
-                }
-                else
-                {
-                    char mode[MAX_MODE_LENGTH], map[MAX_MAP_LENGTH];
-                    
-                    strcopy(map, sizeof(map), gsVoteMotion[SplitString(gsVoteMotion, ":", mode, sizeof(mode))]);
-                    strcopy(gsNextMode, sizeof(gsNextMode), mode);
-                    ghConVarNextmap.SetString(map);
-                        
-                    if(giVoteType != VOTE_RUN) {
-                        MC_PrintToChatAll("%t", "xmsc_run_next", mode, DeprefixMap(map));
                     }
-                    else {
-                        Run();
+                }
+
+                case VOTE_CUSTOM: {
+                    // No action taken
+                }
+
+                default:
+                {
+                    char sMode[MAX_MODE_LENGTH],
+                         sMap [MAX_MAP_LENGTH];
+                    int i = ( bMultiChoice ? iLead : 0 );
+
+                    strcopy(sMap, sizeof(sMap), gsVoteMotion[i][SplitString(gsVoteMotion[i], ":", sMode, sizeof(sMode))]);
+                    strcopy(gsNextMode, sizeof(gsNextMode), sMode);
+                    ghConVarNextmap.SetString(sMap);
+
+                    if (giVoteType != VOTE_RUN)
+                    {
+                        if (!bDraw) {
+                            MC_PrintToChatAll("%t", "xmsc_run_next", sMode, DeprefixMap(sMap));
+                        }
+
+                        gbNextMapChosen = true;
+                    }
+                    else
+                    {
+                        SetGamestate(GAME_CHANGING);
+                        CreateTimer(1.0, T_Run, _, TIMER_REPEAT);
                     }
                 }
             }
         }
+
         default: {
-            // vote ongoing
+            // Vote is ongoing
         }
     }
-        
-    for(int i = 1; i <= MaxClients; i++)
+
+    for (int iClient = 1; iClient <= MaxClients; iClient++)
     {
-        if(!IsClientConnected(i) || !IsClientInGame(i) || IsFakeClient(i)) {
+        char sHud2[1024];
+
+        if (!IsClientConnected(iClient) || !IsClientInGame(iClient) || IsFakeClient(iClient)) {
             continue;
         }
-        
 
-        if(giVoteStatus != 1)
+        if (giVoteType == VOTE_RUNNEXT_AUTO) {
+            Format(sHud2, sizeof(sHud2), "%T %s", "xms_autovote", iClient, sHud);
+        }
+        else {
+            Format(sHud2, sizeof(sHud2), "%T - %s", "xms_vote", iClient, sHud);
+        }
+
+        if (giVoteStatus != 1)
         {
-            if(!AreClientCookiesCached(i) || GetClientCookieInt(i, ghCookieSounds) == 1) {
-                ClientCommand(i, "playgamesound %s", giVoteStatus == -1 ? SOUND_VOTEFAILED : SOUND_VOTESUCCESS);
+            if (!AreClientCookiesCached(iClient) || GetClientCookieInt(iClient, ghCookieSounds) == 1 && giVoteType != VOTE_RUNNEXT_AUTO) {
+                ClientCommand(iClient, "playgamesound %s", giVoteStatus == -1 ? SOUND_VOTEFAILED : SOUND_VOTESUCCESS);
             }
-            else {
-                MC_PrintToChat(i, "%sVote %s.", giVoteStatus == -1 ? "{E}" : "{H}", giVoteStatus == -1 ? "failed" : "succeeded");
+            else if (!bMultiChoice) {
+                MC_PrintToChat(iClient, "%t", giVoteStatus == -1 ? "xms_vote_fail" : "xms_vote_success");
             }
         }
         else {
-            int r = GetClientCookieInt(i, ghCookieColorR, 0, 255),
-              g = GetClientCookieInt(i, ghCookieColorG, 0, 255),
-             b = GetClientCookieInt(i, ghCookieColorB, 0, 255);
-            SetHudTextParams(0.01, 0.11, 1.01, r, g, b, 255, view_as<int>(giVoteMaxTime - iter <= 5), 0.0, 0.0, 0.0);                   
+            int iCol[3];
+
+            iCol[0] = clamp(GetClientCookieInt(iClient, ghCookieColorR), 0, 255);
+            iCol[1] = clamp(GetClientCookieInt(iClient, ghCookieColorG), 0, 255);
+            iCol[2] = clamp(GetClientCookieInt(iClient, ghCookieColorB), 0, 255);
+            SetHudTextParams(0.01, 0.11, 1.01, iCol[0], iCol[1], iCol[2], 255, view_as<int>(giVoteMaxTime - iSeconds <= 5), 0.0, 0.0, 0.0);
         }
-        
-        ShowSyncHudText(i, ghVoteHud, text);
+
+        ShowSyncHudText(iClient, ghVoteHud, sHud2);
     }
-    
-    if(giVoteStatus != 1) {
+
+    if (giVoteStatus != 1) {
         giVoteStatus = 0;
     }
 
-    iter++;
+    iSeconds++;
     return Plugin_Continue;
 }
 
-
-/**************************************************************************************************
- *** Overtime
-**************************************************************************************************/
-void CreateOverTimer(float delay=0.0)
+void CallVote(int iType, int iCaller)
 {
-    if(ghOvertimer != INVALID_HANDLE) {
+    bool bMulti = (strlen(gsVoteMotion[1]) > 0);
+
+    giClientVoteTick[iCaller] = GetGameTickCount();
+    giVoteStatus = 1;
+    giVoteType   = iType;
+
+    if (!bMulti) {
+        giClientVote[iCaller] = 1;
+    }
+
+    if (iCaller != 0) {
+        MC_PrintToChatAllFrom(iCaller, false, "%t", "xmsc_callvote");
+    }
+
+    IfCookiePlaySoundAll(ghCookieSounds, SOUND_VOTECALLED);
+
+    for (int iClient = 1; iClient <= MaxClients; iClient++)
+    {
+        if (!IsClientConnected(iClient) || !IsClientInGame(iClient) || IsFakeClient(iClient)) {
+            continue;
+        }
+
+        if ( (iClient != iCaller || bMulti) && (!IsClientObserver(iClient) || iType != VOTE_MATCH) ) {
+            giClientVote[iClient] = -1;
+            VotingMenu(iClient).Display(iClient, MENU_TIME_FOREVER);
+        }
+    }
+}
+
+void CallVoteFor(int iType, int iCaller, const char[] sMotion, any ...)
+{
+    VFormat(gsVoteMotion[0], sizeof(gsVoteMotion[]), sMotion, 4);
+    CallVote(iType, iCaller);
+}
+
+void CallRandomMapVote()
+{
+    char sModes   [3][MAX_MODE_LENGTH],
+         sChoices [5][MAX_MAP_LENGTH + MAX_MODE_LENGTH + 1],
+         sCommand [512];
+
+    for (int i = 0; i < 3; i++)
+    {
+        char sMapcycle[PLATFORM_MAX_PATH];
+
+        // pick a mode
+        if (i == 0) {
+            // current mode for first 3 choices
+            strcopy(sModes[i], sizeof(sModes[]), gsMode);
+        }
+        else {
+            // pick random
+            do {
+                if (!GetRandomMode(sModes[i], sizeof(sModes[]), true)) {
+                    break;
+                }
+            }
+            while (StrEqual(sModes[i], sModes[i - 1]));
+        }
+
+        // get mapcycle
+        if (!GetConfigString(sMapcycle, sizeof(sMapcycle), "Mapcycle", "Gamemodes", sModes[i])) {
+            continue;
+        }
+
+        // fetch available maps with GetMapsArray
+        char sMaps[512][MAX_MAP_LENGTH];
+        int  iHits = GetMapsArray(sMaps, 512, MAX_MAP_LENGTH, sMapcycle);
+
+        if (iHits > 1)
+        {
+            for (int y = 0; y < 5; y++)
+            {
+                int iRan;
+
+                if ( (i == 0 && y > 2) || (i == 1 && y != 3) || (i == 2 && y != 4) ) {
+                    continue;
+                }
+
+                do {
+                    // pick a random map
+                    iRan = Math_GetRandomInt(0, iHits);
+                }
+                while (!strlen(sMaps[iRan]) || StrEqual(sMaps[iRan], gsMap));
+
+                Format(sChoices[y], sizeof(sChoices[]), "%s:%s", sModes[i], sMaps[iRan]);
+                sMaps[iRan] = "";
+            }
+        }
+    }
+
+    for (int i = 0; i < 5; i++) {
+        if (strlen(sChoices[i]) > 1) {
+            Format(sCommand, sizeof(sCommand), "%s%s%s", sCommand, i > 0 ? "," : "", sChoices[i]);
+        }
+    }
+
+    ServerCommand("runnext %s", sCommand);
+}
+
+int VoteTimeout(int iClient)
+{
+    int iTime;
+
+    if (GetRealClientCount(true, false, true) > giVoteMinPlayers) {
+        iTime = ( giVoteCooldown * Tickrate() + giClientVoteTick[iClient] - GetGameTickCount() ) / Tickrate();
+    }
+
+    if (iTime < 0) {
+        return 0;
+    }
+
+    return iTime;
+}
+
+/**************************************************************
+ * OTHER HUD ELEMENTS
+ *************************************************************/
+public Action T_KeysHud(Handle hTimer)
+{
+    if (giGamestate == GAME_OVER || giGamestate == GAME_CHANGING || giGamestate == GAME_PAUSED) {
+        return Plugin_Continue;
+    }
+
+    for (int iClient = 1; iClient <= MaxClients; iClient++)
+    {
+        char sHud[1024];
+        int  iTarget,
+             iColor[3];
+
+        if (!IsClientConnected(iClient) || !IsClientInGame(iClient) || IsFakeClient(iClient)) {
+            continue;
+        }
+
+        if (GetClientButtons(iClient) & IN_SCORE || (!IsClientObserver(iClient) && !gbShowKeys)) {
+            continue;
+        }
+
+        if (IsClientObserver(iClient)) {
+            iTarget = GetEntPropEnt(iClient, Prop_Send, "m_hObserverTarget");
+        }
+        else {
+            iTarget = iClient;
+        }
+
+        iColor[0] = clamp(GetClientCookieInt(iClient, ghCookieColorR), 0, 255);
+        iColor[1] = clamp(GetClientCookieInt(iClient, ghCookieColorG), 0, 255);
+        iColor[2] = clamp(GetClientCookieInt(iClient, ghCookieColorB), 0, 255);
+
+        if (GetEntProp(iClient, Prop_Send, "m_iObserverMode") != 7 && iTarget > 0 && IsClientConnected(iTarget) && IsClientInGame(iTarget))
+        {
+            int   iButtons = GetClientButtons(iTarget);
+            float fAngles[3];
+
+            GetClientAbsAngles(iClient, fAngles);
+
+            Format(sHud, sizeof(sHud), "health: %i   suit: %i\nvel: %03i  %s   %0.1fº\n%s         %s          %s\n%s     %s     %s",
+              GetClientHealth(iTarget),
+              GetClientArmor(iTarget),
+              GetClientVelocity(iTarget),
+              (iButtons & IN_FORWARD)   ? "↑"       : "  ",
+              fAngles[1],
+              (iButtons & IN_MOVELEFT)  ? "←"       : "  ",
+              (iButtons & IN_SPEED)     ? "+SPRINT" : "        ",
+              (iButtons & IN_MOVERIGHT) ? "→"       : "  ",
+              (iButtons & IN_DUCK)      ? "+DUCK"   : "    ",
+              (iButtons & IN_BACK)      ? "↓"       : "  ",
+              (iButtons & IN_JUMP)      ? "+JUMP"   : "    "
+            );
+
+            SetHudTextParams(-1.0, 0.7, 0.3, iColor[0], iColor[1], iColor[2], 255, 0, 0.0, 0.0, 0.0);
+        }
+        else {
+            SetHudTextParams(-1.0, -0.02, 0.3, iColor[0], iColor[1], iColor[2], 255, 0, 0.0, 0.0, 0.0);
+            Format(sHud, sizeof(sHud), "%T\n%T", "xms_hud_spec1", iClient, "xms_hud_spec2", iClient);
+        }
+
+        ShowSyncHudText(iClient, ghKeysHud, sHud);
+    }
+
+    return Plugin_Continue;
+}
+
+public Action T_TimeHud(Handle hTimer)
+{
+    static int iTimer;
+
+    bool bRed = (giOvertime == 2);
+    char sHud[48];
+
+    if (giGamestate == GAME_MATCHWAIT || giGamestate == GAME_CHANGING || giGamestate == GAME_PAUSED)
+    {
+        Format(sHud, sizeof(sHud), ". . %s%s%s", iTimer >= 20 ? ". " : "", iTimer >= 15 ? ". " : "", iTimer >= 10 ? "." : "");
+        iTimer++;
+        if (iTimer >= 25) {
+            iTimer = 0;
+        }
+    }
+
+    else if (giGamestate != GAME_OVER && ghConVarTimelimit.BoolValue)
+    {
+        float fTime = GetTimeRemaining(false);
+
+        Format(sHud, sizeof(sHud), "%s%s", sHud, Timestring(fTime, fTime < 10, true));
+        bRed = (fTime < 60);
+    }
+
+    for (int iClient = 1; iClient <= MaxClients; iClient++)
+    {
+        if (!IsClientConnected(iClient) || !IsClientInGame(iClient) || (IsFakeClient(iClient) && !IsClientSourceTV(iClient)) ) {
+            continue;
+        }
+
+        char sHud2[48];
+        bool bMargin = IsClientObserver(iClient) && !IsClientSourceTV(iClient);
+
+        strcopy(sHud2, sizeof(sHud2), sHud);
+
+        if (giGamestate == GAME_OVER) {
+            Format(sHud2, sizeof(sHud2), "%T", "xms_hud_gameover", iClient);
+        }
+        else if (giGamestate == GAME_MATCHEX || giGamestate == GAME_OVERTIME) {
+            Format(sHud2, sizeof(sHud2), "%T\n%s", "xms_hud_overtime", iClient, sHud);
+        }
+
+        if (strlen(sHud2))
+        {
+            if (bRed) {
+                SetHudTextParams(-1.0, bMargin ? 0.03 : 0.01, 0.3, 220, 10, 10, 255, 0, 0.0, 0.0, 0.0);
+            }
+            else
+            {
+                int iColor[3];
+                iColor[0] = clamp(GetClientCookieInt(iClient, ghCookieColorR), 0, 255);
+                iColor[1] = clamp(GetClientCookieInt(iClient, ghCookieColorG), 0, 255);
+                iColor[2] = clamp(GetClientCookieInt(iClient, ghCookieColorB), 0, 255);
+
+                SetHudTextParams(-1.0, bMargin ? 0.03 : 0.01, 0.3, iColor[0], iColor[1], iColor[2], 255, 0, 0.0, 0.0, 0.0);
+            }
+
+            ShowSyncHudText(iClient, ghTimeHud, sHud2);
+        }
+    }
+}
+
+/**************************************************************
+ * OVERTIME
+ *************************************************************/
+void CreateOverTimer(float fDelay=0.0)
+{
+    if (ghOvertimer != INVALID_HANDLE) {
         KillTimer(ghOvertimer);
         ghOvertimer = INVALID_HANDLE;
     }
-        
-    ghOvertimer = CreateTimer(GetTimeRemaining(false) - 0.1 + delay, T_PreOvertime, _, TIMER_FLAG_NO_MAPCHANGE);
+
+    ghOvertimer = CreateTimer(GetTimeRemaining(false) - 0.1 + fDelay, T_PreOvertime, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
-public Action T_PreOvertime(Handle timer)
+public Action T_PreOvertime(Handle hTimer)
 {
-    if(GetRealClientCount(true, true, false) > 1)
+    if (GetRealClientCount(true, true, false) > 1)
     {
-        if(gbTeamplay) {
-            if(GetTeamScore(TEAM_REBELS) - GetTeamScore(TEAM_COMBINE) == 0 && GetTeamClientCount(TEAM_REBELS) && GetTeamClientCount(TEAM_COMBINE)) {
+        if (gbTeamplay) {
+            if (GetTeamScore(TEAM_REBELS) - GetTeamScore(TEAM_COMBINE) == 0 && GetTeamClientCount(TEAM_REBELS) && GetTeamClientCount(TEAM_COMBINE)) {
                 StartOvertime();
             }
         }
-        else if(!GetTopPlayer(false)) {
+        else if (!GetTopPlayer(false)) {
             StartOvertime();
         }
     }
@@ -2788,938 +3893,1234 @@ void StartOvertime()
 {
     giOvertime = 2;
     ghConVarTimelimit.IntValue += OVERTIME_TIME;
-    
-    if(gbTeamplay || GetRealClientCount(true, false, false) == 2) {
+
+    if (gbTeamplay || GetRealClientCount(true, false, false) == 2) {
         MC_PrintToChatAll("%t", "xms_overtime_start1", gbTeamplay ? "team" : "player");
     }
     else {
         MC_PrintToChatAll("%t", "xms_overtime_start2");
     }
+
     CreateTimer(0.1, T_Overtime, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
-    SetGamestate(IsGamestate(GAME_MATCH) ? GAME_MATCHEX : GAME_OVERTIME);
+
+    if (giGamestate == GAME_MATCH) {
+        SetGamestate(GAME_MATCHEX);
+    }
+    else {
+        SetGamestate(GAME_OVERTIME);
+    }
 }
-    
-public Action T_Overtime(Handle timer)
+
+public Action T_Overtime(Handle hTimer)
 {
-    int result;
-        
-    if(giOvertime != 2) {
+    int  iResult;
+    char sName[MAX_NAME_LENGTH];
+
+    if (giOvertime != 2) {
         return Plugin_Stop;
     }
-        
-    if(gbTeamplay)
+
+    if (gbTeamplay)
     {
-        result = GetTeamScore(TEAM_REBELS) - GetTeamScore(TEAM_COMBINE);
-        
-        if(result == 0) {
+        iResult = GetTeamScore(TEAM_REBELS) - GetTeamScore(TEAM_COMBINE);
+
+        if (iResult == 0) {
             return Plugin_Continue;
         }
-        
-        MC_PrintToChatAll("%t", "xms_overtime_teamwin", result < 0 ? "Combine" : "Rebels");
+
+        GetTeamName(iResult < 0 ? TEAM_COMBINE : TEAM_REBELS, sName, sizeof(sName));
+        MC_PrintToChatAll("%t", "xms_overtime_teamwin", sName);
     }
     else
     {
-        result = GetTopPlayer(false);
-        
-        if(!result) {
+        iResult = GetTopPlayer(false);
+
+        if (!iResult) {
             return Plugin_Continue;
         }
-        
-        char name[MAX_NAME_LENGTH];
-        GetClientName(result, name, sizeof(name));
-        
-        MC_PrintToChatAll("%t", "xms_overtime_win", name);
+
+        GetClientName(iResult, sName, sizeof(sName));
+
+        MC_PrintToChatAll("%t", "xms_overtime_win", sName);
     }
-    
+
     Game_End();
     giOvertime = 1;
-    
+
     return Plugin_Stop;
 }
 
-
-/**************************************************************************************************
- *** Menus
-**************************************************************************************************/
-public Action T_AttemptInitMenu(Handle timer, int client)
+/**************************************************************
+ * SOURCETV
+ *************************************************************/
+public Action T_StartRecord(Handle hTimer)
 {
-    if(!IsClientConnected(client) || !IsClientInGame(client) || IsFakeClient(client) || giClientMenuType[client] == 2) {
-        return Plugin_Stop;
-    }
-    
-    QueryClientConVar(client, "cl_showpluginmessages", ShowMenuIfVisible, client);
-    return Plugin_Continue;
+    StartRecord();
 }
 
-public void ShowMenuIfVisible(QueryCookie cookie, int client, ConVarQueryResult result, char[] cvarName, char[] cvarValue)
+void StartRecord()
 {
-    if(!StringToInt(cvarValue))
+    if (!ghConVarTv.BoolValue) {
+        LogError("SourceTV is not active!");
+    }
+
+    if (!gbRecording) {
+        ServerCommand("tv_name \"%s - %s\";tv_record %s/incomplete/%s", gsServerName, gsGameId, gsDemoPath, gsGameId);
+        gbRecording = true;
+    }
+}
+
+public Action T_StopRecord(Handle hTimer, bool bEarly)
+{
+    StopRecord(bEarly);
+}
+
+void StopRecord(bool bDiscard)
+{
+    char sPath[2][PLATFORM_MAX_PATH];
+
+    if (!gbRecording) {
+        return;
+    }
+
+    Format(sPath[0], sizeof(sPath[]), "%s/incomplete/%s.dem", gsDemoPath, gsGameId);
+    Format(sPath[1], sizeof(sPath[]), "%s/%s.dem", gsDemoPath, gsGameId);
+
+    ServerCommand("tv_stoprecord");
+    gbRecording = false;
+
+    if (!bDiscard)
     {
-        if(giClientMenuType[client] == 0) {
-            MC_PrintToChat(client, "%t", "xms_menu_fail");
+        GenerateDemoTxt(sPath[1]);
+        RenameFile(sPath[1], sPath[0], true);
+        if (strlen(gsDemoURL)) {
+            MC_PrintToChatAll("%t", "xms_announcedemo", gsDemoURL, gsGameId, gsDemoFileExt);
+        }
+    }
+    else {
+        DeleteFile(sPath[0], true);
+    }
+}
+
+void GenerateDemoTxt(const char[] sPath)
+{
+    static char sHost[16];
+    static int  iPort;
+
+    char sPath2 [PLATFORM_MAX_PATH],
+         sTime  [32],
+         sTitle [256],
+         sPlayers[2][2048];
+    bool bDuel = GetRealClientCount(true, false, false) == 2;
+    File hFile;
+
+    if (!strlen(sHost)) {
+        FindConVar("ip").GetString(sHost, sizeof(sHost));
+        iPort = FindConVar("hostport").IntValue;
+    }
+
+    Format(sPath2, PLATFORM_MAX_PATH, "%s.txt", sPath);
+    FormatTime(sTime, sizeof(sTime), "%d %b %Y");
+
+    if (gbTeamplay) {
+        Format(sPlayers[0], sizeof(sPlayers[]), "THE COMBINE [Score: %i]:\n", GetTeamScore(TEAM_COMBINE));
+        Format(sPlayers[1], sizeof(sPlayers[]), "REBEL FORCES [Score: %i]:\n", GetTeamScore(TEAM_REBELS));
+    }
+
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        int z;
+
+        if (!IsClientConnected(i) || !IsClientInGame(i) || IsFakeClient(i) || IsClientObserver(i)) {
+            continue;
+        }
+
+        if (gbTeamplay) {
+            z = GetClientTeam(i) - 2;
+        }
+
+        Format(sPlayers[z], sizeof(sPlayers[]), "%s\"%N\" %s [%i kills, %i deaths]\n", sPlayers[z], i, UnbufferedAuthId(i), GetClientFrags(i), GetClientDeaths(i));
+
+        if (bDuel) {
+            Format(sTitle, sizeof(sTitle), "%s%N%s", sTitle, i, !strlen(sTitle) ? " vs " : "");
+        }
+    }
+
+    if (gbTeamplay) {
+        Format(sTitle, sizeof(sTitle), "%s %iv%i - %s - %s", gsMode, GetTeamClientCount(TEAM_REBELS), GetTeamClientCount(TEAM_COMBINE), gsMap, sTime);
+    }
+    else if (bDuel) {
+        Format(sTitle, sizeof(sTitle), "%s 1v1 (%s) - %s - %s", gsMode, sTitle, gsMap, sTime);
+    }
+    else {
+        Format(sTitle, sizeof(sTitle), "%s ffa - %s - %s", gsMode, gsMap, sTime);
+    }
+
+    hFile = OpenFile(sPath2, "w", true);
+    hFile.WriteLine(sTitle);
+    hFile.WriteLine("");
+    hFile.WriteLine(sPlayers[0]);
+
+    if (gbTeamplay) {
+        hFile.WriteLine(sPlayers[1]);
+    }
+
+    hFile.WriteLine("Server: \"%s\" [%s:%i]", gsServerName, sHost, iPort);
+    hFile.WriteLine("Version: %i [XMS v%s]", GameVersion(), PLUGIN_VERSION);
+    hFile.Close();
+}
+
+/**************************************************************
+ * MENUS
+ *************************************************************/
+public void ShowMenuIfVisible(QueryCookie cookie, int iClient, ConVarQueryResult result, char[] sCvarName, char[] sCvarValue)
+{
+    if (!StringToInt(sCvarValue))
+    {
+        if (giClientMenuType[iClient] == 0)
+        {
+            MC_PrintToChat(iClient, "%t", "xmenu_fail");
+            IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
 
             // keep trying in the background
-            CreateTimer(2.0, T_AttemptInitMenu, client, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
-            giClientMenuType[client] = 1;
+            CreateTimer(2.0, T_AttemptInitMenu, iClient, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+            giClientMenuType[iClient] = 1;
         }
     }
     else
     {
-        MC_PrintToChat(client, "%t", "xms_menu_announce");
-        giClientMenuType[client] = 2;
-        ghMenuClient[client] = Menu_Base(client);
-        ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
+        MC_PrintToChat(iClient, "%t", "xmenu_announce");
+        giClientMenuType[iClient] = 2;
+        FakeClientCommand(iClient, "sm_xmenu 0");
     }
 }
 
-Menu Menu_Base(int client)
+public Action T_AttemptInitMenu(Handle hTimer, int iClient)
 {
-    static int lan = -1;
-    if(lan == -1) {
-        lan = FindConVar("sv_lan").BoolValue;
+    if (!IsClientConnected(iClient) || !IsClientInGame(iClient) || IsFakeClient(iClient) || giClientMenuType[iClient] == 2) {
+        return Plugin_Stop;
     }
-    
-    Menu menu = new Menu(MenuLogic_Base);
-    char title[512];
-    char item[32];
-    
-    Format(title, sizeof(title), "%T", IsGameMatch() ? "xms_menu_base_matchpre" : "xms_menu_base_pre", client);
-    Format(title, sizeof(title), "%s\n%T", title, "xms_menu_base", client, DeprefixMap(gsMap), gsMode, strlen(gsModeName)?"(":"", gsModeName, strlen(gsModeName)?")":"", gsServerName, Tickrate(), lan ? "lan" : "dedicated", strlen(gsServerAdmin) ? "admin:   " : "", gsServerAdmin, strlen(gsServerAdmin) ? "\n" : "", strlen(gsServerURL) ? "website: " : "", gsServerURL, strlen(gsServerURL)     ? "\n" : "", GameVersion(), PLUGIN_VERSION);
-    
-    menu.SetTitle(title);
 
-    if(!IsGameMatch()) {
-        Format(item, sizeof(item), "%T", "xms_menu_base_team", client);
-        menu.AddItem("team", item);
-    }
-    else {
-        Format(item, sizeof(item), "%T", "xms_menu_base_pause", client);
-        menu.AddItem("pause", item);
-    }
-    Format(item, sizeof(item), "%T", "xms_menu_base_voting", client);
-    menu.AddItem("voting", item);
-    Format(item, sizeof(item), "%T", "xms_menu_base_players", client);
-    menu.AddItem("players", item);
-    Format(item, sizeof(item), "%T", "xms_menu_base_settings", client);
-    menu.AddItem("settings", item);
-    Format(item, sizeof(item), "%T", "xms_menu_base_servers", client);
-    menu.AddItem("servers", item);
-    
-    SetMenuOptionFlags(menu, MENU_NO_PAGINATION);
-    return menu;
+    QueryClientConVar(iClient, "cl_showpluginmessages", ShowMenuIfVisible, iClient);
+    return Plugin_Continue;
 }
 
-public int MenuLogic_Base(Menu menu, MenuAction action, int client, int param)
+
+int XMenuCurrentPage(StringMap mMenu)
 {
-    if(client > 0 && IsClientConnected(client) && IsClientInGame(client) && !IsFakeClient(client))
+    int iPage;
+    mMenu.GetValue("current", iPage);
+    return iPage;
+}
+
+int XMenuPageCount(int iClient)
+{
+    int iCount;
+    gmMenu[iClient].GetValue("count", iCount);
+    return iCount;
+}
+
+void XMenuDisplay(StringMap mMenu, int iClient, int iPage=-1)
+{
+    char       sPage[3];
+    DialogType iType;
+    KeyValues  kMenu;
+
+    if (iPage == -1)
     {
-        if(action == MenuAction_Select)
+        iPage = XMenuCurrentPage(mMenu);
+        if (!iPage) {
+            iPage = 1;
+        }
+    }
+    IntToString(iPage, sPage, sizeof(sPage));
+
+    mMenu.GetValue(sPage, kMenu);
+    mMenu.GetValue("type", iType);
+
+    mMenu.SetValue("current", iPage);
+    kMenu.SetNum("time", 99999);
+
+    CreateDialog(iClient, kMenu, iType);
+    IfCookiePlaySound(ghCookieSounds, iClient, SOUND_MENUACTION);
+}
+
+public Action XMenuBack(int iClient, int iArgs)
+{
+    int iPage = XMenuCurrentPage(gmMenu[iClient]) - 1;
+
+    if (iPage >= 1) {
+        XMenuDisplay(gmMenu[iClient], iClient, iPage);
+    }
+    return Plugin_Handled;
+}
+
+public Action XMenuNext(int iClient, int iArgs)
+{
+    int iPage = XMenuCurrentPage(gmMenu[iClient]) + 1;
+
+    if (iPage <= XMenuPageCount(iClient)){
+        XMenuDisplay(gmMenu[iClient], iClient, iPage);
+    }
+    return Plugin_Handled;
+}
+
+// Menu logic:
+public Action XMenuAction(int iClient, int iArgs)
+{
+    int  iMenuId;
+    char sParam[3][256];
+
+    if (iClient == 0) {
+        return Plugin_Handled;
+    }
+
+    if (iArgs)
+    {
+        iMenuId = GetCmdArgInt(1);
+
+        for (int i = 2; i < iArgs + 1; i++)
         {
-            char info[32];
-            menu.GetItem(param, info, sizeof(info));
-                
-            if(StrEqual(info, "team")) {
-                ghMenuClient[client] = Menu_Team(client);
-                ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
+            if (i >= 5) {
+                break;
             }
-            else if(StrEqual(info, "players")) {
-                ghMenuClient[client] = Menu_Players(client);
-                ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
-            }
-            else if(StrEqual(info, "settings")) {
-                ghMenuClient[client] = Menu_Settings(client);
-                ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
-            }
-            else if(StrEqual(info, "voting")) {
-                ghMenuClient[client] = Menu_Voting(client);
-                ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
-            }
-            else if(StrEqual(info, "pause")) {
-                FakeClientCommand(client, "pause");
-                ghMenuClient[client] = Menu_Base(client);
-                ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
-            }
-            else if(StrEqual(info, "servers")) {
-                ghMenuClient[client] = Menu_Servers(client);
-                ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
-            }                
-        }
-        else if(action == MenuAction_Cancel && (param == MenuCancel_Exit || param == MenuCancel_ExitBack)) {
-            if(param == MenuCancel_Exit || param == MenuCancel_ExitBack) {
-                ghMenuClient[client] = Menu_Base(client);
-                ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
-            }
+
+            GetCmdArg(i, sParam[i - 2], sizeof(sParam[]));
         }
     }
-}
 
-
-Menu Menu_Servers(int client)
-{
-    Menu menu = new Menu(MenuLogic_Servers);
-    char serverlist[512], servers[32][32];
-    int count = GetConfigKeys(serverlist, sizeof(serverlist), "otherServers");
-    
-    char title[512];
-    Format(title, sizeof(title), "%T", "xms_menu_servers", client);
-    menu.SetTitle(title);
-    
-    ExplodeString(serverlist, ",", servers, count, 32);
-    for(int i = 0; i < count; i++) {
-        char address[64];
-        GetConfigString(address, sizeof(address), servers[i], "otherServers");
-        menu.AddItem(address, servers[i]);
-    }
-    
-    return menu;
-}
-
-public int MenuLogic_Servers(Menu menu, MenuAction action, int client, int param)
-{
-    if(client > 0 && IsClientConnected(client) && IsClientInGame(client) && !IsFakeClient(client))
+    switch (iMenuId)
     {
-        if(action == MenuAction_Select) {
-            char info[32];
-            menu.GetItem(param, info, sizeof(info));
-            DisplayAskConnectBox(client, 30.0, info);
-            
-            ghMenuClient[client] = Menu_Base(client);
-            ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
-        } 
-        else if(action == MenuAction_Cancel && (param == MenuCancel_Exit || param == MenuCancel_ExitBack)) {
-            ghMenuClient[client] = Menu_Base(client);
-            ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
-        }
-    }
-}
-
-
-Menu Menu_Team(int client)
-{
-    Menu menu = new Menu(MenuLogic_Team);
-    char title[512];
-    Format(title, sizeof(title), "%T", "xms_menu_team", client);
-    menu.SetTitle(title);
-    
-    menu.AddItem("Rebels", "Rebels");
-    if(gbTeamplay) {
-        menu.AddItem("Combine", "Combine");
-    }
-    menu.AddItem("Spectators", "Spectators");
-
-    return menu;
-}
-
-public int MenuLogic_Team(Menu menu, MenuAction action, int client, int param)
-{
-    if(client > 0 && IsClientConnected(client) && IsClientInGame(client) && !IsFakeClient(client))
-    {
-        if(action == MenuAction_Select) {
-            char info[32];
-            menu.GetItem(param, info, sizeof(info));
-            FakeClientCommand(client, "jointeam %i", StrEqual(info, "Rebels") ? TEAM_REBELS : StrEqual(info, "Combine") ? TEAM_COMBINE : TEAM_SPECTATORS);
-            ghMenuClient[client] = Menu_Base(client);
-            ghMenuClient[client].Display(client, MENU_TIME_FOREVER);  
-        }
-        else if(action == MenuAction_Cancel && (param == MenuCancel_Exit || param == MenuCancel_ExitBack)) {
-            ghMenuClient[client] = Menu_Base(client);
-            ghMenuClient[client].Display(client, MENU_TIME_FOREVER);  
-        }
-    }
-}
-
-
-Menu Menu_Start(int client)
-{
-    Menu menu = new Menu(MenuLogic_Start);
-    char desc[512];
-
-    if(GetRealClientCount(true, false, false) == 1) {
-        Format(desc, sizeof(desc), "%T", "xms_menu_start_denycount", client);
-        menu.SetTitle(desc);
-    }
-    else if(IsModeMatchable(gsMode)) {
-        Format(desc, sizeof(desc), "%T", "xms_menu_start", client);
-        menu.SetTitle(desc);
-        
-        Format(desc, sizeof(desc), "%T", "xms_menu_start_confirm", client);
-        menu.AddItem("yes", desc);
-    }
-    else {
-        Format(desc, sizeof(desc), "%T", "xms_menu_start_denymode", client);
-        menu.SetTitle(desc);
-    }
-    
-    Format(desc, sizeof(desc), "%T", "xms_menu_start_cancel", client);
-    menu.AddItem("no", desc);
-    
-    return menu;
-}
-
-public int MenuLogic_Start(Menu menu, MenuAction action, int client, int param)
-{
-    if(client > 0 && IsClientConnected(client) && IsClientInGame(client) && !IsFakeClient(client))
-    {
-        if(action == MenuAction_Select)
+        // Base menu
+        case 0:
         {
-            char info[32];
-            menu.GetItem(param, info, sizeof(info));
-                
-            if(StrEqual(info, "yes")) {
-                FakeClientCommand(client, "start");
-                ghMenuClient[client] = Menu_Base(client);
-                ghMenuClient[client].Display(client, MENU_TIME_FOREVER);  
-            }
-            else {
-                ghMenuClient[client] = Menu_Voting(client);
-                ghMenuClient[client].Display(client, MENU_TIME_FOREVER);  
-            }
-        }
-            
-        if(action == MenuAction_Cancel && (param == MenuCancel_Exit || param == MenuCancel_ExitBack)) {
-            ghMenuClient[client] = Menu_Voting(client);
-            ghMenuClient[client].Display(client, MENU_TIME_FOREVER);    
-        }
-    }
-}
-
-
-Menu Menu_Decision(int client)
-{
-    Menu menu = new Menu(MenuLogic_Decision);
-    
-    char desc[512];
-    Format(desc, sizeof(desc), "%T", "xms_menu_decision", client, gsVoteMotion);
-    menu.SetTitle(desc);
-    
-    Format(desc, sizeof(desc), "%T", "xms_menu_decision_yes", client);
-    menu.AddItem("yes", desc);
-    
-    Format(desc, sizeof(desc), "%T", "xms_menu_decision_no", client);
-    menu.AddItem("no", desc);
-    
-    Format(desc, sizeof(desc), "%T", "xms_menu_decision_abstain", client);
-    menu.AddItem("abstain", desc);
-
-    return menu;
-}
-
-public int MenuLogic_Decision(Menu menu, MenuAction action, int client, int param)
-{
-    if(client > 0 && IsClientConnected(client) && IsClientInGame(client) && !IsFakeClient(client))
-    {
-        if(action == MenuAction_Select)
-        {
-            char info[32];
-            menu.GetItem(param, info, sizeof(info));
-            
-            if(StrEqual(info, "yes") || StrEqual(info, "no")) {
-                FakeClientCommand(client, info);
-            }
-        }
-        
-        ghMenuClient[client] = Menu_Base(client);
-        ghMenuClient[client].Display(client, MENU_TIME_FOREVER);  
-    }
-}
-
-
-Menu Menu_Mode(int client)
-{
-    Menu menu = new Menu(MenuLogic_Mode);
-    char list[512], modes[512][MAX_MODE_LENGTH];
-    int count = GetConfigKeys(list, sizeof(list), "gamemodes");
-
-    char title[512];
-    Format(title, sizeof(title), "%T", "xms_menu_mode", client, gsMode);
-    menu.SetTitle(title);
-
-    ExplodeString(list, ",", modes, count, MAX_MODE_LENGTH);
-    for(int i = 0; i < count; i++)
-    {
-        if(!StrEqual(modes[i], gsMode))
-        {
-            char desc[24];
-            
-            if(GetConfigString(desc, sizeof(desc), "name", "gamemodes", modes[i]) && !StrEqual(desc, modes[i], false)) {
-                Format(desc, sizeof(desc), "%s (%s)", modes[i], desc);
-            }
-            else {
-                strcopy(desc, sizeof(desc), modes[i]);
-            }
-            
-            menu.AddItem(modes[i], desc);
-        }
-    }
-
-    return menu;
-}
-
-public int MenuLogic_Mode(Menu menu, MenuAction action, int client, int param)
-{   
-    if(client > 0 && IsClientConnected(client) && IsClientInGame(client) && !IsFakeClient(client))
-    {
-        if(action == MenuAction_Select) {
-            char info[MAX_MAP_LENGTH];
-            menu.GetItem(param, info, sizeof(info));
-            ghMenuClient[client] = Menu_Map(client, info);
-            ghMenuClient[client].Display(client, MENU_TIME_FOREVER);                 
-        }
-        else if(action == MenuAction_Cancel && (param == MenuCancel_Exit || param == MenuCancel_ExitBack)) {
-            ghMenuClient[client] = Menu_Voting(client);
-            ghMenuClient[client].Display(client, MENU_TIME_FOREVER);  
-        }
-    }
-}
-
-
-Menu Menu_Model(int client)
-{
-    Menu menu = new Menu(MenuLogic_Model);
-    char filename[70];
-    
-    char title[512];
-    Format(title, sizeof(title), "%T", "xms_menu_model", client);
-    menu.SetTitle(title);
-    
-    for(int i = 0; i < sizeof(gsModelPath); i++) {
-        File_GetFileName(gsModelPath[i], filename, sizeof(filename));
-        menu.AddItem(gsModelPath[i], filename);
-    }
-    
-    return menu;
-}
-
-public int MenuLogic_Model(Menu menu, MenuAction action, int client, int param)
-{
-    if(client > 0 && IsClientConnected(client) && IsClientInGame(client) && !IsFakeClient(client))
-    {
-        if(action == MenuAction_Select) {
-            char info[70];
-            menu.GetItem(param, info, sizeof(info));
-            ClientCommand(client, "cl_playermodel %s", info);
-        }
-        
-        ghMenuClient[client] = Menu_Settings(client);        
-        ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
-    }
-}
-
-
-Menu Menu_Map(int client, const char[] gamemode, bool byLetter=false, const char[] filter=NULL_STRING)
-{   
-    char mapcycle[PLATFORM_MAX_PATH], mapname[MAX_MAP_LENGTH], runcommand[64], commandtitle[64], ref[32], title[256];
-    File file;
-    int count;
-    Menu menu = new Menu(MenuLogic_Map);
-    
-    if(byLetter)
-    {
-        if(StrEqual(filter, NULL_STRING))
-        {
-            
-            Format(title, sizeof(title), "%T", "xms_menu_map_filter", client);
-            menu.SetTitle(title);
-    
-            char letters[28], letter[2];
-            Format(letters, sizeof(letters), "abcdefghijklmnopqrstuvwxyz0");
-            for(int i = 0; i < sizeof(letters); i++) {
-                strcopy(letter, sizeof(letter), letters[i]);
-                Format(ref, sizeof(ref), "byletter-%s%s%s", gamemode, strlen(gamemode) ? "-" : NULL_STRING, letter);
-                menu.AddItem(ref, StrEqual(letter, "0") ? "0-9" : letter);
-            }
-            
-            return menu;
-        }
-    }
-    else if(!StrEqual(gamemode, gsMode))
-    {
-        Format(title, sizeof(title), "%T", "xms_menu_map_mode", client, gamemode);
-        Format(runcommand, sizeof(runcommand), "%s %s", gamemode, mapname);
-                
-        if(IsItemDistinctInList(gsMode, gsRetainModes) && IsItemDistinctInList(gamemode, gsRetainModes)) {
-            Format(commandtitle, sizeof(commandtitle), "%T", "xms_menu_map_keepcurrent", client);
-            menu.AddItem(runcommand, commandtitle);
-        }
-    }
-    
-    if(!byLetter) {
-        Format(ref, sizeof(ref), "byletter-%s", gamemode);
-        Format(commandtitle, sizeof(commandtitle), "%T", "xms_menu_map_sort", client);
-        menu.AddItem(ref, commandtitle);
-    }
-
-    Format(mapcycle, sizeof(mapcycle), "cfg/%s", GetConfigString(mapcycle, sizeof(mapcycle), "mapcycle", "gamemodes", gamemode) ? mapcycle : "mapcycle_default.txt");
-    
-    file = OpenFile(mapcycle, "rt", true);
-    if(file != null)
-    {
-        while (!file.EndOfFile() && file.ReadLine(mapname, sizeof(mapname)))
-        {
-            int len = strlen(mapname);
-                
-            if(mapname[0] == ';' || !IsCharAlpha(mapname[0])) {
-                continue;
-            }
-
-            for(int i = 0; i < len; i++) {
-                if(IsCharSpace(mapname[i])) {
-                    mapname[i] = '\0';
-                    break;
-                }
-            }
-            
-            if(!IsMapValid(mapname)) {
-                continue;
-            }
-                
-            Format(runcommand, sizeof(runcommand), "%s %s", gamemode, mapname);
-            Format(mapname, sizeof(mapname), DeprefixMap(mapname));
-            
-            if(!byLetter || StrContains(mapname, filter, false) == 0 || ( StrEqual(filter, "0") && IsCharNumeric(mapname[0]) )) {
-                count++;
-                menu.AddItem(runcommand, mapname);
-            }
-        }
-        
-        file.Close();
-    }
-    else {
-        LogError("Couldn't read mapcyclefile: %s", mapcycle);
-    }
-    
-    if(!count) {
-        Format(commandtitle, sizeof(commandtitle), "%T", "xms_menu_map_sortnone", client);
-        menu.AddItem("", commandtitle);
-    }
-    
-    if(!byLetter) {
-        Format(title, sizeof(title), "%T", "xms_menu_map_list", client, count);
-    }
-    else {
-        Format(title, sizeof(title), "%T", "xms_menu_map_sortlist", client, count, StrEqual(filter, "0") ? "0-9" : filter);
-    }
-    menu.SetTitle(title);
-    
-    return menu;
-}
-    
-public int MenuLogic_Map(Menu menu, MenuAction action, int client, int param)
-{
-    if(client > 0 && IsClientConnected(client) && IsClientInGame(client) && !IsFakeClient(client))
-    {
-        if(action == MenuAction_Select)
-        {
-            char info[32];
-            menu.GetItem(param, info, sizeof(info));
-                
-            if(StrContains(info, "byletter") == 0)
+            if (iArgs <= 1)
             {
-                char gamemode[MAX_MODE_LENGTH], letter[2];
-                int pos = SplitString(info[9], "-", gamemode, sizeof(gamemode));
-                    
-                if(pos == -1) {
-                    strcopy(gamemode, sizeof(gamemode), info[9]);
-                }
-                else {
-                    strcopy(letter, sizeof(letter), info[9+pos]);
-                }
-                
-                ghMenuClient[client] = Menu_Map(client, gamemode, true, letter);
-                ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
+                bool bLan = FindConVar("sv_lan").BoolValue;
+                char sTitle[64],
+                     sMessage[1024];
+
+                Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_0", iClient, PLUGIN_VERSION);
+                Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_0", iClient, gsMode, gsModeName, gsMap, gsServerName, GameVersion(), PLUGIN_VERSION, Tickrate(), bLan ? "local" : "dedicated", gsServerMsg);
+
+                gmMenu[iClient] = XMenuQuick(iClient, 7, false, false, "sm_xmenu 0", sTitle, sMessage, !IsGameMatch() ? "xmenu0_team" : "xmenu0_pause;pause",
+                  "xmenu0_vote", "xmenu0_players", "xmenu0_settings", "xmenu0_switch", "xmenu0_admin", "xmenu0_report;report"
+                );
+
+                XMenuDisplay(gmMenu[iClient], iClient);
             }
-            else {
-                ghMenuClient[client] = Menu_Run(client, info);
-                ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
-            }
-        }
-        else if(action == MenuAction_Cancel && (param == MenuCancel_Exit || param == MenuCancel_ExitBack)) {
-            ghMenuClient[client] = Menu_Voting(client);
-            ghMenuClient[client].Display(client, MENU_TIME_FOREVER);  
-        }
-    }
-}
-
-
-Menu Menu_Run(int client, const char[] command)
-{
-    char ref[64], desc[256];
-    Menu menu = new Menu(MenuLogic_Run);
-
-    Format(desc, sizeof(desc), "%T", "xms_menu_run", client, command);
-    menu.SetTitle(desc);
-    
-    Format(ref, sizeof(ref), "run %s", command);
-    Format(desc, sizeof(desc), "%T", "xms_menu_run_now", client);
-    menu.AddItem(ref, desc);
-    
-    Format(ref, sizeof(ref), "runnext %s", command);
-    Format(desc, sizeof(desc), "%T", "xms_menu_run_next", client);
-    menu.AddItem(ref, desc);
-
-    
-    return menu;
-}
-
-public int MenuLogic_Run(Menu menu, MenuAction action, int client, int param)
-{
-    if(client > 0 && IsClientConnected(client) && IsClientInGame(client) && !IsFakeClient(client))
-    {
-        if(action == MenuAction_Select) {
-            char info[64];
-            menu.GetItem(param, info, sizeof(info));
-            FakeClientCommand(client, "%s", info);
-            ghMenuClient[client] = Menu_Base(client);
-            ghMenuClient[client].Display(client, MENU_TIME_FOREVER);  
-        } 
-        else if(action == MenuAction_Cancel && (param == MenuCancel_Exit || param == MenuCancel_ExitBack)) {
-            ghMenuClient[client] = Menu_Voting(client);
-            ghMenuClient[client].Display(client, MENU_TIME_FOREVER);  
-        }
-    }
-}
-
-
-Menu Menu_Fov(int client)
-{
-    Menu menu = new Menu(MenuLogic_Fov);
-    
-    char title[256];
-    Format(title, sizeof(title), "%T", "xms_menu_fov", client);
-    menu.SetTitle(title);
-    
-    int d = FindConVar("xfov_defaultfov").IntValue;
-    for(int i = FindConVar("xfov_minfov").IntValue; i <= FindConVar("xfov_maxfov").IntValue; i += 5)
-    {
-        char si[4];
-        IntToString(i, si, sizeof(si));
-        
-        if(i == d) {
-            char desc[15];
-            Format(desc, sizeof(desc), "%s (default)", si);
-            menu.AddItem(si, desc);
-        }
-        else {
-            menu.AddItem(si, si);
-        }
-    }
-
-    return menu;
-}
-    
-public int MenuLogic_Fov(Menu menu, MenuAction action, int client, int param)
-{
-    if(client > 0 && IsClientConnected(client) && IsClientInGame(client) && !IsFakeClient(client))
-    {
-        if(action == MenuAction_Select) {
-            char info[32];
-            menu.GetItem(param, info, sizeof(info));
-            FakeClientCommand(client, "fov %s", info);
-        }
-        
-        ghMenuClient[client] = Menu_Settings(client);
-        ghMenuClient[client].Display(client, MENU_TIME_FOREVER);  
-    }
-}
-
-
-Menu Menu_Players(int client, int target=0)
-{
-    char name[MAX_NAME_LENGTH], id[12];
-    Menu menu = new Menu(MenuLogic_Players);
-
-    char desc[256];
-
-    if(!target)
-    {
-        for(int i = 1; i <= MaxClients; i++)
-        {
-            if(!IsClientConnected(i) || !IsClientInGame(i) || IsFakeClient(i)) {
-                continue;
-            
-           }
-           
-            Format(id, sizeof(id), "%s%i", !IsClientAdmin(client) ? "profile-" : "", i);
-            Format(name, sizeof(name), "%N", i);
-            menu.AddItem(id, name);
-        }
-        
-        Format(desc, sizeof(desc), "%T", IsClientAdmin(client) ? "xms_menu_players_admin" : "xms_menu_players", client);
-        menu.SetTitle(desc);
-    }
-    else // admin menu
-    {
-        char ref[32];
-        
-        Format(ref, sizeof(ref), "profile-%i", target);
-        Format(desc, sizeof(desc), "%T", "xms_menu_players_profile", client);
-        menu.AddItem(ref, desc);
-        
-        if(IsClientObserver(target))
-        {
-            if(IsGameMatch()) {    
-                Format(ref, sizeof(ref), "allow-%i", target);
-                Format(desc, sizeof(desc), "%T", "xms_menu_players_allow", client);
-                menu.AddItem(ref, desc);
-            }
-        }
-        else {
-            Format(ref, sizeof(ref), "forcespec-%i", target);
-            Format(desc, sizeof(desc), "%T", "xms_menu_players_forcespec", client);
-            menu.AddItem(ref, desc);
-        }
-        
-        if(IsClientAdmin(client, ADMFLAG_CHAT)) {
-            Format(ref, sizeof(ref), "mute-%i", target);
-            Format(desc, sizeof(desc), "%T", BaseComm_IsClientMuted(target) ? "xms_menu_players_unmute" : "xms_menu_players_mute", client);
-            menu.AddItem(ref, desc);
-        }
-        
-        if(IsClientAdmin(client, ADMFLAG_KICK)) {
-            Format(ref, sizeof(ref), "kick-%i", target);
-            Format(desc, sizeof(desc), "%T", "xms_menu_players_kick", client);
-            menu.AddItem(ref, desc);
-        }
-         
-        if(IsClientAdmin(client, ADMFLAG_BAN)) {         
-            Format(ref, sizeof(ref), "ban-%i", target);
-            Format(desc, sizeof(desc), "%T", "xms_menu_players_tempban", client);
-            menu.AddItem(ref, desc);
-        }
-
-        char targetName[MAX_NAME_LENGTH];
-        GetClientName(target, targetName, sizeof(targetName));
-        Format(desc, sizeof(desc), "%T", "xms_menu_players_player", client, targetName, GetClientUserId(target), GetClientSteamID(target));
-        menu.SetTitle(desc);
-        menu.ExitBackButton = true;
-    }
-
-    return menu;
-}
-
-public int MenuLogic_Players(Menu menu, MenuAction action, int client, int param)
-{
-    if(client > 0 && IsClientConnected(client) && IsClientInGame(client) && !IsFakeClient(client))
-    {
-        if(action == MenuAction_Select)
-        {
-            char info[32];
-            menu.GetItem(param, info, sizeof(info));
-                    
-            int target = StringToInt(info[StrContains(info, "-") + 1]);
-                    
-            if(target && IsClientInGame(target))
+            else if (StrEqual(sParam[0], "pause"))
             {
-                int target_id = GetClientUserId(target);    
-                if(StrContains(info, "profile") == 0) {
-                    FakeClientCommand(client, "profile %i", target_id);
-                }
-                else if(StrContains(info, "allow") == 0) {
-                    FakeClientCommand(client, "allow %i", target_id);
-                }
-                else if(StrContains(info, "forcespec") == 0) {
-                    FakeClientCommand(client, "forcespec %i", target_id);
-                }
-                else if(StrContains(info, "kick") == 0) {
-                    FakeClientCommand(client, "sm_kick #%i", target_id);
-                    target = 0;
-                }
-                else if(StrContains(info, "ban") == 0) {
-                    FakeClientCommand(client, "sm_ban #%i 1440 Banned for 24 hours", target_id);
-                    target = 0;
-                }
-                else if(StrContains(info, "mute") == 0) {
-                    FakeClientCommand(client, "sm_%s #%i", BaseComm_IsClientMuted(target) ? "unmute" : "mute", target_id);
-                }
-                if(!IsClientAdmin(client)) {
-                    target = 0;
-                }
+                FakeClientCommand(iClient, "pause");
+                FakeClientCommand(iClient, "sm_xmenu 0");
+            }
+            else if (StrEqual(sParam[0], "report"))
+            {
+                FakeClientCommand(iClient, "sm_xmenu 7 menu");
             }
             else {
-                target = 0;
+                FakeClientCommand(iClient, "sm_xmenu %s", sParam[0]);
             }
-            ghMenuClient[client] = Menu_Players(client, target);
-            ghMenuClient[client].Display(client, MENU_TIME_FOREVER);  
         }
-        else if(action == MenuAction_Cancel && (param == MenuCancel_Exit || param == MenuCancel_ExitBack)) {
-            ghMenuClient[client] = (param == MenuCancel_Exit ? Menu_Base(client) : Menu_Players(client, 0));
-            ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
-        }
-    }
-}
 
-
-Menu Menu_Voting(int client)
-{
-    Menu menu = new Menu(MenuLogic_Voting);
-    
-    char desc[256];
-    Format(desc, sizeof(desc), "%T", "xms_menu_voting", client);
-    menu.SetTitle(desc);
-    
-    if(!IsGameMatch()) {
-        Format(desc, sizeof(desc), "%T", "xms_menu_voting_map", client);
-        menu.AddItem("map", desc);
-        Format(desc, sizeof(desc), "%T", "xms_menu_voting_mode", client);
-        menu.AddItem("mode", desc);
-        Format(desc, sizeof(desc), "%T", "xms_menu_voting_start", client);
-        menu.AddItem("start", desc);
-    }
-    else {
-        Format(desc, sizeof(desc), "%T", "xms_menu_voting_cancel", client);
-        menu.AddItem("cancel", desc);        
-    }
-
-    return menu;
-}
-
-public int MenuLogic_Voting(Menu menu, MenuAction action, int client, int param)
-{
-    if(client > 0 && IsClientConnected(client) && IsClientInGame(client) && !IsFakeClient(client))
-    {
-        if(action == MenuAction_Select)
+        // Change Team menu
+        case 1:
         {
-            char info[32];
-            menu.GetItem(param, info, sizeof(info));
-                
-            if(StrEqual(info, "map")) {
-                ghMenuClient[client] = Menu_Map(client, gsMode);
-                ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
-            }
-            else if(StrEqual(info, "mode")) {
-                ghMenuClient[client] = Menu_Mode(client);
-                ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
-            }
-            else if(StrEqual(info, "start")) {
-                ghMenuClient[client] = Menu_Start(client);
-                ghMenuClient[client].Display(client, MENU_TIME_FOREVER);
-            }
-            else if(StrEqual(info, "cancel")) {
-                FakeClientCommand(client, "cancel");
-            }
-        }
-        else if(action == MenuAction_Cancel && (param == MenuCancel_Exit || param == MenuCancel_ExitBack)) {
-            ghMenuClient[client] = Menu_Base(client);
-            ghMenuClient[client].Display(client, MENU_TIME_FOREVER);  
-        }
-    }
-}
+            if (iArgs == 1)
+            {
+                char sTitle  [64],
+                     sMessage[512];
+                DataPack dOptions = CreateDataPack();
 
+                dOptions.Reset();
 
-Menu Menu_Settings(int client)
-{
-    Menu menu = new Menu(MenuLogic_Settings);
-    char desc[256];
-    
-    Format(desc, sizeof(desc), "%T", "xms_menu_settings", client);
-    menu.SetTitle(desc);
-    
-    Format(desc, sizeof(desc), "%T", "xms_menu_settings_model", client);
-    menu.AddItem("model", desc);
-    if(CommandExists("sm_fov")) {
-        Format(desc, sizeof(desc), "%T", "xms_menu_settings_fov", client);
-        menu.AddItem("fov", desc);
-    }
-    Format(desc, sizeof(desc), "%T", "xms_menu_settings_hudcolor", client);
-    menu.AddItem("hudcolor", desc);
-    
-    Format(desc, sizeof(desc), "%T", GetClientCookieInt(client, ghCookieMusic) == 1 ? "xms_menu_settings_endmusic1" : "xms_menu_settings_endmusic0", client);
-    menu.AddItem("endmusic", desc);
-    
-    Format(desc, sizeof(desc), "%T", GetClientCookieInt(client, ghCookieSounds) == 1 ? "xms_menu_settings_sounds1" : "xms_menu_settings_sounds0", client);
-    menu.AddItem("miscsounds", desc);
-    
-    return menu;
-}
+                Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_1", iClient);
+                Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_1", iClient);
 
-public int MenuLogic_Settings(Menu menu, MenuAction action, int client, int param)
-{
-    if(client > 0 && IsClientConnected(client) && IsClientInGame(client) && !IsFakeClient(client))
-    {
-        if(action == MenuAction_Select)
-        {
-            char info[32];
-            menu.GetItem(param, info, sizeof(info));
-                
-            if(StrEqual(info, "fov")) {
-                ghMenuClient[client] = Menu_Fov(client);
-                ghMenuClient[client].Display(client, MENU_TIME_FOREVER);  
-            }
-            else if(StrEqual(info, "model")) {
-                ghMenuClient[client] = Menu_Model(client);
-                ghMenuClient[client].Display(client, MENU_TIME_FOREVER);  
+                for (int i = 3; i > 0; i--)
+                {
+                    char sOption[64];
+
+                    if (!gbTeamplay && i == TEAM_COMBINE) {
+                        continue;
+                    }
+
+                    GetTeamName(i, sOption, sizeof(sOption));
+                    Format(sOption, sizeof(sOption), "%s;%i", sOption, i);
+
+                    dOptions.WriteString(sOption);
+                }
+
+                gmMenu[iClient] = XMenu(iClient, true, false, "sm_xmenu 1", sTitle, sMessage, dOptions);
+                XMenuDisplay(gmMenu[iClient], iClient);
             }
             else
             {
-                if(StrEqual(info, "hudcolor")) {
-                    ghMenuClient[client] = Menu_HudColor(client);
-                    ghMenuClient[client].Display(client, MENU_TIME_FOREVER);  
+                FakeClientCommand(iClient, "jointeam %s", sParam[0]);
+                FakeClientCommand(iClient, "sm_xmenu 0");
+            }
+        }
+
+        // Call Vote menu
+        case 2:
+        {
+            if (iArgs == 1)
+            {
+                char sMessage[1024],
+                     sOptions[8][64];
+
+                Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_2", iClient, giVoteMinPlayers);
+
+                if (!IsGameMatch())
+                {
+                    Format(sOptions[0], sizeof(sOptions[]), "xmenu2_map;selectmap");
+                    Format(sOptions[1], sizeof(sOptions[]), "xmenu2_mode;selectmode");
+                    Format(sOptions[2], sizeof(sOptions[]), "xmenu2_start;start");
+
+                    if (gbTeamplay) {
+                        Format(sOptions[3], sizeof(sOptions[]), "xmenu2_shuffle;shuffle");
+                        Format(sOptions[4], sizeof(sOptions[]), "xmenu2_invert;invert");
+                    }
+                }
+                else {
+                    Format(sOptions[0], sizeof(sOptions[]), "xmenu2_cancel;cancel");
+                }
+
+                gmMenu[iClient] = XMenuQuick(iClient, 4, true, false, "sm_xmenu 2", "xmenutitle_2", sMessage, sOptions[0], sOptions[1], sOptions[2], sOptions[3], sOptions[4]);
+            }
+
+            else if (StrContains(sParam[0], "selectmap") != -1)
+            {
+                bool     bMode;
+                char     sMode       [MAX_MODE_LENGTH],
+                         sCommandBase[256],
+                         sOption     [512],
+                         sTitle      [64],
+                         sMessage    [512];
+                DataPack dOptions = CreateDataPack();
+
+                dOptions.Reset();
+
+                if (StrContains(sParam[0], "selectmap") == 0) {
+                    strcopy(sMode, sizeof(sMode), gsMode);
+                }
+                else {
+                    SplitString(sParam[0], "-", sMode, sizeof(sMode));
+                    bMode = true;
+                }
+
+                Format(sCommandBase, sizeof(sCommandBase), "sm_xmenu 2 %s-selectmap", sMode);
+
+                // Main menu
+                if (strlen(sParam[1]) < 2)
+                {
+                    int  iResults;
+                    bool bLetter = (StrContains(sParam[0], "byletter") != -1);
+                    char sResults[256][MAX_MAP_LENGTH*2],
+                         sMapcycle[PLATFORM_MAX_PATH];
+
+                    GetModeMapcycle(sMapcycle, sizeof(sMapcycle), sMode);
+
+                    if (!bLetter)
+                    {
+                        if (bMode)
+                        {
+                            if (IsItemDistinctInList(gsMode, gsRetainModes) && IsItemDistinctInList(sMode, gsRetainModes)) {
+                                Format(sOption, sizeof(sOption), "%T;%s", "xmenu2_map_keep", iClient, gsMap);
+                                dOptions.WriteString(sOption);
+                            }
+                        }
+
+                        Format(sOption, sizeof(sOption), "%T;byletter", "xmenu2_map_sort", iClient, sMode);
+                        dOptions.WriteString(sOption);
+                    }
+
+                    do
+                    {
+                        char sMap[2][256][MAX_MAP_LENGTH];
+                        int  iCount = GetMapsArray(sMap[0], 256, MAX_MAP_LENGTH, sMapcycle, sParam[1], _, false, true, sMap[1]);
+
+                        for (int i = 0; i <= iCount; i++) {
+                            Format(sResults[iResults + i], sizeof(sResults[]), "%s;%s", sMap[0][i], sMap[1][i]);
+                        }
+
+                        iResults += iCount;
+                    }
+                    while (String_IsNumeric(sParam[1]) && !StrEqual(sParam[1], "9") && Format(sParam[1], sizeof(sParam[]), "%i", StringToInt(sParam[1]) + 1)); // byletter 0-9
+
+                    SortStrings(sResults, clamp(iResults, 0, 256), Sort_Ascending);
+
+                    for (int i = 0; i < clamp(iResults, 0, 256); i++) {
+                        dOptions.WriteString(sResults[i]);
+                    }
+
+                    if (!bLetter)
+                    {
+                        Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_2_map", iClient, iResults, sMode);
+
+                        if (bMode) {
+                            Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_2_modemap", iClient, sMode);
+                        }
+                        else {
+                            Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_2_map", iClient);
+                        }
+                    }
+                    else {
+                        Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_2_map_byletter", iClient, iResults, String_IsNumeric(sParam[1]) ? "0-9" : sParam[1]);
+                        Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_2_mapfilter", iClient, sParam[1]);
+                    }
+
+                    gmMenu[iClient] = XMenu(iClient, true, true, sCommandBase, sTitle, sMessage, dOptions);
+                }
+
+                // Letter select menu
+                else if (StrEqual(sParam[1], "byletter"))
+                {
+                    char sLetters[26] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+                         sLetter[2];
+
+                    Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_2_map_filter", iClient);
+
+                    dOptions.WriteString("0-9;0");
+
+                    for (int i = 0; i < sizeof(sLetters); i++)
+                    {
+                        strcopy(sLetter, sizeof(sLetter), sLetters[i]);
+                        Format(sOption, sizeof(sOption), "%s;%s", sLetter, sLetter);
+                        dOptions.WriteString(sOption);
+                    }
+
+                    StrCat(sCommandBase, sizeof(sCommandBase), "-byletter");
+                    Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_2_mapfilter", iClient, "");
+
+                    gmMenu[iClient] = XMenu(iClient, true, false, sCommandBase, sTitle, sMessage, dOptions);
+                }
+
+                // confirmation menu
+                else if (StrEqual(sParam[2], "confirm"))
+                {
+                    Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_2_mapconfirm", iClient, sMode, sParam[1]);
+                    Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_2_mapconfirm", iClient, sMode, sParam[1], sMode, sParam[1]);
+                    Format(sCommandBase, sizeof(sCommandBase), "sm_xmenu 2 %s-selectmap %s", sMode, sParam[1]);
+
+                    Format(sOption, sizeof(sOption), "%T;now", "xmenu2_map_now", iClient);
+                    dOptions.WriteString(sOption);
+
+                    Format(sOption, sizeof(sOption), "%T;next", "xmenu2_map_next", iClient);
+                    dOptions.WriteString(sOption);
+
+                    gmMenu[iClient] = XMenu(iClient, true, false, sCommandBase, sTitle, sMessage, dOptions);
+                }
+
+                // take action
+                else
+                {
+                    if (!strlen(sParam[2])) {
+                        FakeClientCommand(iClient, "sm_xmenu 2 %s-selectmap %s confirm", sMode, sParam[1]);
+                    }
+                    else {
+                        FakeClientCommand(iClient, "%s %s:%s", StrEqual(sParam[2], "now") ? "run" : "runnext", sMode, sParam[1]);
+                        FakeClientCommand(iClient, "sm_xmenu 0");
+                    }
+
+                    dOptions.Close();
+                    return Plugin_Handled;
+                }
+            }
+
+            else if (StrEqual(sParam[0], "selectmode"))
+            {
+                if (iArgs == 2)
+                {
+                    char     sModes  [64][MAX_MODE_LENGTH],
+                             sOption [128],
+                             sTitle  [64],
+                             sMessage[512];
+                    DataPack dOptions = CreateDataPack();
+
+                    dOptions.Reset();
+
+                    ExplodeString(gsValidModes, ",", sModes, 64, MAX_MODE_LENGTH, false);
+
+                    for (int i = 0; i < 64; i++)
+                    {
+                        if (!strlen(sModes[i])) {
+                            break;
+                        }
+
+                        if (!StrEqual(sModes[i], gsMode))
+                        {
+                            char sModeName[64];
+
+                            GetModeFullName(sModeName, sizeof(sModeName), sModes[i]);
+                            Format(sOption, sizeof(sOption), "%s (%s);%s", sModes[i], sModeName, sModes[i]);
+                            dOptions.WriteString(sOption);
+                        }
+                    }
+
+                    Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_2_mode", iClient, gsMode);
+                    Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_2_mode", iClient);
+
+                    gmMenu[iClient] = XMenu(iClient, true, false, "sm_xmenu 2 selectmode", sTitle, sMessage, dOptions);
                 }
                 else
                 {
-                    if(StrEqual(info, "endmusic")) {
-                        SetClientCookie(client, ghCookieMusic,   GetClientCookieInt(client, ghCookieMusic) == 1 ? "-1" : "1");
-                    }
-                    else if(StrEqual(info, "miscsounds")) {
-                        SetClientCookie(client, ghCookieSounds, GetClientCookieInt(client, ghCookieSounds) == 1 ? "-1" : "1");
-                    }
-                        
-                    ghMenuClient[client] = Menu_Settings(client);
-                    ghMenuClient[client].Display(client, MENU_TIME_FOREVER);  
+                    FakeClientCommand(iClient, "sm_xmenu 2 %s-selectmap", sParam[1]);
+                    return Plugin_Handled;
                 }
-            }            
+            }
+
+            else if (StrEqual(sParam[0], "start"))
+            {
+                if (iArgs == 2) {
+                    gmMenu[iClient] = XMenuQuick(iClient, 3, true, false, "sm_xmenu 2 start", "xmenutitle_2_start", "xmenumsg_2_start", GetRealClientCount(true, false, false) > 1 ? "xmenu2_start_confirm" : "xmenu2_start_deny");
+                }
+                else {
+                    FakeClientCommand(iClient, sParam[0]);
+                    FakeClientCommand(iClient, "sm_xmenu 0");
+                }
+            }
+
+            else
+            {
+                FakeClientCommand(iClient, sParam[0]);
+                FakeClientCommand(iClient, "sm_xmenu 0");
+                return Plugin_Handled;
+            }
+
+            XMenuDisplay(gmMenu[iClient], iClient);
         }
-        else if(action == MenuAction_Cancel && (param == MenuCancel_Exit || param == MenuCancel_ExitBack)) {
-            ghMenuClient[client] = Menu_Base(client);
-            ghMenuClient[client].Display(client, MENU_TIME_FOREVER);  
+
+        // Player Info menu
+        case 3:
+        {
+            if (iArgs == 1)
+            {
+                char     sMessage[1024],
+                         sTitle  [64];
+                DataPack dOptions = CreateDataPack();
+
+                dOptions.Reset();
+
+                Format(sMessage, sizeof(sMessage), "%T", IsClientAdmin(iClient) ? "xmenumsg_3_admin" : "xmenumsg_3", iClient);
+                Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_3", iClient);
+
+                for (int i = 1; i <= MaxClients; i++)
+                {
+                    char sOption[64];
+
+                    if (IsClientConnected(i) && IsClientInGame(i) && !IsFakeClient(i))
+                    {
+                        Format(sOption, sizeof(sOption), "%N >;%i", i, i);
+                        dOptions.WriteString(sOption);
+                    }
+                }
+
+                if (gbGameME && gameME_StatsInitialised())
+                {
+                    char sTop10Names[6][MAX_NAME_LENGTH],
+                         sTop10List [512];
+
+                    for (int i = 1; i < 6; i++)
+                    {
+                        int iPoints = gameME_FetchTop10PlayerData(i, sTop10Names[i], sizeof(sTop10Names[]));
+
+                        if (strlen(sTop10Names[i]) > 23) {
+                            sTop10Names[i][20] = '.';
+                            sTop10Names[i][21] = '.';
+                            sTop10Names[i][22] = '.';
+                            sTop10Names[i][23] = '\0';
+                        }
+                        Format(sTop10List, sizeof(sTop10List), "%s#%i - %s (%i%s)\n", sTop10List, i, sTop10Names[i], iPoints, i == 1 ? " points" : "");
+                    }
+
+                    Format(sMessage, sizeof(sMessage), "%s\n\n%T", sMessage, "xmenumsg_3_gameme", iClient, sTop10List);
+                }
+
+                gmMenu[iClient] = XMenu(iClient, true, false, "sm_xmenu 3", sTitle, sMessage, dOptions);
+            }
+
+            // sParam[0] is a client
+            else if (!strlen(sParam[1]))
+            {
+                int      iTarget  = StringToInt(sParam[0]);
+                char     sTarget     [MAX_NAME_LENGTH],
+                         sOption     [64],
+                         sMessage    [1024],
+                         sTitle      [64],
+                         sCommandBase[64];
+                DataPack dOptions = CreateDataPack();
+
+                dOptions.Reset();
+
+                Format(sTitle, sizeof(sTitle), "%T > %N", "xmenutitle_3", iClient, iTarget);
+                Format(sCommandBase, sizeof(sCommandBase), "sm_xmenu 3 %i", iTarget);
+                GetClientName(iTarget, sTarget, sizeof(sTarget));
+
+                Format(sOption, sizeof(sOption), "%T;profile", "xmenu3_profile", iClient);
+                dOptions.WriteString(sOption);
+
+                if (IsClientAdmin(iClient, ADMFLAG_GENERIC))
+                {
+                    if (IsClientObserver(iTarget))
+                    {
+                        if (IsGameMatch()) {
+                            Format(sOption, sizeof(sOption), "%T;allow", "xmenu3_allow", iClient);
+                            dOptions.WriteString(sOption);
+                        }
+                    }
+                    else {
+                        Format(sOption, sizeof(sOption), "%T;forcespec", "xmenu3_forcespec", iClient);
+                        dOptions.WriteString(sOption);
+                    }
+
+                    if (IsClientAdmin(iClient, ADMFLAG_CHAT)) {
+                        Format(sOption, sizeof(sOption), "%T;mute", !BaseComm_IsClientMuted(iTarget) ? "xmenu3_mute" : "xmenu3_unmute", iClient);
+                        dOptions.WriteString(sOption);
+                    }
+
+                    if (IsClientAdmin(iClient, ADMFLAG_KICK)) {
+                        Format(sOption, sizeof(sOption), "%T;kick", "xmenu3_kick", iClient);
+                        dOptions.WriteString(sOption);
+                    }
+
+                    if (IsClientAdmin(iClient, ADMFLAG_BAN)) {
+                        Format(sOption, sizeof(sOption), "%T;ban", "xmenu3_ban", iClient);
+                        dOptions.WriteString(sOption);
+                    }
+                }
+
+                if (gbGameME && gameME_StatsInitialised() && gameME_IsPlayerRanked(iTarget))
+                {
+                    Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_3_player_gameme", iClient, sTarget, GetClientUserId(iTarget), UnbufferedAuthId(iTarget),
+                      gameME_FetchPlayerChar(iTarget, GM_RANK), gameME_FetchPlayerChar(iTarget, GM_POINTS), Timestring(gameME_FetchPlayerFloat(iTarget, GM_PLAYTIME)), gameME_FetchPlayerChar(iTarget, GM_KILLS),
+                      gameME_FetchPlayerChar(iTarget, GM_DEATHS), gameME_FetchPlayerChar(iTarget, GM_KPD), gameME_FetchPlayerChar(iTarget, GM_HEADSHOTS), gameME_FetchPlayerChar(iTarget, GM_SUICIDES),
+                      gameME_FetchPlayerChar(iTarget, GM_ACCURACY, true), gameME_FetchPlayerChar(iTarget, GM_KILLSPREE)
+                    );
+                }
+                else {
+                    Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_3_player", iClient, sTarget, GetClientUserId(iTarget), UnbufferedAuthId(iTarget));
+                }
+
+                gmMenu[iClient] = XMenu(iClient, true, false, sCommandBase, sTitle, sMessage, dOptions);
+            }
+
+            else
+            {
+                int iTarget   = StringToInt(sParam[0]),
+                    iTargetId = GetClientUserId(iTarget);
+
+                if (StrEqual(sParam[1], "kick")) {
+                    FakeClientCommand(iClient, "sm_kick #%i", iTargetId);
+                    FakeClientCommand(iClient, "sm_xmenu 3");
+                }
+                else if (StrEqual(sParam[1], "ban")) {
+                    FakeClientCommand(iClient, "sm_ban #%i 1440 Banned for 24 hours", iTargetId);
+                    FakeClientCommand(iClient, "sm_xmenu 3");
+                }
+                else if (StrEqual(sParam[1], "mute")) {
+                    FakeClientCommand(iClient, "sm_%s #%i", BaseComm_IsClientMuted(iTarget) ? "unmute" : "mute", iTargetId);
+                    FakeClientCommand(iClient, "sm_xmenu 3 %i", iTarget);
+                }
+                else
+                {
+                    FakeClientCommand(iClient, "%s %i", sParam[1], iTargetId);
+
+                    if (StrEqual(sParam[1], "forcespec")) {
+                        FakeClientCommand(iClient, "sm_xmenu 3 %i", iTarget);
+                    }
+                    else {
+                        XMenuDisplay(gmMenu[iClient], iClient);
+                    }
+                }
+
+                IfCookiePlaySound(ghCookieSounds, iClient, SOUND_ACTIVATED);
+                return Plugin_Handled;
+            }
+
+            XMenuDisplay(gmMenu[iClient], iClient);
         }
+
+        // Settings menu
+        case 4:
+        {
+            if (iArgs == 1)
+            {
+                char     sOption [64],
+                         sTitle  [64],
+                         sMessage[512];
+                DataPack dOptions = CreateDataPack();
+
+                dOptions.Reset();
+
+                Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_4", iClient);
+                Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_4", iClient);
+
+                Format(sOption, sizeof(sOption), "%T;model", "xmenu4_model", iClient);
+                dOptions.WriteString(sOption);
+
+                if (CommandExists("sm_fov")) {
+                    Format(sOption, sizeof(sOption), "%T;fov", "xmenu4_fov", iClient);
+                    dOptions.WriteString(sOption);
+                }
+
+                Format(sOption, sizeof(sOption), "%T;hudcolor", "xmenu4_hudcolor", iClient);
+                dOptions.WriteString(sOption);
+
+                Format(sOption, sizeof(sOption), "xmenu4_music%s", GetClientCookieInt(iClient, ghCookieMusic) == 1 ? "1" : "0");
+                Format(sOption, sizeof(sOption), "%T;music", sOption, iClient);
+                dOptions.WriteString(sOption);
+
+                Format(sOption, sizeof(sOption), "xmenu4_sound%s", GetClientCookieInt(iClient, ghCookieSounds) == 1 ? "1" : "0");
+                Format(sOption, sizeof(sOption), "%T;sound", sOption, iClient);
+                dOptions.WriteString(sOption);
+
+                gmMenu[iClient] = XMenu(iClient, true, false, "sm_xmenu 4", sTitle, sMessage, dOptions);
+            }
+
+            else if (StrEqual(sParam[0], "model"))
+            {
+                if (iArgs == 2)
+                {
+                    char     sTitle  [64],
+                             sMessage[512],
+                             sOption [140];
+                    DataPack dOptions = CreateDataPack();
+
+                    dOptions.Reset();
+
+                    Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_4_model", iClient);
+                    Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_4_model", iClient);
+
+                    for (int i = 0; i < sizeof(gsModelPath); i++)
+                    {
+                        File_GetFileName(gsModelPath[i], sOption, sizeof(sOption));
+                        Format(sOption, sizeof(sOption), "%s;%s", sOption, gsModelPath[i]);
+                        dOptions.WriteString(sOption);
+                    }
+
+                    gmMenu[iClient] = XMenu(iClient, true, true, "sm_xmenu 4 model", sTitle, sMessage, dOptions);
+                }
+                else
+                {
+                    ClientCommand(iClient, "cl_playermodel %s", sParam[1]);
+                    FakeClientCommand(iClient, "sm_xmenu 4");
+                    IfCookiePlaySound(ghCookieSounds, iClient, SOUND_ACTIVATED);
+                    return Plugin_Handled;
+                }
+            }
+
+            else if (StrEqual(sParam[0], "fov"))
+            {
+                if (iArgs == 2)
+                {
+                    int      iDefault = FindConVar("xfov_defaultfov").IntValue,
+                             iMin     = FindConVar("xfov_minfov").IntValue,
+                             iMax     = FindConVar("xfov_maxfov").IntValue;
+                    char     sOption [64],
+                             sTitle  [64],
+                             sMessage[512];
+                    DataPack dOptions = CreateDataPack();
+
+                    dOptions.Reset();
+
+                    Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_4_fov", iClient);
+                    Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_4_fov", iClient);
+
+                    for (int i = iMin; i <= iMax; i += 5)
+                    {
+                        if (i == iDefault) {
+                            Format(sOption, sizeof(sOption), "%i (default);%i", i, i);
+                        }
+                        else {
+                            Format(sOption, sizeof(sOption), "%i;%i", i, i);
+                        }
+
+                        dOptions.WriteString(sOption);
+                    }
+
+                    gmMenu[iClient] = XMenu(iClient, true, false, "sm_xmenu 4 fov", sTitle, sMessage, dOptions);
+                }
+                else
+                {
+                    FakeClientCommand(iClient, "fov %s", sParam[1]);
+                    IfCookiePlaySound(ghCookieSounds, iClient, SOUND_ACTIVATED);
+
+                    FakeClientCommand(iClient, "sm_xmenu 4");
+                    return Plugin_Handled;
+                }
+            }
+
+            else if (StrEqual(sParam[0], "hudcolor"))
+            {
+                if (iArgs == 2)
+                {
+                    gmMenu[iClient] =
+                        XMenuQuick(iClient, 3, true, false, "sm_xmenu 4 hudcolor", "xmenutitle_4_hudcolor", "xmenumsg_4_hudcolor",
+                          "xmenu4_hudcolor_yellow;255177000", "xmenu4_hudcolor_cyan;000255255", "xmenu4_hudcolor_blue;100100255", "xmenu4_hudcolor_green;075255075",
+                          "xmenu4_hudcolor_red;220010010", "xmenu4_hudcolor_white;255255255", "xmenu4_hudcolor_pink;238130238"
+                        );
+                }
+                else
+                {
+                    char sColor[3][4];
+
+                    strcopy(sColor[0], 4, sParam[1]);
+                    strcopy(sColor[1], 4, sParam[1][3]);
+                    strcopy(sColor[2], 4, sParam[1][6]);
+                    FakeClientCommand(iClient, "hudcolor %s %s %s", sColor[0], sColor[1], sColor[2]);
+                    IfCookiePlaySound(ghCookieSounds, iClient, SOUND_ACTIVATED);
+
+                    FakeClientCommand(iClient, "sm_xmenu 4");
+                    return Plugin_Handled;
+                }
+            }
+
+            else if (StrEqual(sParam[0], "music"))
+            {
+                if (IsCookieEnabled(ghCookieMusic, iClient)) {
+                    SetClientCookie(iClient, ghCookieMusic, "-1");
+                    IfCookiePlaySound(ghCookieSounds, iClient, SOUND_DEACTIVATED);
+                }
+                else {
+                    SetClientCookie(iClient, ghCookieMusic, "1");
+                    IfCookiePlaySound(ghCookieSounds, iClient, SOUND_ACTIVATED);
+                }
+
+                FakeClientCommand(iClient, "sm_xmenu 4");
+                return Plugin_Handled;
+            }
+
+            else if (StrEqual(sParam[0], "sound"))
+            {
+                if (IsCookieEnabled(ghCookieSounds, iClient)) {
+                    SetClientCookie(iClient, ghCookieSounds, "-1");
+                    ClientCommand(iClient, "playgamesound %s", SOUND_DEACTIVATED);
+                }
+                else {
+                    SetClientCookie(iClient, ghCookieSounds, "1");
+                    ClientCommand(iClient, "playgamesound %s", SOUND_ACTIVATED);
+                }
+
+                FakeClientCommand(iClient, "sm_xmenu 4");
+                return Plugin_Handled;
+            }
+
+            XMenuDisplay(gmMenu[iClient], iClient);
+        }
+
+        case 5: // Switch
+        {
+            if (iArgs == 1)
+            {
+                int iServers;
+                char sOption [322],
+                     sMessage[512],
+                     sTitle  [64],
+                     sServers[4096],
+                     sServer [64][64];
+
+                DataPack dOptions = CreateDataPack();
+                dOptions.Reset();
+
+                Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_5", iClient);
+                Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_5", iClient);
+
+                iServers = GetConfigKeys(sServers, sizeof(sServers), "OtherServers");
+                ExplodeString(sServers, ",", sServer, iServers, 64);
+
+                if (!iServers) {
+                    dOptions.WriteString("No servers listed");
+                }
+                else for (int i = 0; i < iServers; i++)
+                {
+                    char sAddress[256];
+
+                    GetConfigString(sAddress, sizeof(sAddress), sServer[i], "OtherServers");
+                    Format(sOption, sizeof(sOption), "%s;%s", sServer[i], sAddress);
+                    dOptions.WriteString(sOption);
+                }
+
+                gmMenu[iClient] = XMenu(iClient, true, false, "sm_xmenu 5", sTitle, sMessage, dOptions);
+            }
+            else
+            {
+                if (strlen(sParam[0]) > 1) {
+                    DisplayAskConnectBox(iClient, 30.0, sParam[0]);
+                }
+                else
+                {
+                    IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
+                    FakeClientCommand(iClient, "sm_xmenu 0");
+                    return Plugin_Handled;
+                }
+            }
+
+            XMenuDisplay(gmMenu[iClient], iClient);
+        }
+
+        case 6: // Management
+        {
+            if (!IsClientAdmin(iClient)) {
+                return Plugin_Handled;
+            }
+
+            if (iArgs == 1)
+            {
+                gmMenu[iClient] = XMenuQuick(iClient, 3, true, false, "sm_xmenu 6", "xmenutitle_6", "xmenumsg_6", "xmenu6_specall;specall",
+                  "xmenu6_reloadadmins;reloadadmins", "xmenu6_reloadplugin;reloadxms", "xmenu6_restart;restart", "xmenu6_feedback;feedback");
+            }
+            else if (StrEqual(sParam[0], "restart"))
+            {
+                ServerCommand("_restart");
+                return Plugin_Handled;
+            }
+            else if (StrEqual(sParam[0], "feedback"))
+            {
+                if (FileExists(gsFeedbackPath))
+                {
+                    char sFeedback[MAX_BUFFER_LENGTH],
+                         sTitle[64];
+
+
+                    File hFile = OpenFile(gsFeedbackPath, "r");
+
+                    hFile.ReadString(sFeedback, sizeof(sFeedback));
+                    hFile.Close();
+
+                    Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_6_feedback", iClient);
+
+                    gmMenu[iClient] = XMenuBox("", sTitle, sFeedback, DialogType_Text);
+                }
+            }
+            else
+            {
+                if (StrEqual(sParam[0], "specall")) {
+                    FakeClientCommand(iClient, "forcespec @all");
+                }
+                else if (StrEqual(sParam[0], "reloadadmins")) {
+                    ServerCommand("sm_reloadadmins");
+                }
+                else if (StrEqual(sParam[0], "reloadxms")) {
+                    ServerCommand("sm plugins reload xms");
+                }
+
+                IfCookiePlaySound(ghCookieSounds, iClient, SOUND_ACTIVATED);
+            }
+
+            XMenuDisplay(gmMenu[iClient], iClient);
+        }
+
+        case 7: // Report
+        {
+            static char sPrevious[4096];
+
+            if (StrEqual(sParam[0], "menu"))
+            {
+                char sTitle  [64],
+                     sMessage[64];
+
+                Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_7", iClient);
+                Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_7", iClient);
+
+                gmMenu[iClient] = XMenuBox("sm_xmenu 7", sTitle, sMessage);
+                XMenuDisplay(gmMenu[iClient], iClient);
+                return Plugin_Handled;
+            }
+
+            else if (iArgs > 1)
+            {
+                char sFeedback[4096];
+
+                GetCmdArgString(sFeedback, sizeof(sFeedback));
+
+                if (!StrEqual(sFeedback, sPrevious)) // fix for double entry if client hits enter
+                {
+                    char sName[MAX_NAME_LENGTH],
+                         sId  [32],
+                         sInfo[256];
+                    File hFile = OpenFile(gsFeedbackPath, "a");
+
+                    GetClientName(iClient, sName, sizeof(sName));
+                    GetClientAuthId(iClient, AuthId_Engine, sId, sizeof(sId));
+                    Format(sInfo, sizeof(sInfo), "%s --- %s %s says:", gsGameId, sName, sId);
+
+                    hFile.WriteLine("");
+                    hFile.WriteLine(sInfo);
+                    hFile.WriteLine(sFeedback[1]);
+                    hFile.Close();
+
+                    Forward_OnClientFeedback(sFeedback[2], sName, sId, gsGameId);
+                    strcopy(sPrevious, sizeof(sPrevious), sFeedback);
+                }
+            }
+
+            FakeClientCommand(iClient, "sm_xmenu 0");
+        }
+    }
+
+    return Plugin_Handled;
+}
+
+// Constrain message to remain visible at default menu size. Only used for "MenuMessage" in xms.cfg
+int FormatMenuMessage(const char[] sMsg, char[] sOutput, int iMaxlen)
+{
+    int  iRows;
+    char sArray[5][192];
+
+    if (strcopy(sArray[0], sizeof(sArray[]), sMsg) > MENU_ROWLEN || StrContains(sArray[0], "\\n"))
+    {
+        for (int iRow = 0; iRow < 5; iRow++)
+        {
+            int iLen = strlen(sArray[iRow]);
+
+            for (int i = 0; i < iLen; i++)
+            {
+                bool bCut;
+                int  iCut = 0;
+                int  iNewlPos = StrContains(sArray[iRow][i], "\\n");
+
+                if (iNewlPos == 0) {
+                    bCut = true;
+                    iCut = (sArray[iRow][i + 2] == ' ' ? 3 : 2);
+                }
+                else if (iNewlPos != -1 && (iNewlPos + i <= (MENU_ROWLEN + 2))) {
+                    continue;
+                }
+                else
+                {
+                    if (sArray[iRow][i] == ' ')
+                    {
+                        int iNext = StrContains(sArray[iRow][i + 1], " "); // next word length
+                        if (!iNext) {
+                            iNext = StrContains(sArray[iRow][i + 1], "\\");
+                            if (iNext == -1 || sArray[iRow][i + iNext + 2] != 'n') {
+                                iNext = iLen - i;
+                            }
+                        }
+
+                        bCut = (iNext + i) >= MENU_ROWLEN;
+                        iCut = 1;
+                    }
+                    else if (i == MENU_ROWLEN) {
+                        bCut = true;
+                    }
+                }
+
+                if (bCut)
+                {
+                    if (iRows < 4) {
+                        strcopy(sArray[iRow + 1], sizeof(sArray[]), sArray[iRow][i + iCut]);
+                        iRows = iRow + 1;
+                    }
+                    sArray[iRow][i] = '\0';
+                    break;
+                }
+                else if (iRow == 4 && iLen > MENU_ROWLEN) {
+                    sArray[iRow][MENU_ROWLEN - 2] = '.';
+                    sArray[iRow][MENU_ROWLEN - 1] = '.';
+                    sArray[iRow][MENU_ROWLEN]     = '\0';
+                }
+            }
+        }
+
+        strcopy(sOutput, iMaxlen, sArray[0]);
+
+        for (int iRow = 1; iRow <= iRows; iRow++) {
+            StrCat(sOutput, iMaxlen, "\n  ");
+            StrCat(sOutput, iMaxlen, sArray[iRow]);
+        }
+
+        return strlen(sOutput);
+    }
+    else {
+        return strcopy(sOutput, iMaxlen, sMsg);
     }
 }
 
-
-Menu Menu_HudColor(int client)
+// Haven't found a way to refresh my XMenu on clients (change what is on their screen without them having to select an option)
+// So below still using the built in menu type, for voting and !model command
+Menu VotingMenu(int iClient)
 {
-    Menu menu = new Menu(MenuLogic_HudColor);
-    
-    char desc[256];
-    Format(desc, sizeof(desc), "%T", "xms_menu_hudcolor", client);
-    menu.SetTitle(desc);
+    Menu hMenu  = new Menu(VotingMenuAction);
+    bool bMulti = view_as<bool>(strlen(gsVoteMotion[1]));
+    char sOption[128];
 
-    Format(desc, sizeof(desc), "%T", "xms_menu_hudcolor_orange", client);
-    menu.AddItem("255 177 0",   desc);
-    Format(desc, sizeof(desc), "%T", "xms_menu_hudcolor_cyan", client);
-    menu.AddItem("0 255 255",   desc);
-    Format(desc, sizeof(desc), "%T", "xms_menu_hudcolor_green", client);
-    menu.AddItem("75 255 75",   desc);
-    Format(desc, sizeof(desc), "%T", "xms_menu_hudcolor_red", client);
-    menu.AddItem("220 10 10",   desc);
-    Format(desc, sizeof(desc), "%T", "xms_menu_hudcolor_white", client);
-    menu.AddItem("255 255 255", desc);
-    Format(desc, sizeof(desc), "%T", "xms_menu_hudcolor_grey", client);
-    menu.AddItem("175 175 175", desc);
-    Format(desc, sizeof(desc), "%T", "xms_menu_hudcolor_violet", client);
-    menu.AddItem("238 130 238", desc);
-    Format(desc, sizeof(desc), "%T", "xms_menu_hudcolor_pink", client);
-    menu.AddItem("255 105 180", desc);
-    
-    return menu;
+    if (!bMulti)
+    {
+        Format(sOption, sizeof(sOption), "%T", "xms_menu_decision", iClient, gsVoteMotion[0]);
+        hMenu.SetTitle(sOption);
+        Format(sOption, sizeof(sOption), "%T", "xms_menu_decision_yes", iClient);
+        hMenu.AddItem("yes", sOption);
+        Format(sOption, sizeof(sOption), "%T", "xms_menu_decision_no", iClient);
+        hMenu.AddItem("no", sOption);
+    }
+    else
+    {
+        Format(sOption, sizeof(sOption), "%T", "xms_menu_decision_multi", iClient);
+        hMenu.SetTitle(sOption);
+
+        for (int i = 1; i < 6; i++)
+        {
+            if (strlen(gsVoteMotion[i - 1])) {
+                hMenu.AddItem(IntToChar(i), gsVoteMotion[i - 1]);
+            }
+        }
+    }
+
+    Format(sOption, sizeof(sOption), "%T", "xms_menu_decision_abstain", iClient);
+    hMenu.AddItem("abstain", sOption);
+
+    return hMenu;
 }
 
-public int MenuLogic_HudColor(Menu menu, MenuAction action, int client, int param)
+public int VotingMenuAction(Menu hMenu, MenuAction iAction, int iClient, int iParam)
 {
-    if(client > 0 && IsClientConnected(client) && IsClientInGame(client) && !IsFakeClient(client))
+    if (iClient > 0 && IsClientConnected(iClient) && IsClientInGame(iClient) && !IsFakeClient(iClient))
     {
-        if(action == MenuAction_Select) {
-            char info[32];
-            menu.GetItem(param, info, sizeof(info));
-            FakeClientCommand(client, "hudcolor %s", info);
-            ghMenuClient[client] = Menu_HudColor(client);
-            ghMenuClient[client].Display(client, MENU_TIME_FOREVER);  
+        if (iAction == MenuAction_Select)
+        {
+            char sCommand[8];
+            hMenu.GetItem(iParam, sCommand, sizeof(sCommand));
+
+            FakeClientCommand(iClient, sCommand);
         }
-        else if(action == MenuAction_Cancel && (param == MenuCancel_Exit || param == MenuCancel_ExitBack)) {
-            ghMenuClient[client] = Menu_Settings(client);
-            ghMenuClient[client].Display(client, MENU_TIME_FOREVER);  
+
+        FakeClientCommand(iClient, "sm_xmenu 0");
+    }
+}
+
+Menu ModelMenu(int iClient)
+{
+    Menu hMenu = new Menu(ModelMenuAction);
+    char sFile[70],
+         sTitle[512];
+
+    Format(sTitle, sizeof(sTitle), "%T", "xms_menu_model", iClient);
+    hMenu.SetTitle(sTitle);
+
+    for (int i = 0; i < sizeof(gsModelPath); i++) {
+        File_GetFileName(gsModelPath[i], sFile, sizeof(sFile));
+        hMenu.AddItem(gsModelPath[i], sFile);
+    }
+
+    return hMenu;
+}
+
+public int ModelMenuAction(Menu hMenu, MenuAction iAction, int iClient, int iParam)
+{
+    if (iClient > 0 && IsClientConnected(iClient) && IsClientInGame(iClient) && !IsFakeClient(iClient))
+    {
+        if (iAction == MenuAction_Select)
+        {
+            char sCommand[70];
+            hMenu.GetItem(iParam, sCommand, sizeof(sCommand));
+
+            ClientCommand(iClient, "cl_playermodel %s", sCommand);
+            IfCookiePlaySound(ghCookieSounds, iClient, SOUND_ACTIVATED);
         }
+
+        FakeClientCommand(iClient, "sm_xmenu 0");
     }
 }
 
