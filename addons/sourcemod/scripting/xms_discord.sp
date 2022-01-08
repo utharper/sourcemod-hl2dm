@@ -1,5 +1,8 @@
+#pragma dynamic 131072
+#pragma semicolon 1
 //#define PLUGIN_DEBUG
-#define PLUGIN_VERSION  "1.2"
+
+#define PLUGIN_VERSION  "1.3"
 #define PLUGIN_URL      "www.hl2dm.community"
 #define PLUGIN_UPDATE   "http://raw.githubusercontent.com/utharper/sourcemod-hl2dm/master/addons/sourcemod/xms_discord.upd"
 
@@ -11,83 +14,93 @@ public Plugin myinfo = {
     url               = PLUGIN_URL
 };
 
-/**************************************************************************************************/
+/**************************************************************/
 
-#define PLUGIN_DEBUG
-#pragma dynamic 131072
-#pragma semicolon 1
-#pragma newdecls optional
 #include <sourcemod>
 #include <steamworks>
 
 #undef REQUIRE_PLUGIN
 #include <updater>
-#define REQUIRE_PLUGIN
 
+#define REQUIRE_PLUGIN
 #pragma newdecls required
 #include <jhl2dm>
 #include <xms>
 
-/**************************************************************************************************/
+/**************************************************************/
 
-char gsWebhook[99][PLATFORM_MAX_PATH];
-char gsServerName[32];
-char gsDemoURL[PLATFORM_MAX_PATH];
-char gsDemoExtension[8];
-char gsGameID[128];
-char gsMap[MAX_MAP_LENGTH];
-char gsMode[MAX_MODE_LENGTH];
-char gsModeName[32];
-char gsPlayerURL[PLATFORM_MAX_PATH];
-char gsThumbsURL[PLATFORM_MAX_PATH];
-char gsFooterText[256];
-char gsFlagCode[3];
 bool gbTeamplay;
 
-/**************************************************************************************************/
+char gsMatchHook [99][PLATFORM_MAX_PATH],
+     gsReportHook[PLATFORM_MAX_PATH],
+     gsServerName[32],
+     gsDemoURL   [PLATFORM_MAX_PATH],
+     gsDemoExt   [8],
+     gsGameID    [128],
+     gsMap       [MAX_MAP_LENGTH],
+     gsMode      [MAX_MODE_LENGTH],
+     gsModeName  [32],
+     gsPlayerURL [PLATFORM_MAX_PATH],
+     gsThumbsURL [PLATFORM_MAX_PATH],
+     gsFooter    [256],
+     gsFlagCode  [3];
+
+/**************************************************************/
+
+#if defined PLUGIN_DEBUG
+public Action Command_Push(int argc)
+{
+    GenerateMatchReport();
+}
+#endif
 
 public void OnPluginStart()
 {
     CreateConVar("xms_discord_version", PLUGIN_VERSION, _, FCVAR_NOTIFY);
-    
+
     #if defined PLUGIN_DEBUG
     RegServerCmd("discord_push", Command_Push, "Manually push match report to Discord server");
     #endif
-    
-    if(LibraryExists("updater")) {
+
+    if (LibraryExists("updater")) {
         Updater_AddPlugin(PLUGIN_UPDATE);
     }
 }
 
-public void OnLibraryAdded(const char[] name)
+public void OnLibraryAdded(const char[] sName)
 {
-    if(StrEqual(name, "updater")) {
+    if (StrEqual(sName, "updater")) {
         Updater_AddPlugin(PLUGIN_UPDATE);
     }
 }
 
 public void OnAllPluginsLoaded()
 {
-    GetConfigString(gsServerName, sizeof(gsServerName), "serverName");
-    GetConfigString(gsDemoURL, sizeof(gsDemoURL), "demoURL");
-    if(StrContains(gsDemoURL, "://") == -1) {
+    GetConfigString(gsServerName, sizeof(gsServerName), "ServerName");
+    GetConfigString(gsDemoExt,    sizeof(gsDemoExt),    "DemoExtension");
+    GetConfigString(gsDemoURL,    sizeof(gsDemoURL),    "DemoURL");
+
+    if (StrContains(gsDemoURL, "://") == -1) {
         Format(gsDemoURL, sizeof(gsDemoURL), "http://%s", gsDemoURL);
     }
-    GetConfigString(gsDemoExtension, sizeof(gsDemoExtension), "demoExtension");
-    GetConfigString(gsPlayerURL, sizeof(gsPlayerURL), "url_player", "discord");
-    GetConfigString(gsThumbsURL, sizeof(gsThumbsURL), "url_thumbs", "discord");
-    GetConfigString(gsFooterText, sizeof(gsFooterText), "footer", "discord");
-    GetConfigString(gsFlagCode, sizeof(gsFlagCode), "flagCode", "discord");
-        
-    char key[30];
-    for(int i = 0; i < 99; i++)
+
+    GetConfigString(gsPlayerURL,  sizeof(gsPlayerURL),  "PlayerURL",       "Discord");
+    GetConfigString(gsThumbsURL,  sizeof(gsThumbsURL),  "ThumbsURL",       "Discord");
+    GetConfigString(gsFooter,     sizeof(gsFooter),     "FooterText",      "Discord");
+    GetConfigString(gsFlagCode,   sizeof(gsFlagCode),   "FlagCode",        "Discord");
+    GetConfigString(gsReportHook, sizeof(gsReportHook), "FeedbackWebhook", "Discord");
+
+    for (int i = 0; i < 99; i++)
     {
-        Format(key, sizeof(key), "webhook%i", i + 1);
-        if(!GetConfigString(gsWebhook[i], sizeof(gsWebhook[]), key, "discord")) {
+        char sKey[30];
+
+        Format(sKey, sizeof(sKey), "MatchWebhook%i", i + 1);
+        if (!GetConfigString(gsMatchHook[i], sizeof(gsMatchHook[]), sKey, "Discord")) {
             break;
         }
-        if(StrContains(gsWebhook[i], "/slack", false) == -1) {
-            StrCat(gsWebhook[i], sizeof(gsWebhook[]), "/slack");
+
+        if (StrContains(gsMatchHook[i], "/slack", false) == -1) {
+            StrCat(gsMatchHook[i], sizeof(gsMatchHook[]), "/slack");
         }
     }
 }
@@ -96,8 +109,20 @@ public void OnMapStart()
 {
     GetCurrentMap(gsMap, sizeof(gsMap));
     GetGamemode(gsMode, sizeof(gsMode));
-    GetConfigString(gsModeName, sizeof(gsModeName), "name", "gamemodes", gsMode);
+    GetConfigString(gsModeName, sizeof(gsModeName), "Name", "Gamemodes", gsMode);
+
     gbTeamplay = FindConVar("mp_teamplay").BoolValue;
+}
+
+public void OnClientFeedback(const char[] sFeedback, const char[] sName, const char[] sID, const char[] sGameID)
+{
+    if (strlen(gsReportHook))
+    {
+        char sJson[4096];
+
+        Format(sJson, sizeof(sJson), "{\"content\": \"**[%s]** --- [%s](<%s%s>) reports feedback:\\n  %s\"}", sGameID, sName, gsPlayerURL, sID, sFeedback);
+        POST(gsReportHook, sJson);
+    }
 }
 
 public void OnMatchStart()
@@ -105,71 +130,81 @@ public void OnMatchStart()
     GetGameID(gsGameID, sizeof(gsGameID));
 }
 
-public void OnMatchEnd(bool success)
+public void OnMatchEnd(bool bSuccess)
 {
-    if(success) {
+    if (bSuccess) {
         GenerateMatchReport();
     }
 }
 
 void GenerateMatchReport()
 {
-    int playercount, teamScore[2];
-    char demolink[PLATFORM_MAX_PATH], thumblink[PLATFORM_MAX_PATH], playerScores[2][384], players[2][2096], player_json[10000], json[12000];
-    bool sent;
-   
+    int  iPlayers,
+         iTeamScore [2];
+
+    bool bSent;
+
+    char sDemoURL   [PLATFORM_MAX_PATH],
+         sThumbURL  [PLATFORM_MAX_PATH],
+         sPlayers   [2][2096],
+         sScores    [2][384],
+         sPlayerJson[10000],
+         sFullJson  [12000];
+
     // Generate URLs
-    if(strlen(gsDemoURL)) {
-        Format(demolink, sizeof(demolink), "%s/%s%s", gsDemoURL, gsGameID, gsDemoExtension);
+    if (strlen(gsDemoURL)) {
+        Format(sDemoURL, sizeof(sDemoURL), "%s/%s%s", gsDemoURL, gsGameID, gsDemoExt);
     }
-    if(strlen(gsThumbsURL)) {
-        Format(thumblink, sizeof(thumblink), "%s/%s.jpg", gsThumbsURL, gsMap);
+    if (strlen(gsThumbsURL)) {
+        Format(sThumbURL, sizeof(sThumbURL), "%s/%s.jpg", gsThumbsURL, gsMap);
     }
-    
+
     // Fetch player data
-    for(int i = 1; i <= MaxClients; i++)
+    for (int i = 1; i <= MaxClients; i++)
     {
-        if(IsClientInGame(i) && !IsClientObserver(i))
+        if (IsClientInGame(i) && !IsClientObserver(i))
         {
-            char id[18], name[128];
-            int team, index;
-                    
-            playercount++;
-            GetClientAuthId(i, AuthId_Engine, id, sizeof(id));       
-            GetClientName(i, name, sizeof(name));
-            
-            if(!IsFakeClient(i)) {
-                Format(name, sizeof(name), "[%s](%s%s)", name, gsPlayerURL, id);
+            int  iTeam,
+                 iIndex;
+
+            char sId[32],
+                 sPlayer[128];
+
+            iPlayers++;
+            GetClientAuthId(i, AuthId_Engine, sId, sizeof(sId));
+            GetClientName(i, sPlayer, sizeof(sPlayer));
+
+            if (!IsFakeClient(i)) {
+                Format(sPlayer, sizeof(sPlayer), "[%s](%s%s)", sPlayer, gsPlayerURL, sId);
             }
-                    
-            if(gbTeamplay) {
-                team = GetClientTeam(i);
-                index = (team == TEAM_REBELS || team == TEAM_COMBINE) ? team - 2 : 0;
-                teamScore[index] += GetClientFrags(i);
+
+            if (gbTeamplay)
+            {
+                iTeam = GetClientTeam(i);
+
+                if (iTeam == TEAM_REBELS || iTeam == TEAM_COMBINE) {
+                    iIndex = iTeam - 2;
+                }
+
+                iTeamScore[iIndex] += GetClientFrags(i);
             }
-    
-            Format(players[index], sizeof(players[]), "%s%s\\n",     
-                players[index], name
-            );
-                    
-            Format(playerScores[index], sizeof(players[]), "%s%i Kills, %i Deaths\\n",
-                playerScores[index], GetClientFrags(i), GetClientDeaths(i)
-            );
-                    
+
+            Format(sPlayers[iIndex], sizeof(sPlayers[]), "%s%s\\n", sPlayers[iIndex], sPlayer);
+            Format(sScores[iIndex], sizeof(sScores[]), "%s%i Kills, %i Deaths\\n", sScores[iIndex], GetClientFrags(i), GetClientDeaths(i));
         }
     }
-    
+
     #if !defined PLUGIN_DEBUG
-    if(playercount < 2) {
+    if (iPlayers < 2) {
         LogError("Discarding match report due to less than 2 active players");
         return;
     }
     #endif
-   
+
     // Build player list
-    if(gbTeamplay)
+    if (gbTeamplay)
     {
-        Format(player_json, sizeof(player_json),
+        Format(sPlayerJson, sizeof(sPlayerJson),
             "{\
                 \"value\": \"%s\",\
                 \"short\": true,\
@@ -195,18 +230,17 @@ void GenerateMatchReport()
                 \"short\": true,\
                 \"title\": \"Team Score: ```%i```\"\
             }",
-            
-            players[0],
-            playerScores[0],
-            teamScore[0],
-            
-            players[1],
-            playerScores[1],
-            teamScore[1]
+
+            sPlayers[0],
+            sScores[0],
+            iTeamScore[0],
+            sPlayers[1],
+            sScores[1],
+            iTeamScore[1]
         );
     }
     else {
-        Format(player_json, sizeof(player_json),
+        Format(sPlayerJson, sizeof(sPlayerJson),
             "{\
                 \"value\": \"%s\",\
                 \"short\": true,\
@@ -217,20 +251,20 @@ void GenerateMatchReport()
                 \"short\": true,\
                 \"title\": \"Score\"\
             }",
-            players[0], playerScores[0]
+            sPlayers[0], sScores[0]
         );
     }
-    ReplaceString(player_json, sizeof(player_json), "  ", "");
-    
+    ReplaceString(sPlayerJson, sizeof(sPlayerJson), "  ", "");
+
     // Build final json
-    Format(json, sizeof(json),
+    Format(sFullJson, sizeof(sFullJson),
         "{\"attachments\":[{\
             \"color\": \"%s\",\
             \"title\": \":flag_%s:   %s\",\
             \"thumb_url\": \"%s\",\
             \"footer\": \"%s\",\
             \"fields\": [\
-            {\       
+            {\
                 \"value\": \"**Map:**\\u2003%s\\n\
                     **Mode:**\\u2002%s\\n\
                     **Players:**\\u2002%i\",\
@@ -253,62 +287,59 @@ void GenerateMatchReport()
                 \"title\": \"\"\
             }]\
         }]}",
-        
+
         "#f79321",
         gsFlagCode,
         gsServerName,
-        thumblink,
-        gsFooterText,
+        sThumbURL,
+        gsFooter,
         gsMap,
         strlen(gsModeName) ? gsModeName : gsMode,
-        playercount,
-        player_json,
-        strlen(demolink) ? "Download match demo" : "",
-        demolink
+        iPlayers,
+        sPlayerJson,
+        strlen(sDemoURL) ? "Download match demo" : "",
+        sDemoURL
     );
-    ReplaceString(json, sizeof(json), "  ", "");
+    ReplaceString(sFullJson, sizeof(sFullJson), "  ", "");
 
-
-    for(int i = 0; i < 99; i++) {
-        if(strlen(gsWebhook[i])) {
-            POST(gsWebhook[i], json);
-            sent = true;
+    // Send
+    for (int i = 0; i < 99; i++)
+    {
+        if (!strlen(gsMatchHook[i])) {
+            break;
         }
-        else break;
+
+        POST(gsMatchHook[i], sFullJson);
+        bSent = true;
     }
-    
-    if(!sent) {
+
+    if (!bSent) {
         LogError("No webhooks defined - check your config!");
     }
 }
 
-#if defined PLUGIN_DEBUG
-public Action Command_Push(int argc)
+void POST(const char[] sUrl, const char[] sJson)
 {
-    GenerateMatchReport();
-}
-#endif
+    Handle hRequest = SteamWorks_CreateHTTPRequest(k_EHTTPMethodPOST, sUrl);
 
-void POST(const char[] url, const char[] json)
-{
-    Handle http = SteamWorks_CreateHTTPRequest(k_EHTTPMethodPOST, url);
-    
     #if defined PLUGIN_DEBUG
-    SteamWorks_SetHTTPCallbacks(http, HTTPRequestCompleted);
+    SteamWorks_SetHTTPCallbacks(hRequest, OnRequestCompleted);
     #endif
-    
-    SteamWorks_SetHTTPRequestRawPostBody(http, "application/json", json, strlen(json));
-    SteamWorks_SetHTTPRequestNetworkActivityTimeout(http, 30);
-    SteamWorks_SendHTTPRequest(http);
+
+    SteamWorks_SetHTTPRequestRawPostBody(hRequest, "application/json", sJson, strlen(sJson));
+    SteamWorks_SetHTTPRequestNetworkActivityTimeout(hRequest, 30);
+    SteamWorks_SendHTTPRequest(hRequest);
 }
 
 #if defined PLUGIN_DEBUG
-stock int HTTPRequestCompleted(Handle request, bool failure, bool requestSuccessful, EHTTPStatusCode statusCode, Handle data)
+int OnRequestCompleted(Handle hRequest, bool bFailure, bool bSuccessful, EHTTPStatusCode iStatusCode, Handle hData)
 {
-    int len = 0;
-    SteamWorks_GetHTTPResponseBodySize(request, len);
-    char[] response = new char[len];
-    SteamWorks_GetHTTPResponseBodyData(request, response, len);
-    PrintToServer("Response: %s", response);
+    int iLen;
+    SteamWorks_GetHTTPResponseBodySize(hRequest, iLen);
+
+    char[] sResponse = new char[iLen];
+    SteamWorks_GetHTTPResponseBodyData(hRequest, sResponse, iLen);
+
+    PrintToServer("Response: %s", sResponse);
 }
 #endif
