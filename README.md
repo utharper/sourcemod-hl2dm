@@ -174,7 +174,7 @@ After extracting the contents of xms.zip, you will want to edit `cfg/server.cfg`
 
 Make sure the server works, and then you can proceed to edit `xms.cfg` to your desired values. Everything is explained in there.
 
-Finally, you will need to configure your mapcycles (these are also in the `cfg` folder). Be sure to only include maps that are actually in your maps folder. You will also need to order your maps alphabetically, otherwise they will show out of order in the menu. You can just google 'alphabetize list' to find a website that does this for you.
+Finally, you will need to configure your mapcycles (these are also in the `cfg` folder). Be sure to only include maps that are actually in your maps folder.
 
 ### Download
 * [Download zip](https://github.com/utharper/sourcemod-hl2dm/releases/download/latest/xms.zip)
@@ -211,7 +211,7 @@ Everything is configured in the `"Discord"` section of `xms.cfg`.
 # gameme_hud
 **Requires the [gameME plugin](https://github.com/gamemedev/plugin-sourcemod) (gameME is a paid service)**
 
-Displays a HUD (left of the socreboard) showing your overall rank, kills, deaths, headshots, accuracy, etc.
+Displays a HUD (left of the scoreboard) showing your overall rank, kills, deaths, headshots, accuracy, etc.
 It only shows when the scoreboard is open (by holding TAB). If you are spectating another player, it will show their stats instead.
 
 ![gameme_hud_example](https://i.imgur.com/zww76IL.png)
