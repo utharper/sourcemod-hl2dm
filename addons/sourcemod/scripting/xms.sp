@@ -1,7 +1,7 @@
 #pragma dynamic 2097152
 #pragma semicolon 1
 
-#define PLUGIN_VERSION  "1.9"
+#define PLUGIN_VERSION  "1.91"
 #define PLUGIN_URL      "www.hl2dm.community"
 #define PLUGIN_UPDATE   "http://raw.githubusercontent.com/utharper/sourcemod-hl2dm/master/addons/sourcemod/xms.upd"
 
@@ -165,9 +165,7 @@ Handle      ghForwardGamestateChanged,
             ghOvertimer = INVALID_HANDLE,
             ghCookieMusic,
             ghCookieSounds,
-            ghCookieColorR,
-            ghCookieColorG,
-            ghCookieColorB;
+            ghCookieColors[3];
 
 ConVar      ghConVarTags,
             ghConVarTimelimit,
@@ -477,7 +475,6 @@ public int Native_XMenu(Handle hPlugin, int iParams)
 
         kPanel[i].SetString ("title", sPageTitle);
         kPanel[i].SetNum    ("level", 1); // ?
-        kPanel[i].SetColor  ("color", 255, 100, 100, 255); // TODO
         kPanel[i].SetString ("msg"  , sMessage);
 
         // Save:
@@ -642,11 +639,11 @@ public void OnPluginStart()
     ghTimeHud = CreateHudSynchronizer();
     ghVoteHud = CreateHudSynchronizer();
 
-    ghCookieMusic  = RegClientCookie("xms_endmusic", "Enable music at the end of each map", CookieAccess_Public);
-    ghCookieSounds = RegClientCookie("xms_miscsounds", "Enable beeps and other XMS command sounds", CookieAccess_Public);
-    ghCookieColorR = RegClientCookie("hudcolor_r", "HUD color red value", CookieAccess_Public);
-    ghCookieColorG = RegClientCookie("hudcolor_g", "HUD color green value", CookieAccess_Public);
-    ghCookieColorB = RegClientCookie("hudcolor_b", "HUD color blue value", CookieAccess_Public);
+    ghCookieMusic     = RegClientCookie("xms_endmusic",   "Enable music at the end of each map",       CookieAccess_Public);
+    ghCookieSounds    = RegClientCookie("xms_miscsounds", "Enable beeps and other XMS command sounds", CookieAccess_Public);
+    ghCookieColors[0] = RegClientCookie("hudcolor_r",     "HUD color red value",                       CookieAccess_Public);
+    ghCookieColors[1] = RegClientCookie("hudcolor_g",     "HUD color green value",                     CookieAccess_Public);
+    ghCookieColors[2] = RegClientCookie("hudcolor_b",     "HUD color blue value",                      CookieAccess_Public);
 
     ghConVarTv       = FindConVar("tv_enable");
     ghConVarPausable = FindConVar("sv_pausable");
@@ -719,17 +716,17 @@ void LoadConfigValues()
         LogError("xms.cfg missing or corrupted!");
     }
 
-    if (GetConfigString(gsServerMsg,    sizeof(gsServerMsg),        "MenuMessage") == 1) {
+    if (GetConfigString(gsServerMsg, sizeof(gsServerMsg), "MenuMessage") == 1) {
         FormatMenuMessage(gsServerMsg, gsServerMsg, sizeof(gsServerMsg));
     }
 
-    GetConfigString(gsDemoPath,         sizeof(gsDemoPath),         "DemoFolder");
-    GetConfigString(gsDemoURL,          sizeof(gsDemoURL),          "DemoURL");
-    GetConfigString(gsDemoFileExt,    sizeof(gsDemoFileExt),    "DemoExtension");
-    GetConfigString(gsServerName,       sizeof(gsServerName),       "ServerName");
-    GetConfigString(gsRetainModes,      sizeof(gsRetainModes),      "RetainModes");
-    GetConfigString(gsStripPrefix,   sizeof(gsStripPrefix),   "StripPrefix", "Maps");
-    GetConfigString(gsModeName,         sizeof(gsModeName),         "Name", "Gamemodes", gsMode);
+    GetConfigString(gsDemoPath,    sizeof(gsDemoPath),    "DemoFolder");
+    GetConfigString(gsDemoURL,     sizeof(gsDemoURL),     "DemoURL");
+    GetConfigString(gsDemoFileExt, sizeof(gsDemoFileExt), "DemoExtension");
+    GetConfigString(gsServerName,  sizeof(gsServerName),  "ServerName");
+    GetConfigString(gsRetainModes, sizeof(gsRetainModes), "RetainModes");
+    GetConfigString(gsStripPrefix, sizeof(gsStripPrefix), "StripPrefix", "Maps");
+    GetConfigString(gsModeName,    sizeof(gsModeName),    "Name",        "Gamemodes", gsMode);
 
     giAdFrequency       = GetConfigInt("Frequency", "ServerAds");
     giVoteMinPlayers    = GetConfigInt("VoteMinPlayers");
@@ -739,13 +736,13 @@ void LoadConfigValues()
     gbStockMapsIfEmpty  = GetConfigInt("UseStockMapsIfEmpty") == 1;
 
     // Gamemode settings:
-    giSpawnHealth       = GetConfigInt("SpawnHealth",   "Gamemodes", gsMode);
-    giSpawnSuit         = GetConfigInt("SpawnSuit",     "Gamemodes", gsMode);
-    gbDisableCollisions = GetConfigInt("NoCollisions",  "Gamemodes", gsMode) == 1;
-    gbUnlimitedAux      = GetConfigInt("UnlimitedAux",  "Gamemodes", gsMode) == 1;
-    gbDisableProps      = GetConfigInt("DisableProps",  "Gamemodes", gsMode) == 1;
-    giOvertime          = GetConfigInt("Overtime",      "Gamemodes", gsMode) == 1;
-    gbShowKeys          = GetConfigInt("Selfkeys",      "Gamemodes", gsMode) == 1;
+    giSpawnHealth       = GetConfigInt("SpawnHealth",  "Gamemodes", gsMode);
+    giSpawnSuit         = GetConfigInt("SpawnSuit",    "Gamemodes", gsMode);
+    gbDisableCollisions = GetConfigInt("NoCollisions", "Gamemodes", gsMode) == 1;
+    gbUnlimitedAux      = GetConfigInt("UnlimitedAux", "Gamemodes", gsMode) == 1;
+    gbDisableProps      = GetConfigInt("DisableProps", "Gamemodes", gsMode) == 1;
+    giOvertime          = GetConfigInt("Overtime",     "Gamemodes", gsMode) == 1;
+    gbShowKeys          = GetConfigInt("Selfkeys",     "Gamemodes", gsMode) == 1;
 
     // Weapon settings:
     char sWeapons[512],
@@ -1664,11 +1661,8 @@ public Action Cmd_HudColor(int iClient, int iArgs)
 
         for (int i = 0; i < 3; i++) {
             Format(sColor[i], sizeof(sColor[]), "%03i", StringToInt(sColor[i]));
+            SetClientCookie(iClient, ghCookieColors[i], sColor[i]);
         }
-
-        SetClientCookie(iClient, ghCookieColorR, sColor[0]);
-        SetClientCookie(iClient, ghCookieColorG, sColor[1]);
-        SetClientCookie(iClient, ghCookieColorB, sColor[2]);
     }
 
     return Plugin_Handled;
@@ -2087,11 +2081,18 @@ public void OnClientCookiesCached(int iClient)
     }
 
     // Set default values
-    SetClientCookie(iClient, ghCookieMusic,  "1");
-    SetClientCookie(iClient, ghCookieSounds, "1");
-    SetClientCookie(iClient, ghCookieColorR, "255");
-    SetClientCookie(iClient, ghCookieColorG, "177");
-    SetClientCookie(iClient, ghCookieColorB, "0");
+    SetClientCookie(iClient, ghCookieMusic,     "1");
+    SetClientCookie(iClient, ghCookieSounds,    "1");
+    SetClientCookie(iClient, ghCookieColors[0], "255");
+    SetClientCookie(iClient, ghCookieColors[1], "177");
+    SetClientCookie(iClient, ghCookieColors[2], "0");
+}
+
+void GetClientColors(int iClient, int iColors[3])
+{
+    for (int i = 0; i < 3; i++) {
+        iColors[i] = clamp(GetClientCookieInt(iClient, ghCookieColors[i]), 0, 255);
+    }
 }
 
 public void OnClientPostAdminCheck(int iClient)
@@ -3593,12 +3594,10 @@ public Action T_Voting(Handle hTimer)
             }
         }
         else {
-            int iCol[3];
+            int iColor[3];
 
-            iCol[0] = clamp(GetClientCookieInt(iClient, ghCookieColorR), 0, 255);
-            iCol[1] = clamp(GetClientCookieInt(iClient, ghCookieColorG), 0, 255);
-            iCol[2] = clamp(GetClientCookieInt(iClient, ghCookieColorB), 0, 255);
-            SetHudTextParams(0.01, 0.11, 1.01, iCol[0], iCol[1], iCol[2], 255, view_as<int>(giVoteMaxTime - iSeconds <= 5), 0.0, 0.0, 0.0);
+            GetClientColors(iClient, iColor);
+            SetHudTextParams(0.01, 0.11, 1.01, iColor[0], iColor[1], iColor[2], 255, view_as<int>(giVoteMaxTime - iSeconds <= 5), 0.0, 0.0, 0.0);
         }
 
         ShowSyncHudText(iClient, ghVoteHud, sHud2);
@@ -3759,9 +3758,7 @@ public Action T_KeysHud(Handle hTimer)
             iTarget = iClient;
         }
 
-        iColor[0] = clamp(GetClientCookieInt(iClient, ghCookieColorR), 0, 255);
-        iColor[1] = clamp(GetClientCookieInt(iClient, ghCookieColorG), 0, 255);
-        iColor[2] = clamp(GetClientCookieInt(iClient, ghCookieColorB), 0, 255);
+        GetClientColors(iClient, iColor);
 
         if (GetEntProp(iClient, Prop_Send, "m_iObserverMode") != 7 && iTarget > 0 && IsClientConnected(iTarget) && IsClientInGame(iTarget))
         {
@@ -3847,10 +3844,8 @@ public Action T_TimeHud(Handle hTimer)
             else
             {
                 int iColor[3];
-                iColor[0] = clamp(GetClientCookieInt(iClient, ghCookieColorR), 0, 255);
-                iColor[1] = clamp(GetClientCookieInt(iClient, ghCookieColorG), 0, 255);
-                iColor[2] = clamp(GetClientCookieInt(iClient, ghCookieColorB), 0, 255);
 
+                GetClientColors(iClient, iColor);
                 SetHudTextParams(-1.0, bMargin ? 0.03 : 0.01, 0.3, iColor[0], iColor[1], iColor[2], 255, 0, 0.0, 0.0, 0.0);
             }
 
@@ -4122,6 +4117,7 @@ int XMenuPageCount(int iClient)
 
 void XMenuDisplay(StringMap mMenu, int iClient, int iPage=-1)
 {
+    int        iColor[3];
     char       sPage[3];
     DialogType iType;
     KeyValues  kMenu;
@@ -4135,11 +4131,14 @@ void XMenuDisplay(StringMap mMenu, int iClient, int iPage=-1)
     }
     IntToString(iPage, sPage, sizeof(sPage));
 
+    GetClientColors(iClient, iColor);
+
     mMenu.GetValue(sPage, kMenu);
     mMenu.GetValue("type", iType);
 
     mMenu.SetValue("current", iPage);
     kMenu.SetNum("time", 99999);
+    kMenu.SetColor("color", iColor[0], iColor[1], iColor[2], 255);
 
     CreateDialog(iClient, kMenu, iType);
     IfCookiePlaySound(ghCookieSounds, iClient, SOUND_MENUACTION);
@@ -4845,8 +4844,12 @@ public Action XMenuAction(int iClient, int iArgs)
             }
             else
             {
-                if (strlen(sParam[0]) > 1) {
-                    DisplayAskConnectBox(iClient, 30.0, sParam[0]);
+                if (strlen(sParam[0]) > 1)
+                {
+                    char sAddress[256];
+
+                    Format(sAddress, sizeof(sAddress), "%s:%s", sParam[0], sParam[2]);
+                    DisplayAskConnectBox(iClient, 30.0, sAddress);
                 }
                 else
                 {
