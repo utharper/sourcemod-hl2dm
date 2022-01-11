@@ -102,7 +102,7 @@
     "xmenumsg_0"
     {
         "#format"   "{1:s},{2:s},{3:s},{4:s},{5:i},{6:s},{7:i},{8:s},{9:s}"
-        "en"        "If you close this page, say: !menu\n\n▪ mode  :  {1} ({2})\n▪ map    :  {3}\n▪ server :  {4}\n▪ version:  v{5}/XMS {6}\n▪ type    :  {7} tick {8}\n\n{9}"
+        "en"        "Say !menu to reopen this page\n\n▪ mode  :  {1} {2}\n▪ map    :  {3}\n▪ server :  {4}\n▪ version:  v{5}/XMS {6}\n▪ type    :  {7} tick {8}\n\n{9}"
     }
     "xmenumsg_1"
     {

@@ -1,16 +1,16 @@
 #pragma dynamic 2097152
 #pragma semicolon 1
 
-#define PLUGIN_VERSION  "1.91"
-#define PLUGIN_URL      "www.hl2dm.community"
-#define PLUGIN_UPDATE   "http://raw.githubusercontent.com/utharper/sourcemod-hl2dm/master/addons/sourcemod/xms.upd"
+#define PLUGIN_VERSION     "1.92"
+#define PLUGIN_URL         "www.hl2dm.community"
+#define PLUGIN_UPDATE      "http://raw.githubusercontent.com/utharper/sourcemod-hl2dm/master/addons/sourcemod/xms.upd"
 
 public Plugin myinfo = {
-    name              = "XMS (eXtended Match System)",
-    version           = PLUGIN_VERSION,
-    description       = "Multi-gamemode match plugin for competitive HL2DM servers",
-    author            = "harper",
-    url               = PLUGIN_URL
+    name                 = "XMS (eXtended Match System)",
+    version              = PLUGIN_VERSION,
+    description          = "Multi-gamemode match plugin for competitive HL2DM servers",
+    author               = "harper",
+    url                  = PLUGIN_URL
 };
 
 /**************************************************************
@@ -115,7 +115,8 @@ int         giGamestate,
             giVoteCooldown,
             giVoteType,
             giVoteStatus,
-            giAdFrequency;
+            giAdFrequency,
+            giShowKeys;
 
 bool        gbPluginReady,
             gbModTags,
@@ -128,7 +129,6 @@ bool        gbPluginReady,
             gbDisableCollisions,
             gbUnlimitedAux,
             gbRecording,
-            gbShowKeys,
             gbNextMapChosen,
             gbStockMapsIfEmpty;
 
@@ -726,7 +726,6 @@ void LoadConfigValues()
     GetConfigString(gsServerName,  sizeof(gsServerName),  "ServerName");
     GetConfigString(gsRetainModes, sizeof(gsRetainModes), "RetainModes");
     GetConfigString(gsStripPrefix, sizeof(gsStripPrefix), "StripPrefix", "Maps");
-    GetConfigString(gsModeName,    sizeof(gsModeName),    "Name",        "Gamemodes", gsMode);
 
     giAdFrequency       = GetConfigInt("Frequency", "ServerAds");
     giVoteMinPlayers    = GetConfigInt("VoteMinPlayers");
@@ -742,7 +741,7 @@ void LoadConfigValues()
     gbUnlimitedAux      = GetConfigInt("UnlimitedAux", "Gamemodes", gsMode) == 1;
     gbDisableProps      = GetConfigInt("DisableProps", "Gamemodes", gsMode) == 1;
     giOvertime          = GetConfigInt("Overtime",     "Gamemodes", gsMode) == 1;
-    gbShowKeys          = GetConfigInt("Selfkeys",     "Gamemodes", gsMode) == 1;
+    giShowKeys          = GetConfigInt("Selfkeys",     "Gamemodes", gsMode);
 
     // Weapon settings:
     char sWeapons[512],
@@ -2171,9 +2170,13 @@ public void OnMapStart()
 
     GetCurrentMap(gsMap, sizeof(gsMap));
     strcopy(gsNextMode, sizeof(gsNextMode), gsMode);
+
     strcopy(sModeDesc, sizeof(sModeDesc), gsMode);
-    if (strlen(gsModeName)) {
+    if(GetConfigString(gsModeName, sizeof(gsModeName), "Name", "Gamemodes", gsMode) == 1) {
         Format(sModeDesc, sizeof(sModeDesc), "%s (%s)", sModeDesc, gsModeName);
+    }
+    else {
+        gsModeName[0] = '\0';
     }
     Steam_SetGameDescription(sModeDesc);
 
@@ -3747,7 +3750,7 @@ public Action T_KeysHud(Handle hTimer)
             continue;
         }
 
-        if (GetClientButtons(iClient) & IN_SCORE || (!IsClientObserver(iClient) && !gbShowKeys)) {
+        if (GetClientButtons(iClient) & IN_SCORE || (!IsClientObserver(iClient) && !giShowKeys)) {
             continue;
         }
 
@@ -3767,9 +3770,11 @@ public Action T_KeysHud(Handle hTimer)
 
             GetClientAbsAngles(iClient, fAngles);
 
-            Format(sHud, sizeof(sHud), "health: %i   suit: %i\nvel: %03i  %s   %0.1fº\n%s         %s          %s\n%s     %s     %s",
-              GetClientHealth(iTarget),
-              GetClientArmor(iTarget),
+            if (giShowKeys != 2) {
+                Format(sHud, sizeof(sHud), "health: %i   suit: %i\n", GetClientHealth(iTarget), GetClientArmor(iTarget));
+            }
+
+            Format(sHud, sizeof(sHud), "%svel: %03i  %s   %0.1fº\n%s         %s          %s\n%s     %s     %s", sHud,
               GetClientVelocity(iTarget),
               (iButtons & IN_FORWARD)   ? "↑"       : "  ",
               fAngles[1],
@@ -4197,10 +4202,14 @@ public Action XMenuAction(int iClient, int iArgs)
             {
                 bool bLan = FindConVar("sv_lan").BoolValue;
                 char sTitle[64],
-                     sMessage[1024];
+                     sMessage[1024],
+                     sModeName[32];
 
                 Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_0", iClient, PLUGIN_VERSION);
-                Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_0", iClient, gsMode, gsModeName, gsMap, gsServerName, GameVersion(), PLUGIN_VERSION, Tickrate(), bLan ? "local" : "dedicated", gsServerMsg);
+                if(strlen(gsModeName)) {
+                    Format(sModeName, sizeof(sModeName), "(%s)", gsModeName);
+                }
+                Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_0", iClient, gsMode, sModeName, gsMap, gsServerName, GameVersion(), PLUGIN_VERSION, Tickrate(), bLan ? "local" : "dedicated", gsServerMsg);
 
                 gmMenu[iClient] = XMenuQuick(iClient, 7, false, false, "sm_xmenu 0", sTitle, sMessage, !IsGameMatch() ? "xmenu0_team" : "xmenu0_pause;pause",
                   "xmenu0_vote", "xmenu0_players", "xmenu0_settings", "xmenu0_switch", "xmenu0_admin", "xmenu0_report;report"
@@ -4449,10 +4458,12 @@ public Action XMenuAction(int iClient, int iArgs)
 
                         if (!StrEqual(sModes[i], gsMode))
                         {
-                            char sModeName[64];
+                            char sModeName[32];
 
-                            GetModeFullName(sModeName, sizeof(sModeName), sModes[i]);
-                            Format(sOption, sizeof(sOption), "%s (%s);%s", sModes[i], sModeName, sModes[i]);
+                            if(GetModeFullName(sModeName, sizeof(sModeName), sModes[i])) {
+                                Format(sModeName, sizeof(sModeName), "(%s)", sModeName);
+                            }
+                            Format(sOption, sizeof(sOption), "%s %s;%s", sModes[i], sModeName, sModes[i]);
                             dOptions.WriteString(sOption);
                         }
                     }
