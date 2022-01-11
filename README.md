@@ -69,7 +69,7 @@ No configuration is required.
 
 **XMS** (eXtended Match System) is the most advanced system for competitive HL2DM servers. Commands are backwards compatible with VG servers and the old servermanagement plugin by gavvvr. It also features an easy player menu and is intended to be as simple for players to use as possible.
 
-You can easily define your own custom gamemodes, but the default config contains **dm**, **tdm**, **jm** (jump/bhop), **kb** (killbox low-grav), **ctf** (Capture The Flag), and **arcade** (spawn with all weapons).
+You can easily define your own custom gamemodes, but the default config contains **dm**, **tdm**, **kb** (killbox low-grav), **jm** (jump maps), **surf** (surf maps), **ctf** (Capture The Flag) and **arcade** (spawn with all weapons).
 
 Everything is configured and explained in `addons\sourcemod\configs\xms.cfg`.
 
