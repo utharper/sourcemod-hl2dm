@@ -116,7 +116,8 @@ int         giGamestate,
             giVoteType,
             giVoteStatus,
             giAdFrequency,
-            giShowKeys;
+            giShowKeys,
+            giMapchangeCount;
 
 bool        gbPluginReady,
             gbModTags,
@@ -2168,6 +2169,7 @@ public void OnMapStart()
         return;
     }
 
+    giMapchangeCount++;
     GetCurrentMap(gsMap, sizeof(gsMap));
     strcopy(gsNextMode, sizeof(gsNextMode), gsMode);
 
@@ -2220,7 +2222,41 @@ public Action OnMapChanging(int iClient, const char[] sCommand, int iArgs)
     {
         SetGamestate(GAME_CHANGING);
         SetGamemode(gsNextMode);
+
+        CreateTimer(10.0, T_MapChangeFailsafe, giMapchangeCount);
     }
+}
+
+public Action T_MapChangeFailsafe(Handle hTimer, int iMapcount)
+{
+    if(giMapchangeCount > iMapcount) {
+        return Plugin_Stop;
+    }
+
+    char sMap[MAX_MAP_LENGTH];
+    int  i = 1;
+
+    LogError("[%i] Map change failed! Check your mapcycles for missing maps or typos! Reverting to DefaultMap ...", i++);
+
+    if(!GetConfigString(sMap, sizeof(sMap), "DefaultMap", "Gamemodes", gsMode) || !IsMapValid(sMap))
+    {
+        LogError("[%i] DefaultMap for gamemode \"%s\" is undefined or unavailable! Reverting to DefaultMode ...", i++, gsMode);
+        SetGamemode(gsDefaultMode);
+
+        if(!GetConfigString(sMap, sizeof(sMap), "DefaultMap", "Gamemodes", gsDefaultMode) || !IsMapValid(sMap))
+        {
+            LogError("[%i] DefaultMap for default gamemode \"%s\" is also undefined or unavailable!", i++, gsDefaultMode);
+            LogError("[%i] SHUTTING DOWN - Unrecoverable errors in XMS config.", i++);
+            ServerCommand("quit");
+
+            return Plugin_Stop;
+        }
+    }
+
+    LogError("[%i] ... Now loading %s", i, sMap);
+    ServerCommand("changelevel %s", sMap);
+
+    return Plugin_Stop;
 }
 
 public void OnMapEnd()
@@ -3328,7 +3364,7 @@ public Action T_Voting(Handle hTimer)
         if (giVoteType == VOTE_RUN || giVoteType == VOTE_RUNNEXT || giVoteType == VOTE_RUNNEXT_AUTO)
         {
             bool bCurrentModeOnly = true;
-            int  iDisplayLen      = 32,
+            int  iDisplayLen      = 40,
                  iCount,
                  iPos[5];
 
@@ -3417,7 +3453,7 @@ public Action T_Voting(Handle hTimer)
             bDraw = true;
         }
 
-        iPercent[i] = RoundToNearest(iTally[i] ? iTally[i] / iVotes * 100.0 : 0.0);
+        iPercent[i] = RoundToCeil(iTally[i] ? ( iTally[i] / iVotes * 100.0 ) : 0.0);
     }
 
     for (int i = 0; i < 5; i++)
@@ -3432,39 +3468,46 @@ public Action T_Voting(Handle hTimer)
     // Calculate result:
     if ((iLead > -1 && !bContested) || iSeconds >= giVoteMaxTime)
     {
-        if (bMultiChoice && bDraw)
+        if (bMultiChoice)
         {
-            if (!iVotes && !IsGameOver()) {
-                // Nobody voted. Fail.
-                iLead = -1;
-            }
-            else {
-                // Draw. Pick winner at random from the first 2 equal choices
-                int iWinner[2] = -1;
+            if (bDraw)
+            {
+                if (!iVotes && !IsGameOver()) {
+                    // Nobody voted. Fail.
+                    iLead = -1;
+                }
+                else {
+                    // Draw. Pick winner at random from the first 2 equal choices
+                    int iWinner[2] = -1;
 
-                for (int i = 0; i < 6; i++)
-                {
-                    if (iTally[i] == iHighest)
+                    for (int i = 0; i < 6; i++)
                     {
-                        if (iWinner[0] == -1) {
-                            iWinner[0] = i;
-                        }
-                        else if (iWinner[1] == -1) {
-                            iWinner[1] = i;
-                        }
-                        else {
-                            break;
+                        if (iTally[i] == iHighest)
+                        {
+                            if (iWinner[0] == -1) {
+                                iWinner[0] = i;
+                            }
+                            else if (iWinner[1] == -1) {
+                                iWinner[1] = i;
+                            }
+                            else {
+                                break;
+                            }
                         }
                     }
-                }
 
-                iLead = iWinner[Math_GetRandomInt(0, 1)];
-                MC_PrintToChatAll("%t", "xms_vote_draw", iLead + 1, sMotion[iLead]);
+                    iLead = iWinner[Math_GetRandomInt(0, 1)];
+                    MC_PrintToChatAll("%t", "xms_vote_draw", iLead + 1, sMotion[iLead]);
+                }
+            }
+            else {
+                    MC_PrintToChatAll("%t", "xms_vote_victory", iLead + 1, sMotion[iLead]);
             }
         }
 
         giVoteStatus = iLead > -1 ? 2 : -1;
     }
+
 
     // Format HUD :
     if (giVoteType == VOTE_RUN || giVoteType == VOTE_RUNNEXT) {
@@ -3480,27 +3523,23 @@ public Action T_Voting(Handle hTimer)
     }
     else
     {
-        Format(sHud, sizeof(sHud), "%s(%i)", sHud, giVoteMaxTime - iSeconds);
+        Format(sHud, sizeof(sHud), "%s(%i)", sHud, (giVoteMaxTime - iSeconds) );
+
         for (int i = 0; i < 5; i++)
         {
-            if (strlen(sMotion[i])) {
-                Format(sHud, sizeof(sHud), "%s\n▪ %s %s - %i (%i%%%%)", sHud, BigNumber(i+1), iLead == i ? Char_Uppify(sMotion[i]) : sMotion[i], iTally[i], iPercent[i]);
+            if (!strlen(sMotion[i])) {
+                break;
             }
+
+            char sMotionLead[192];
+
+            if(iLead == i) {
+                String_ToUpper(sMotion[i], sMotionLead, 192);
+            }
+
+            Format(sHud, sizeof(sHud), "%s\n▪ %s %s - %i", sHud, BigNumber(i+1), iLead == i ? sMotionLead : sMotion[i], iTally[i]);
         }
     }
-
-    /*
-    Format(sHud, sizeof(sHud), "%s\n▪ abstain: %i", sHud, iAbstains);
-
-    if (giVoteStatus == 1) {
-        Format(sHud, sizeof(sHud), "%s\n%is remaining..", sHud, giVoteMaxTime - iSeconds);
-        for (int i = 5; i <= giVoteMaxTime; i += 5) {
-            if (giVoteMaxTime - i >= iSeconds) {
-                StrCat(sHud, sizeof(sHud), ".");
-            }
-        }
-    }
-    */
 
     // Take action :
     switch(giVoteStatus)
@@ -3544,7 +3583,7 @@ public Action T_Voting(Handle hTimer)
                 {
                     char sMode[MAX_MODE_LENGTH],
                          sMap [MAX_MAP_LENGTH];
-                    int i = ( bMultiChoice ? iLead : 0 );
+                    int  i = ( bMultiChoice ? iLead : 0 );
 
                     strcopy(sMap, sizeof(sMap), gsVoteMotion[i][SplitString(gsVoteMotion[i], ":", sMode, sizeof(sMode))]);
                     strcopy(gsNextMode, sizeof(gsNextMode), sMode);
@@ -3595,6 +3634,7 @@ public Action T_Voting(Handle hTimer)
             else if (!bMultiChoice) {
                 MC_PrintToChat(iClient, "%t", giVoteStatus == -1 ? "xms_vote_fail" : "xms_vote_success");
             }
+
         }
         else {
             int iColor[3];
@@ -3714,6 +3754,7 @@ void CallRandomMapVote()
     }
 
     ServerCommand("runnext %s", sCommand);
+    MC_PrintToChatAll("%t", "xms_autovote_chat");
 }
 
 int VoteTimeout(int iClient)

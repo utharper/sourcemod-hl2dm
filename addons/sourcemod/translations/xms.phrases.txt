@@ -381,6 +381,10 @@
     {
         "en"        "ᴠᴏᴛᴇ ғᴏʀ ɴᴇxᴛ ᴍᴀᴘ"
     }
+    "xms_autovote_chat"
+    {
+        "en"        "{I}Voting has begun for the next map."
+    }
     "xms_vote_fail"
     {
         "en"        "{E}Vote failed."
@@ -393,5 +397,10 @@
     {
         "#format"   "{1:i},{2:s}"
         "en"        "{I}Vote draw! The server chose {H}{1} {I}({H}{2}){I}."
+    }
+    "xms_vote_victory"
+    {
+        "#format"   "{1:i},{2:s}"
+        "en"        "{I}The vote was won by option {H}{1} {I}({H}{2}){I}."
     }
 }
