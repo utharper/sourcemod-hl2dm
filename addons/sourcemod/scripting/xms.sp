@@ -116,8 +116,8 @@ int         giGamestate,
             giVoteType,
             giVoteStatus,
             giAdFrequency,
-            giShowKeys,
-            giMapchangeCount;
+            giMapchangeCount,
+            giRevertTime;
 
 bool        gbPluginReady,
             gbModTags,
@@ -131,7 +131,7 @@ bool        gbPluginReady,
             gbUnlimitedAux,
             gbRecording,
             gbNextMapChosen,
-            gbStockMapsIfEmpty;
+            gbSelfKeys;
 
 float       gfPretime,
             gfEndtime;
@@ -154,7 +154,8 @@ char        gsConfigPath  [PLATFORM_MAX_PATH],
             gsServerMsg   [192],
             gsDemoURL     [PLATFORM_MAX_PATH],
             gsDemoFileExt [8],
-            gsStripPrefix [512];
+            gsStripPrefix [512],
+            gsEmptyCycle  [PLATFORM_MAX_PATH];
 
 Handle      ghForwardGamestateChanged,
             ghForwardMatchStart,
@@ -727,22 +728,23 @@ void LoadConfigValues()
     GetConfigString(gsServerName,  sizeof(gsServerName),  "ServerName");
     GetConfigString(gsRetainModes, sizeof(gsRetainModes), "RetainModes");
     GetConfigString(gsStripPrefix, sizeof(gsStripPrefix), "StripPrefix", "Maps");
+    GetConfigString(gsEmptyCycle,  sizeof(gsEmptyCycle),  "EmptyMapcycle");
 
     giAdFrequency       = GetConfigInt("Frequency", "ServerAds");
     giVoteMinPlayers    = GetConfigInt("VoteMinPlayers");
     giVoteMaxTime       = GetConfigInt("VoteMaxTime");
     giVoteCooldown      = GetConfigInt("VoteCooldown");
+    giRevertTime        = GetConfigInt("RevertTime");
     gbAutoVoting        = GetConfigInt("AutoVoting") == 1;
-    gbStockMapsIfEmpty  = GetConfigInt("UseStockMapsIfEmpty") == 1;
 
     // Gamemode settings:
     giSpawnHealth       = GetConfigInt("SpawnHealth",  "Gamemodes", gsMode);
     giSpawnSuit         = GetConfigInt("SpawnSuit",    "Gamemodes", gsMode);
+    giOvertime          = GetConfigInt("Overtime",     "Gamemodes", gsMode) == 1;
     gbDisableCollisions = GetConfigInt("NoCollisions", "Gamemodes", gsMode) == 1;
     gbUnlimitedAux      = GetConfigInt("UnlimitedAux", "Gamemodes", gsMode) == 1;
     gbDisableProps      = GetConfigInt("DisableProps", "Gamemodes", gsMode) == 1;
-    giOvertime          = GetConfigInt("Overtime",     "Gamemodes", gsMode) == 1;
-    giShowKeys          = GetConfigInt("Selfkeys",     "Gamemodes", gsMode);
+    gbSelfKeys          = GetConfigInt("Selfkeys",     "Gamemodes", gsMode) == 1;
 
     // Weapon settings:
     char sWeapons[512],
@@ -2110,10 +2112,17 @@ public void OnClientDisconnect(int iClient)
 {
     if (!IsFakeClient(iClient))
     {
-        if (GetRealClientCount(IsGameMatch()) == 1 && giGamestate != GAME_CHANGING) {
-            // Last player has disconnected, revert to defaults
-            LoadDefaults();
-        }
+        if (GetRealClientCount(IsGameMatch()) == 1 && giGamestate != GAME_CHANGING)
+        {
+            if (IsGameMatch()) {
+                CreateTimer(1.0, T_RestartMap, _, TIMER_FLAG_NO_MAPCHANGE);
+            }
+            else if (giRevertTime)
+            {
+                // Last player has disconnected, revert to defaults
+                CreateTimer(float(giRevertTime), T_LoadDefaults);
+            }
+		}
         else if (gbClientInit[iClient] && !IsGameMatch()) {
             IfCookiePlaySoundAll(ghCookieSounds, SOUND_DISCONNECT);
         }
@@ -2136,7 +2145,13 @@ public void OnClientDisconnect_Post(int iClient)
  *************************************************************/
 public Action T_RestartMap(Handle hTimer)
 {
-    SetGamemode(gsDefaultMode);
+    if(strlen(gsMode)) {
+        SetGamemode(gsMode);
+    }
+    else {
+        SetGamemode(gsDefaultMode);
+    }
+
     ghConVarNextmap.SetString(gsMap);
     ServerCommand("changelevel_next");
     gbPluginReady = true;
@@ -2545,7 +2560,10 @@ void SetMapcycle()
 {
     char sMapcycle[PLATFORM_MAX_PATH];
 
-    if (!GetModeMapcycle(sMapcycle, sizeof(sMapcycle), gsMode) || (gbStockMapsIfEmpty && GetRealClientCount(false, false) <= 1 && StrEqual(gsDefaultMode, gsMode)) ) {
+    if (strlen(gsEmptyCycle) && !GetRealClientCount(false) && StrEqual(gsDefaultMode, gsMode)) {
+        strcopy(sMapcycle, sizeof(sMapcycle), gsEmptyCycle);
+    }
+    else if (!GetModeMapcycle(sMapcycle, sizeof(sMapcycle), gsMode)) {
         Format(sMapcycle, sizeof(sMapcycle), "mapcycle_default.txt");
     }
 
@@ -2807,6 +2825,13 @@ void OnRoundEnd(bool bMatch)
 {
     gfEndtime = GetGameTime();
 
+    if (ghConVarChattime.IntValue > 1 && !GetRealClientCount(true))
+    {
+        // Nobody is in game, just skip to the next map
+        ServerCommand("changelevel_next");
+        return;
+    }
+
     if (bMatch)
     {
         char sCommand[MAX_BUFFER_LENGTH];
@@ -2957,12 +2982,18 @@ void SetGamestate(int iState)
     }
 }
 
-void LoadDefaults()
+public Action T_LoadDefaults(Handle hTimer)
 {
-    SetGamemode(gsDefaultMode);
-    SetMapcycle();
-    ghConVarNextmap.SetString("");
-    ServerCommand("changelevel_next");
+    if (!GetRealClientCount(false))
+    {
+        if (!StrEqual(gsMode, gsDefaultMode))
+        {
+            SetGamemode(gsDefaultMode);
+            SetMapcycle();
+            ghConVarNextmap.SetString("");
+            ServerCommand("changelevel_next");
+        }
+    }
 }
 
 public Action T_RePause(Handle hTimer)
@@ -3791,7 +3822,7 @@ public Action T_KeysHud(Handle hTimer)
             continue;
         }
 
-        if (GetClientButtons(iClient) & IN_SCORE || (!IsClientObserver(iClient) && !giShowKeys)) {
+        if (GetClientButtons(iClient) & IN_SCORE || (!IsClientObserver(iClient) && !gbSelfKeys)) {
             continue;
         }
 
@@ -3811,7 +3842,7 @@ public Action T_KeysHud(Handle hTimer)
 
             GetClientAbsAngles(iClient, fAngles);
 
-            if (giShowKeys != 2) {
+            if (!gbSelfKeys) {
                 Format(sHud, sizeof(sHud), "health: %i   suit: %i\n", GetClientHealth(iTarget), GetClientArmor(iTarget));
             }
 
