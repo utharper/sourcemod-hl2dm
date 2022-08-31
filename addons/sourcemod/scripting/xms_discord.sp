@@ -88,7 +88,10 @@ public void OnAllPluginsLoaded()
     GetConfigString(gsThumbsURL,  sizeof(gsThumbsURL),  "ThumbsURL",       "Discord");
     GetConfigString(gsFooter,     sizeof(gsFooter),     "FooterText",      "Discord");
     GetConfigString(gsFlagCode,   sizeof(gsFlagCode),   "FlagCode",        "Discord");
-    GetConfigString(gsReportHook, sizeof(gsReportHook), "FeedbackWebhook", "Discord");
+    
+    if(GetConfigString(gsReportHook, sizeof(gsReportHook), "FeedbackWebhook", "Discord")) {
+        ReplaceString(gsReportHook, sizeof(gsReportHook), "://discord.com", "://discordapp.com", false);        
+    }
 
     for (int i = 0; i < 99; i++)
     {
@@ -98,6 +101,8 @@ public void OnAllPluginsLoaded()
         if (!GetConfigString(gsMatchHook[i], sizeof(gsMatchHook[]), sKey, "Discord")) {
             break;
         }
+
+        ReplaceString(gsMatchHook[i], sizeof(gsMatchHook[]), "://discord.com", "://discordapp.com", false);
 
         if (StrContains(gsMatchHook[i], "/slack", false) == -1) {
             StrCat(gsMatchHook[i], sizeof(gsMatchHook[]), "/slack");
