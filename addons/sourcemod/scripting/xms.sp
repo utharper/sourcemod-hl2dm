@@ -2374,14 +2374,15 @@ int GetMapsArray(char[][] sArray, int iLen1, int iLen2, const char[] sMapcycle =
     // search mapcyclefile
     else
     {
+        int  iLine;
         char sPath[PLATFORM_MAX_PATH],
-             sMap [2][MAX_MAP_LENGTH];
+             sMap [2][256];
         File hFile;
 
         Format(sPath, sizeof(sPath), "cfg/%s", sMapcycle);
 
         if (!FileExists(sPath, true)) {
-            LogError("Mapcyclefile `%s` is invalid!", sMapcycle);
+            LogError("Mapcycle \"%s\" is invalid - file not found!", sMapcycle);
             return 0;
         }
 
@@ -2389,20 +2390,34 @@ int GetMapsArray(char[][] sArray, int iLen1, int iLen2, const char[] sMapcycle =
 
         while (!hFile.EndOfFile() && hFile.ReadLine(sMap[0], sizeof(sMap[])))
         {
-            if (sMap[0][0] == ';' || !IsCharAlpha(sMap[0][0])) {
-                continue;
-            }
-
+            iLine++;
+            
             for (int i = 0; i < strlen(sMap[0]); i++)
             {
-                if (IsCharSpace(sMap[0][i])) {
+                // skip lines with special characters
+                if (IsCharMB(sMap[0][i])) {
+                    continue;
+                }
+                
+                // cut out spaces
+                else if (IsCharSpace(sMap[0][i])) {
                     sMap[0][i] = '\0';
-                    break;
                 }
             }
-
+            
+            if (!strlen(sMap[0])) {
+                // skip lines that were only spaces
+                continue;
+            }
+            
+            if (sMap[0][0] == ';' || sMap[0][0] == '/') {
+                // ignore commented lines
+                continue;
+            }
+            
+            // log invalid maps
             if (!IsMapValid(sMap[0])) {
-                LogError("Map `%s` in Mapcyclefile `%s` is invalid!", sMap, sPath);
+                LogError("[%s]:%02i] \"%s\" !! map not found !!", sPath, iLine, sMap[0]);
                 continue;
             }
 
