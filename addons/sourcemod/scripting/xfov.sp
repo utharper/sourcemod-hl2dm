@@ -17,6 +17,7 @@ public Plugin myinfo = {
 #include <sourcemod>
 #include <clientprefs>
 #include <morecolors>
+#include <sdkhooks>
 
 #undef REQUIRE_PLUGIN
 #include <updater>
@@ -72,6 +73,11 @@ public void OnLibraryAdded(const char[] sName)
     if (StrEqual(sName, "updater")) {
         Updater_AddPlugin(PLUGIN_UPDATE);
     }
+}
+
+public void OnClientPostAdminCheck(int iClient)
+{
+    SDKHook(iClient, SDKHook_WeaponSwitchPost, OnClientSwitchWeapon);    
 }
 
 public Action Command_FOV(int iClient, int iArgs)
@@ -181,5 +187,12 @@ public Action OnClientToggleZoom(int iClient, const char[] sCommand, int iArgs)
     }
     else {
         giClientZoom[iClient] = ZOOM_TOGL;
+    }
+}
+
+public Action OnClientSwitchWeapon(int iClient, int iWeapon)
+{
+    if (giClientZoom[iClient] == ZOOM_TOGL) {
+        giClientZoom[iClient] = ZOOM_NONE;
     }
 }
