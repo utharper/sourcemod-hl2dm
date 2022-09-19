@@ -41,8 +41,9 @@ public Plugin myinfo = {
 #define OFFS_COLLISIONGROUP  500
 #define MENU_ROWLEN          32
 
-#define OVERTIME_TIME        1
-#define DELAY_ACTION         4
+#define OVERTIME_TIME        1 // minutes
+#define DELAY_ACTION         4 // "loading dm_lockdown in DELAY_ACTION seconds"
+#define XMENU_REFRESH_WAIT   15 // time after last xmenu action to attempt refresh
 
 #define SOUND_CONNECT        "friends/friend_online.wav"
 #define SOUND_DISCONNECT     "friends/friend_join.wav"
@@ -106,12 +107,14 @@ int         giGamestate,
             giPauseClient,
             giSpawnHealth,
             giSpawnSuit,
-            giSpawnAmmo     [16][2],
-            giClientMenuType[MAXPLAYERS + 1],
-            giClientVote    [MAXPLAYERS + 1],
+            giSpawnAmmo    [16][2],
+            giMenuStatus   [MAXPLAYERS + 1],
+            giMenuRefresh  [MAXPLAYERS + 1],
+            giClientVote   [MAXPLAYERS + 1],
             giClientVoteTick[MAXPLAYERS + 1],
             giVoteMinPlayers,
             giVoteMaxTime,
+            giVoteElapsed,
             giVoteCooldown,
             giVoteType,
             giVoteStatus,
@@ -122,8 +125,8 @@ int         giGamestate,
 bool        gbPluginReady,
             gbModTags,
             gbGameME,
-            gbClientInit    [MAXPLAYERS + 1],
-            gbClientKill    [MAXPLAYERS + 1],
+            gbClientInit  [MAXPLAYERS + 1],
+            gbClientKill  [MAXPLAYERS + 1],
             gbAutoVoting,
             gbTeamplay,
             gbDisableProps,
@@ -182,7 +185,7 @@ ConVar      ghConVarTags,
 KeyValues   gkConfig;
 
 StringMap   gmTeams,
-            gmMenu          [MAXPLAYERS + 1];
+            gmMenu        [MAXPLAYERS + 1];
 
 /**************************************************************
  * NATIVES
@@ -677,6 +680,7 @@ public void OnPluginStart()
     CreateTimer(0.1, T_KeysHud, _, TIMER_REPEAT);
     CreateTimer(0.1, T_TimeHud, _, TIMER_REPEAT);
     CreateTimer(1.0, T_Voting,  _, TIMER_REPEAT);
+    CreateTimer(1.0, T_MenuRefresh, _, TIMER_REPEAT);
 
     if (giAdFrequency) {
         CreateTimer(float(giAdFrequency), T_Adverts, _, TIMER_REPEAT);
@@ -817,6 +821,7 @@ public void OnAllPluginsLoaded()
     }
 }
 
+
 /**************************************************************
  * COMMANDS
  *************************************************************/
@@ -863,7 +868,7 @@ void RegisterMainCommands()
 // Open the XMS menu
 public Action Cmd_Menu(int iClient, int iArgs)
 {
-    giClientMenuType[iClient] = 0;
+    giMenuStatus[iClient] = 0;
     QueryClientConVar(iClient, "cl_showpluginmessages", ShowMenuIfVisible, iClient);
     return Plugin_Handled;
 }
@@ -1554,8 +1559,9 @@ public Action Cmd_Model(int iClient, int iArgs)
 
     if (!iArgs)
     {
-        if (giClientMenuType[iClient] == 2) {
-            ModelMenu(iClient).Display(iClient, MENU_TIME_FOREVER);
+        if (giMenuStatus[iClient] == 2) {
+            giMenuRefresh[iClient] = XMENU_REFRESH_WAIT;
+            ModelMenu(iClient).Display(iClient, XMENU_REFRESH_WAIT);
         }
         else {
             MC_PrintToChat(iClient, "%t", "xmenu_fail");
@@ -2103,8 +2109,7 @@ public void OnClientPostAdminCheck(int iClient)
         return;
     }
 
-    giClientMenuType[iClient] = 0;
-    CreateTimer(1.1, T_AttemptInitMenu, iClient, TIMER_FLAG_NO_MAPCHANGE);
+    giMenuStatus[iClient] = 0;
     CreateTimer(0.1, T_Welcome,         iClient, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 }
 
@@ -2122,14 +2127,14 @@ public void OnClientDisconnect(int iClient)
                 // Last player has disconnected, revert to defaults
                 CreateTimer(float(giRevertTime), T_LoadDefaults);
             }
-		}
+        }
         else if (gbClientInit[iClient] && !IsGameMatch()) {
             IfCookiePlaySoundAll(ghCookieSounds, SOUND_DISCONNECT);
         }
     }
 
     gbClientInit[iClient] = false;
-    giClientMenuType[iClient] = 0;
+    giMenuStatus[iClient] = 0;
     giClientVoteTick[iClient] = 0;
 }
 
@@ -2391,30 +2396,30 @@ int GetMapsArray(char[][] sArray, int iLen1, int iLen2, const char[] sMapcycle =
         while (!hFile.EndOfFile() && hFile.ReadLine(sMap[0], sizeof(sMap[])))
         {
             iLine++;
-            
+
             for (int i = 0; i < strlen(sMap[0]); i++)
             {
                 // skip lines with special characters
                 if (IsCharMB(sMap[0][i])) {
                     continue;
                 }
-                
+
                 // cut out spaces
                 else if (IsCharSpace(sMap[0][i])) {
                     sMap[0][i] = '\0';
                 }
             }
-            
+
             if (!strlen(sMap[0])) {
                 // skip lines that were only spaces
                 continue;
             }
-            
+
             if (sMap[0][0] == ';' || sMap[0][0] == '/') {
                 // ignore commented lines
                 continue;
             }
-            
+
             // log invalid maps
             if (!IsMapValid(sMap[0])) {
                 LogError("[%s]:%02i] \"%s\" !! map not found !!", sPath, iLine, sMap[0]);
@@ -3373,7 +3378,6 @@ void IfCookiePlaySoundAll(Handle hCookie, const char[] sFile, bool bUnset=true)
  *************************************************************/
 public Action T_Voting(Handle hTimer)
 {
-    static int  iSeconds;
     static bool bMultiChoice;
     static char sMotion[5][192];
 
@@ -3389,20 +3393,20 @@ public Action T_Voting(Handle hTimer)
 
     if (!giVoteStatus)
     {
-        if (iSeconds)
+        if (giVoteElapsed)
         {
             for (int i = 0; i < 5; i++) {
                 sMotion[i] = "";
                 gsVoteMotion[i] = "";
             }
 
-            iSeconds = 0;
+            giVoteElapsed = 0;
         }
 
         return Plugin_Continue;
     }
 
-    if (!iSeconds)
+    if (!giVoteElapsed)
     {
         // Prepare vote motion(s)
         bMultiChoice = view_as<bool>(strlen(gsVoteMotion[1]));
@@ -3512,7 +3516,7 @@ public Action T_Voting(Handle hTimer)
     }
 
     // Calculate result:
-    if ((iLead > -1 && !bContested) || iSeconds >= giVoteMaxTime)
+    if ((iLead > -1 && !bContested) || giVoteElapsed >= giVoteMaxTime)
     {
         if (bMultiChoice)
         {
@@ -3562,14 +3566,14 @@ public Action T_Voting(Handle hTimer)
 
     if (!bMultiChoice) {
         Format(sHud, sizeof(sHud), "%s%s (%i)\n▪ %s: %i (%i%%%%)\n▪ %s:  %i (%i%%%%)",
-            sHud, sMotion[0], giVoteMaxTime - iSeconds,
+            sHud, sMotion[0], giVoteMaxTime - giVoteElapsed,
             iTally[1] >= iTally[0] ? "YES" : "yes", iTally[1], iPercent[1],
             iTally[0] > iTally[1]  ? "NO"  : "no" , iTally[0], iPercent[0]
         );
     }
     else
     {
-        Format(sHud, sizeof(sHud), "%s(%i)", sHud, (giVoteMaxTime - iSeconds) );
+        Format(sHud, sizeof(sHud), "%s(%i)", sHud, (giVoteMaxTime - giVoteElapsed) );
 
         for (int i = 0; i < 5; i++)
         {
@@ -3680,13 +3684,12 @@ public Action T_Voting(Handle hTimer)
             else if (!bMultiChoice) {
                 MC_PrintToChat(iClient, "%t", giVoteStatus == -1 ? "xms_vote_fail" : "xms_vote_success");
             }
-
         }
         else {
             int iColor[3];
 
             GetClientColors(iClient, iColor);
-            SetHudTextParams(0.01, 0.11, 1.01, iColor[0], iColor[1], iColor[2], 255, view_as<int>(giVoteMaxTime - iSeconds <= 5), 0.0, 0.0, 0.0);
+            SetHudTextParams(0.01, 0.11, 1.01, iColor[0], iColor[1], iColor[2], 255, view_as<int>(giVoteMaxTime - giVoteElapsed <= 5), 0.0, 0.0, 0.0);
         }
 
         ShowSyncHudText(iClient, ghVoteHud, sHud2);
@@ -3696,7 +3699,7 @@ public Action T_Voting(Handle hTimer)
         giVoteStatus = 0;
     }
 
-    iSeconds++;
+    giVoteElapsed++;
     return Plugin_Continue;
 }
 
@@ -3726,7 +3729,7 @@ void CallVote(int iType, int iCaller)
 
         if ( (iClient != iCaller || bMulti) && (!IsClientObserver(iClient) || iType != VOTE_MATCH) ) {
             giClientVote[iClient] = -1;
-            VotingMenu(iClient).Display(iClient, MENU_TIME_FOREVER);
+            VotingMenu(iClient).Display(iClient, giVoteMaxTime);
         }
     }
 }
@@ -4164,32 +4167,43 @@ public void ShowMenuIfVisible(QueryCookie cookie, int iClient, ConVarQueryResult
 {
     if (!StringToInt(sCvarValue))
     {
-        if (giClientMenuType[iClient] == 0)
+        if (giMenuStatus[iClient] == 0)
         {
             MC_PrintToChat(iClient, "%t", "xmenu_fail");
             IfCookiePlaySound(ghCookieSounds, iClient, SOUND_COMMANDFAIL);
-
-            // keep trying in the background
-            CreateTimer(2.0, T_AttemptInitMenu, iClient, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
-            giClientMenuType[iClient] = 1;
+            giMenuStatus[iClient] = 1;
         }
     }
     else
     {
-        MC_PrintToChat(iClient, "%t", "xmenu_announce");
-        giClientMenuType[iClient] = 2;
-        FakeClientCommand(iClient, "sm_xmenu 0");
+        if(giMenuStatus[iClient] != 2)
+        {
+            MC_PrintToChat(iClient, "%t", "xmenu_announce");
+            giMenuStatus[iClient] = 2;
+        }
+
+        FakeClientCommand(iClient, "sm_xmenu -1");
     }
 }
 
-public Action T_AttemptInitMenu(Handle hTimer, int iClient)
+public Action T_MenuRefresh(Handle hTimer)
 {
-    if (!IsClientConnected(iClient) || !IsClientInGame(iClient) || IsFakeClient(iClient) || giClientMenuType[iClient] == 2) {
-        return Plugin_Stop;
-    }
+    for (int iClient = 1; iClient <= MaxClients; iClient++)
+    {
+        if (giMenuRefresh[iClient] <= 0)
+        {
+            if (IsClientConnected(iClient) && IsClientInGame(iClient) && !IsFakeClient(iClient))
+            {
 
-    QueryClientConVar(iClient, "cl_showpluginmessages", ShowMenuIfVisible, iClient);
-    return Plugin_Continue;
+                if(!giVoteStatus || giClientVote[iClient] != -1) {
+                    QueryClientConVar(iClient, "cl_showpluginmessages", ShowMenuIfVisible, iClient);
+                }
+            }
+        }
+        else {
+            giMenuRefresh[iClient]--;
+        }
+    }
 }
 
 
@@ -4207,7 +4221,7 @@ int XMenuPageCount(int iClient)
     return iCount;
 }
 
-void XMenuDisplay(StringMap mMenu, int iClient, int iPage=-1)
+void XMenuDisplay(StringMap mMenu, int iClient, int iPage = -1, bool bSilent = false)
 {
     int        iColor[3];
     char       sPage[3];
@@ -4233,7 +4247,10 @@ void XMenuDisplay(StringMap mMenu, int iClient, int iPage=-1)
     kMenu.SetColor("color", iColor[0], iColor[1], iColor[2], 255);
 
     CreateDialog(iClient, kMenu, iType);
-    IfCookiePlaySound(ghCookieSounds, iClient, SOUND_MENUACTION);
+
+    if (!bSilent) {
+        IfCookiePlaySound(ghCookieSounds, iClient, SOUND_MENUACTION);
+    }
 }
 
 public Action XMenuBack(int iClient, int iArgs)
@@ -4261,6 +4278,7 @@ public Action XMenuAction(int iClient, int iArgs)
 {
     int  iMenuId;
     char sParam[3][256];
+    bool bSilent;
 
     if (iClient == 0) {
         return Plugin_Handled;
@@ -4269,6 +4287,11 @@ public Action XMenuAction(int iClient, int iArgs)
     if (iArgs)
     {
         iMenuId = GetCmdArgInt(1);
+
+        if (iMenuId == -1) {
+            bSilent = true;
+            iMenuId = 0;
+        }
 
         for (int i = 2; i < iArgs + 1; i++)
         {
@@ -4279,6 +4302,8 @@ public Action XMenuAction(int iClient, int iArgs)
             GetCmdArg(i, sParam[i - 2], sizeof(sParam[]));
         }
     }
+
+    giMenuRefresh[iClient] = XMENU_REFRESH_WAIT;
 
     switch (iMenuId)
     {
@@ -4299,10 +4324,10 @@ public Action XMenuAction(int iClient, int iArgs)
                 Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_0", iClient, gsMode, sModeName, gsMap, gsServerName, GameVersion(), PLUGIN_VERSION, Tickrate(), bLan ? "local" : "dedicated", gsServerMsg);
 
                 gmMenu[iClient] = XMenuQuick(iClient, 7, false, false, "sm_xmenu 0", sTitle, sMessage, !IsGameMatch() ? "xmenu0_team" : "xmenu0_pause;pause",
-                  "xmenu0_vote", "xmenu0_players", "xmenu0_settings", "xmenu0_switch", "xmenu0_admin", "xmenu0_report;report"
+                  "xmenu0_vote", "xmenu0_players", "xmenu0_settings", "xmenu0_switch", IsClientAdmin(iClient) ? "xmenu0_admin" : "xmenu0_report;report"
                 );
 
-                XMenuDisplay(gmMenu[iClient], iClient);
+                XMenuDisplay(gmMenu[iClient], iClient, -1, bSilent);
             }
             else if (StrEqual(sParam[0], "pause"))
             {
@@ -4315,7 +4340,10 @@ public Action XMenuAction(int iClient, int iArgs)
             }
             else {
                 FakeClientCommand(iClient, "sm_xmenu %s", sParam[0]);
+                return Plugin_Handled;
             }
+
+            giMenuRefresh[iClient] = 0;
         }
 
         // Change Team menu
@@ -4992,6 +5020,7 @@ public Action XMenuAction(int iClient, int iArgs)
                     Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_6_feedback", iClient);
 
                     gmMenu[iClient] = XMenuBox("", sTitle, sFeedback, DialogType_Text);
+                    giMenuRefresh[iClient] = 0;
                 }
             }
             else

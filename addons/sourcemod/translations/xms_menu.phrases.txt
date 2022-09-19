@@ -25,84 +25,84 @@
     "xmenutitle_0"
     {
         "#format"   "{1:s}"
-        "en"        "XMS {1}"
+        "en"        "XMS {1} [www.hl2dm.community]"
     }
     "xmenutitle_1"
     {
-        "en"        "XMS Menu > Change Team"
+        "en"        "XMS > Change Team"
     }
     "xmenutitle_2"
     {
-        "en"        "XMS Menu > Call Vote"
+        "en"        "XMS > Call Vote"
     }
     "xmenutitle_2_map"
     {
-        "en"        "XMS Menu > Call Vote > Change Map"
+        "en"        "XMS > Call Vote > Change Map"
     }
     "xmenutitle_2_mapfilter"
     {
         "#format"   "{1:s}"
-        "en"        "XMS Menu > Call Vote > Sort Maps By Letter {1}"
+        "en"        "XMS > Call Vote > Sort Maps By Letter {1}"
     }
     "xmenutitle_2_mapconfirm"
     {
         "#format"   "{1:s},{2:s}"
-        "en"        "XMS Menu > Call Vote > {1} > {2}"
+        "en"        "XMS > Call Vote > {1} > {2}"
     }
     "xmenutitle_2_mode"
     {
-        "en"        "XMS Menu > Call Vote > Change Gamemode"
+        "en"        "XMS > Call Vote > Change Gamemode"
     }
     "xmenutitle_2_modemap"
     {
         "#format"   "{1:s}"
-        "en"        "XMS Menu > Call Vote > {1} > Select map"
+        "en"        "XMS > Call Vote > {1} > Select map"
     }
     "xmenutitle_2_start"
     {
-        "en"        "XMS Menu > Call Vote > Start Match"
+        "en"        "XMS > Call Vote > Start Match"
     }
     "xmenutitle_3"
     {
-        "en"        "XMS Menu > Player Info"
+        "en"        "XMS > Player Info"
     }
     "xmenutitle_4"
     {
-        "en"        "XMS Menu > Settings"
+        "en"        "XMS > Settings"
     }
     "xmenutitle_4_model"
     {
-        "en"        "XMS Menu > Settings > Player model"
+        "en"        "XMS > Settings > Player model"
     }
     "xmenutitle_4_fov"
     {
-        "en"        "XMS Menu > Settings > FOV"
+        "en"        "XMS > Settings > FOV"
     }
     "xmenutitle_4_hudcolor"
     {
-        "en"        "XMS Menu > Settings > HUD color"
+        "en"        "XMS > Settings > HUD color"
     }
     "xmenutitle_5"
     {
-        "en"        "XMS Menu > Switch Server"
+        "en"        "XMS > Switch Server"
     }
     "xmenutitle_6"
     {
-        "en"        "XMS Menu > Admin"
+        "en"        "XMS > Admin"
     }
     "xmenutitle_6_feedback"
     {
-        "en"        "XMS Menu > Admin > View Feedback/Reports"
+        "en"        "XMS > Admin > View Feedback/Reports"
     }
     "xmenutitle_7"
     {
-        "en"        "XMS Menu > Report Feedback"
+        "en"        "XMS > Report Feedback"
     }
 
     "xmenumsg_0"
     {
         "#format"   "{1:s},{2:s},{3:s},{4:s},{5:i},{6:s},{7:i},{8:s},{9:s}"
-        "en"        "Say !menu to reopen this page\n\n▪ mode  :  {1} {2}\n▪ map    :  {3}\n▪ server :  {4}\n▪ version:  v{5}/XMS {6}\n▪ type    :  {7} tick {8}\n\n{9}"
+        "en"        "eXtended Match System - !menu\n\n▪ mode  :  {1} {2}\n▪ map    :  {3}\n▪ server :  {4}\n▪ version:  v{5}/XMS {6}\n▪ type    :  {7} tick {8}\n\n{9}"
     }
     "xmenumsg_1"
     {
