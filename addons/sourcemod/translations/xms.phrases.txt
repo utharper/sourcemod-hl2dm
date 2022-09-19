@@ -28,8 +28,12 @@
     "xmsc_nextmap"
     {
         "#format"   "{1:s},{2:s}"
-        "en"        "{N}Next map is {H}{1}{N}:{H}{2}{N}."
+        "en"        "{N}Next map: {H}{1}{N}:{H}{2}{N}."
     }
+	"xmsc_nextmap_none"
+	{
+		"en"		"{N}Next map: {I}Pending vote{N}."
+	}
     "xmsc_currentmap"
     {
         "#format"   "{1:s},{2:s}"

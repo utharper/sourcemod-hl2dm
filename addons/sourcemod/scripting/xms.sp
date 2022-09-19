@@ -2005,11 +2005,23 @@ void Basecommands_Override(int iClient, const char[] sCommand, bool bBroadcast)
     }
     else if (StrEqual(sCommand, "nextmap"))
     {
-        if (bBroadcast) {
-            MC_PrintToChatAll("%t", "xmsc_nextmap", gsNextMode, DeprefixMap(gsNextMap));
+        if(!gbNextMapChosen)
+        {
+            if (bBroadcast) {
+                MC_PrintToChatAll("%t", "xmsc_nextmap_none");
+            }
+            else {
+                MC_PrintToChat(iClient, "%t", "xmsc_nextmap_none");
+            }
         }
-        else {
-            MC_PrintToChat(iClient, "%t", "xmsc_nextmap", gsNextMode, DeprefixMap(gsNextMap));
+        else
+        {
+            if (bBroadcast) {
+                MC_PrintToChatAll("%t", "xmsc_nextmap", gsNextMode, DeprefixMap(gsNextMap));
+            }
+            else {
+                MC_PrintToChat(iClient, "%t", "xmsc_nextmap", gsNextMode, DeprefixMap(gsNextMap));
+            }
         }
     }
     else if (StrEqual(sCommand, "currentmap"))
