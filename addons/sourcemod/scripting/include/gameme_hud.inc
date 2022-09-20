@@ -3,29 +3,49 @@
 #endif
 #define _gameme_hud_included
 
-enum(+=1)
-{
-    // Player rank      // Player rank as of when the current round started
-    GM_RANK,            GM_PRE_RANK,
-    
-    GM_POINTS,          GM_PRE_POINTS,
-    GM_KILLS,           GM_PRE_KILLS,
-    GM_DEATHS,          GM_PRE_DEATHS,
-    GM_SUICIDES,        GM_PRE_SUICIDES,
-    GM_HEADSHOTS,       GM_PRE_HEADSHOTS,
-    GM_HPK,             GM_PRE_HPK,
-    GM_ACCURACY,        GM_PRE_ACCURACY,
-    GM_KILLSPREE,       GM_PRE_KILLSPREE,
-    GM_DEATHSPREE,      GM_PRE_DEATHSPREE,
-    GM_KPD,             GM_PRE_KPD,
-    
-    GM_PLAYTIME,    // Total player time
-    GM_PRETIME,     // Playtime provided by gameME (updated on map change)
-    GM_MAPTIME,     // Playtime in the current map session
-    
-    // Change in total values during current round (can be negative):
-    GM_ROUNDPOINTS, GM_ROUNDKILLS, GM_ROUNDDEATHS, GM_ROUNDSUICIDES, GM_ROUNDHEADSHOTS
-}
+#define GM_RANK 0     // Player rank
+#define GM_PRE_RANK 1 // Player rank as of when the current round started
+
+#define GM_POINTS 2
+#define GM_PRE_POINTS 3
+
+#define GM_KILLS 4
+#define GM_PRE_KILLS 5
+
+#define GM_DEATHS 6
+#define GM_PRE_DEATHS 7
+
+#define GM_SUICIDES 8
+#define GM_PRE_SUICIDES 9
+
+#define GM_HEADSHOTS 10
+#define GM_PRE_HEADSHOTS 11
+
+#define GM_HPK 12
+#define GM_PRE_HPK 13
+
+#define GM_ACCURACY 14
+#define GM_PRE_ACCURACY 15
+
+#define GM_KILLSPREE 16
+#define GM_PRE_KILLSPREE 17
+
+#define GM_DEATHSPREE 18
+#define GM_PRE_DEATHSPREE 19
+
+#define GM_KPD 20
+#define GM_PRE_KPD 21
+
+#define GM_PLAYTIME 22 // Total player time
+#define GM_PRETIME 23  // Playtime provided by gameME (updated on map change)
+#define GM_MAPTIME 24  // Playtime in the current map session
+
+// Change in total values during current round (can be negative):
+#define GM_ROUNDPOINTS 25
+#define GM_ROUNDKILLS 26
+#define GM_ROUNDDEATHS 27
+#define GM_ROUNDSUICIDES 28
+#define GM_ROUNDHEADSHOTS 29
 
 /**************************************************************/
 
@@ -68,23 +88,23 @@ native int gameME_FetchTop10PlayerData(int iRank, char[] sName, int iLen);
 
 /**************************************************************/
 
-stock char gameME_FetchPlayerChar(int iClient, int iField, bool bRoundFloat=false)
+stock char[] gameME_FetchPlayerChar(int iClient, int iField, bool bRoundFloat=false)
 {
     char sValue[64];
-    
+
     gameME_FetchPlayerData(sValue, sizeof(sValue), iClient, iField, bRoundFloat);
-    
+
     return sValue;
 }
 
 stock int gameME_FetchPlayerInt(int iClient, int iField)
 {
     char sValue[64];
-    
-    if (gameME_FetchPlayerData(sValue, sizeof(sValue), iClient, iField)) {
+
+    if(gameME_FetchPlayerData(sValue, sizeof(sValue), iClient, iField)) {
         return StringToInt(sValue);
     }
-    
+
     return -1;
 }
 
@@ -92,11 +112,11 @@ stock float gameME_FetchPlayerFloat(int iClient, int iField, bool bRoundFloat=fa
 {
     char  sValue[64];
     float fValue = -1.0;
-    
+
     if (gameME_FetchPlayerData(sValue, sizeof(sValue), iClient, iField, bRoundFloat)) {
         fValue = StringToFloat(sValue);
     }
-    
+
     return fValue;
 }
 
@@ -105,11 +125,11 @@ stock float gameME_FetchPlayerFloat(int iClient, int iField, bool bRoundFloat=fa
 public SharedPlugin __pl_gameme_hud =
 {
     name = "gameme_hud",
-    file = "gameme_hud.smx", 
+    file = "gameme_hud.smx",
     #if defined REQUIRE_PLUGIN
-        required = 1, 
+        required = 1,
     #else
-        required = 0, 
+        required = 0,
     #endif
 };
 

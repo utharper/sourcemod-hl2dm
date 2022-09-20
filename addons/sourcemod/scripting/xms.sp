@@ -59,11 +59,15 @@ public Plugin myinfo = {
 #define SOUND_VOTESUCCESS    "xms/voteaccept.wav"
 #define SOUND_GG             "xms/gg.mp3"
 
-enum(+=1)
-{
-    VOTE_RUN, VOTE_RUNNEXT, VOTE_RUNNEXT_AUTO, VOTE_RUNMULTI, VOTE_RUNMULTINEXT,
-    VOTE_MATCH, VOTE_SHUFFLE, VOTE_INVERT, VOTE_CUSTOM
-}
+#define VOTE_RUN 0
+#define VOTE_RUNNEXT 1
+#define VOTE_RUNNEXT_AUTO 2
+#define VOTE_RUNMULTI 3
+#define VOTE_RUNMULTINEXT 4
+#define VOTE_MATCH 5
+#define VOTE_SHUFFLE 6
+#define VOTE_INVERT 7
+#define VOTE_CUSTOM 8
 
 char gsMusicPath[6][PLATFORM_MAX_PATH] =
 {
@@ -323,7 +327,7 @@ public int Native_XMenu(Handle hPlugin, int iParams)
 {
     int         iClient     = GetNativeCell(1),
                 iPage       = 0,
-                iOptions[2] = 0;
+                iOptions[2];
     bool        bBackButton = GetNativeCell(2),
                 bExitButton,
                 bNumbered   = GetNativeCell(3),
@@ -627,6 +631,8 @@ public APLRes AskPluginLoad2(Handle hPlugin, bool bLate, char[] sError, int iLen
     ghForwardFeedback         = CreateGlobalForward("OnClientFeedback",   ET_Event, Param_String, Param_String, Param_String, Param_String);
 
     RegPluginLibrary("xms");
+
+    return APLRes_Success;
 }
 
 public void OnPluginStart()
@@ -2172,8 +2178,11 @@ public Action T_RestartMap(Handle hTimer)
     ghConVarNextmap.SetString(gsMap);
     ServerCommand("changelevel_next");
     gbPluginReady = true;
+
+    return Plugin_Handled;
 }
 
+/* TODO: migrate to OnMapInit();
 public Action OnLevelInit(const char[] sMap, char sEntities[2097152])
 {
     char sKeys[4096],
@@ -2192,6 +2201,7 @@ public Action OnLevelInit(const char[] sMap, char sEntities[2097152])
 
     return Plugin_Changed;
 }
+*/
 
 public void OnMapStart()
 {
@@ -2257,6 +2267,8 @@ public Action OnMapChanging(int iClient, const char[] sCommand, int iArgs)
 
         CreateTimer(10.0, T_MapChangeFailsafe, giMapchangeCount);
     }
+
+    return Plugin_Continue;
 }
 
 public Action T_MapChangeFailsafe(Handle hTimer, int iMapcount)
@@ -2303,7 +2315,7 @@ bool GetMapByAbbrev(char[] sOutput, int iLen, const char[] sAbbrev)
     return view_as<bool>(GetConfigString(sOutput, iLen, sAbbrev, "Maps", "Abbreviations") > 0);
 }
 
-char DeprefixMap(const char[] sMap)
+char[] DeprefixMap(const char[] sMap)
 {
     char sPrefix[16],
          sResult[MAX_MAP_LENGTH];
@@ -2321,7 +2333,8 @@ char DeprefixMap(const char[] sMap)
     return sResult;
 }
 
-int GetMapsArray(char[][] sArray, int iLen1, int iLen2, const char[] sMapcycle = "", const char[] sMustBeginWith = "", const char[] sMustContain = "", bool bStopIfExactMatch = true, bool bStripPrefixes = false, char[][] sArray2 = NULL_STRING)
+// TODO: check sArray2
+int GetMapsArray(char[][] sArray, int iLen1, int iLen2, const char[] sMapcycle = "", const char[] sMustBeginWith = "", const char[] sMustContain = "", bool bStopIfExactMatch = true, bool bStripPrefixes = false, char[][] sArray2 = sArray)
 {
     int  iHits;
     bool bExact;
@@ -2732,7 +2745,7 @@ void ShuffleTeams(bool bBroadcast=true)
 
 public Action T_CheckPlayerStates(Handle hTimer)
 {
-    static int iWasTeam[MAXPLAYERS + 1] = -1;
+    static int iWasTeam[MAXPLAYERS + 1] = {-1, ...};
 
     if (giGamestate == GAME_CHANGING) {
         return Plugin_Continue;
@@ -2841,19 +2854,19 @@ void OnMatchPre()
     }
 }
 
-void OnMatchStart()
+public void OnMatchStart()
 {
     Forward_OnMatchStart();
 }
 
-void OnMatchCancelled()
+public void OnMatchCancelled()
 {
     ServerCommand("exec server");
     SetGamemode(gsMode);
     Forward_OnMatchEnd(false);
 }
 
-void OnRoundEnd(bool bMatch)
+public void OnRoundEnd(bool bMatch)
 {
     gfEndtime = GetGameTime();
 
@@ -3026,6 +3039,8 @@ public Action T_LoadDefaults(Handle hTimer)
             ServerCommand("changelevel_next");
         }
     }
+
+    return Plugin_Handled;
 }
 
 public Action T_RePause(Handle hTimer)
@@ -3051,6 +3066,8 @@ public Action T_RePause(Handle hTimer)
 public Action T_RemoveWeapons(Handle hTimer, int iClient)
 {
     Client_RemoveAllWeapons(iClient);
+
+    return Plugin_Handled;
 }
 
 public Action T_SetWeapons(Handle hTimer, int iClient)
@@ -3076,6 +3093,8 @@ public Action T_SetWeapons(Handle hTimer, int iClient)
             Client_GiveWeaponAndAmmo(iClient, gsSpawnWeapon[i], false, giSpawnAmmo[i][0], giSpawnAmmo[i][1], 0, 0);
         }
     }
+
+    return Plugin_Handled;
 }
 
 /**************************************************************
@@ -3206,6 +3225,8 @@ public Action Event_RoundStart(Event hEvent, const char[] sEvent, bool bDontBroa
             }
         }
     }
+
+    return Plugin_Continue;
 }
 
 public Action UserMsg_TextMsg(UserMsg msg, Handle hMsg, const int[] iPlayers, int iNumPlayers, bool bReliable, bool bInit)
@@ -3357,6 +3378,8 @@ public Action T_SoundFadeTrigger(Handle hTimer)
 {
     ClientCommandAll("soundfade 100 1 0 5");
     SetGamestate(GAME_CHANGING);
+
+    return Plugin_Handled;
 }
 
 /**************************************************************
@@ -3540,7 +3563,7 @@ public Action T_Voting(Handle hTimer)
                 }
                 else {
                     // Draw. Pick winner at random from the first 2 equal choices
-                    int iWinner[2] = -1;
+                    int iWinner[2] = {-1, -1};
 
                     for (int i = 0; i < 6; i++)
                     {
@@ -3959,6 +3982,8 @@ public Action T_TimeHud(Handle hTimer)
             ShowSyncHudText(iClient, ghTimeHud, sHud2);
         }
     }
+
+    return Plugin_Continue;
 }
 
 /**************************************************************
@@ -3989,6 +4014,8 @@ public Action T_PreOvertime(Handle hTimer)
     }
 
     ghOvertimer = INVALID_HANDLE;
+
+    return Plugin_Handled;
 }
 
 void StartOvertime()
@@ -4058,6 +4085,8 @@ public Action T_Overtime(Handle hTimer)
 public Action T_StartRecord(Handle hTimer)
 {
     StartRecord();
+
+    return Plugin_Handled;
 }
 
 void StartRecord()
@@ -4075,6 +4104,8 @@ void StartRecord()
 public Action T_StopRecord(Handle hTimer, bool bEarly)
 {
     StopRecord(bEarly);
+
+    return Plugin_Handled;
 }
 
 void StopRecord(bool bDiscard)
@@ -4216,6 +4247,8 @@ public Action T_MenuRefresh(Handle hTimer)
             giMenuRefresh[iClient]--;
         }
     }
+
+    return Plugin_Continue;
 }
 
 
@@ -5230,6 +5263,8 @@ public int VotingMenuAction(Menu hMenu, MenuAction iAction, int iClient, int iPa
 
         FakeClientCommand(iClient, "sm_xmenu 0");
     }
+
+    return 1;
 }
 
 Menu ModelMenu(int iClient)
@@ -5264,6 +5299,8 @@ public int ModelMenuAction(Menu hMenu, MenuAction iAction, int iClient, int iPar
 
         FakeClientCommand(iClient, "sm_xmenu 0");
     }
+
+    return 1;
 }
 
 // END

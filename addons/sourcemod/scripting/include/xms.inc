@@ -9,22 +9,20 @@
 
 #define MAX_MODE_LENGTH 16
 
-enum( += 1) // Gamestates:
-{
-    GAME_PAUSED = -1,  // Game is paused
-    GAME_DEFAULT,      // Standard state
-    GAME_OVERTIME,     // Non-match overtime
-    GAME_MATCHWAIT,    // Match countdown
-    GAME_MATCH,        // Match in progress
-    GAME_MATCHEX,      // Match overtime
-    GAME_OVER,         // Map has ended
-    GAME_CHANGING,     // Map is changing/reloading
-}
+// Gamestates:
+#define GAME_PAUSED    -1 // Game is paused
+#define GAME_DEFAULT    0 // Standard state
+#define GAME_OVERTIME   1 // Non-match overtime
+#define GAME_MATCHWAIT  2 // Match countdown
+#define GAME_MATCH      3 // Match in progress
+#define GAME_MATCHEX    4 // Match overtime
+#define GAME_OVER       5 // Map has ended
+#define GAME_CHANGING   6 // Map is changing/reloading
 
 /**************************************************************
  * NATIVES
  *************************************************************/
- 
+
 /**
  * Retrieve comma-seperated list of available subkeys
  *
@@ -109,25 +107,45 @@ native float GetTimeRemaining(bool bChatTime);
  */
 native StringMap XMenu(int iClient, bool bBackButton, bool bNumbered, const char[] sCommandBase, const char[] sTitle, const char[] sMessage, Handle dPack);
 
-// Create menu from translation strings instead
+/**
+ * (Internal use) Create menu from translation strings
+ *
+ * @param iClient       Client index for translation language
+ * @param iTranslate    Translation type
+ * @param bBackButton   Show back button on non-paginated menu?
+ * @param bNumbered     Show option numbers?
+ * @param sCommandBase  Command base for menu options
+ * @param sTitle        Title of menu
+ * @param sMessage      Message of menu
+ * @param ...           Menu options
+ * @return              StringMap containing KeyValues for each page
+ */
 native StringMap XMenuQuick(int iClient, int iTranslate, bool bBackButton, bool bNumbered, const char[] sCommandBase, const char[] sTitle, const char[] sMessage, any ...);
-#define XMENU_TRANSLATE_NONE 0
-#define XMENU_TRANSLATE_TITLE 1
-#define XMENU_TRANSLATE_TITLE_MESSAGE 2
-#define XMENU_TRANSLATE_TITLE_MESSAGE_OPTIONS 3
-#define XMENU_TRANSLATE_TITLE_OPTIONS 4
-#define XMENU_TRANSLATE_MESSAGE_OPTIONS 5
-#define XMENU_TRANSLATE_MESSAGE 6
-#define XMENU_TRANSLATE_OPTIONS 7
+#define XMENU_TRANSLATE_NONE                    0
+#define XMENU_TRANSLATE_TITLE                   1
+#define XMENU_TRANSLATE_TITLE_MESSAGE           2
+#define XMENU_TRANSLATE_TITLE_MESSAGE_OPTIONS   3
+#define XMENU_TRANSLATE_TITLE_OPTIONS           4
+#define XMENU_TRANSLATE_MESSAGE_OPTIONS         5
+#define XMENU_TRANSLATE_MESSAGE                 6
+#define XMENU_TRANSLATE_OPTIONS                 7
 
-// Create menu without options (richtext/entry)
+/**
+ * (Internal use) Create menu box without options
+ *
+ * @param sCommandBase  Command base for menu
+ * @param sTitle        Title of menu
+ * @param sMessage      Message of menu
+ * @param iType         DialogType_Entry or DialogType_Text
+ * @return              StringMap containing KeyValues for menu
+ */
 native StringMap XMenuBox(const char[] sCommandBase, const char[] sTitle, const char[] sMessage, DialogType iType=DialogType_Entry);
 
 
 /**************************************************************
  * FORWARDS
  *************************************************************/
- 
+
 /**
  * Called when the Gamestate value changes
  *
@@ -162,16 +180,16 @@ forward void OnClientFeedback(const char[] sFeedback, const char[] sName, const 
 /**************************************************************
  * USEFUL SHORTCUTS
  *************************************************************/
- 
+
 // Is a match in progress?
 stock bool IsGameMatch()
 {
     int iState = GetGamestate();
-    
+
     if (iState == GAME_MATCH || iState == GAME_MATCHEX || iState == GAME_MATCHWAIT || iState == GAME_PAUSED) {
         return true;
     }
-    
+
     return false;
 }
 
@@ -179,11 +197,11 @@ stock bool IsGameMatch()
 stock bool IsGameOver()
 {
     int iState = GetGamestate();
-    
+
     if (iState == GAME_OVER || iState == GAME_CHANGING) {
         return true;
     }
-    
+
     return false;
 }
 
@@ -191,9 +209,9 @@ stock bool IsGameOver()
 stock bool IsGamemode(const char[] sMode)
 {
     char sCurrent[MAX_MODE_LENGTH];
-    
+
     GetGamemode(sCurrent, sizeof(sCurrent));
-    
+
     return StrEqual(sCurrent, sMode, false);
 }
 
@@ -201,11 +219,11 @@ stock bool IsGamemode(const char[] sMode)
 stock bool IsValidGamemode(const char[] sMode)
 {
     char sList[512];
-    
+
     if (GetConfigKeys(sList, sizeof(sList), "Gamemodes")) {
         return IsItemDistinctInList(sMode, sList);
     }
-    
+
     return false;
 }
 
@@ -213,14 +231,14 @@ stock bool IsValidGamemode(const char[] sMode)
 stock bool IsModeMatchable(const char[] sMode = NULL_STRING)
 {
     char sMode2[MAX_MODE_LENGTH];
-    
+
     if (!strlen(sMode)) {
         GetGamemode(sMode2, sizeof(sMode2));
     }
     else {
-        strcopy(sMode2, sizeof(sMode2), sMode);    
+        strcopy(sMode2, sizeof(sMode2), sMode);
     }
-    
+
     return view_as<bool>(GetConfigInt("Matchable", "Gamemodes", sMode2));
 }
 
@@ -228,15 +246,15 @@ stock bool IsModeMatchable(const char[] sMode = NULL_STRING)
 /**************************************************************
  * PLUGIN LIBRARY
  *************************************************************/
- 
+
 public SharedPlugin __pl_xms =
 {
     name = "xms",
-    file = "xms.smx", 
+    file = "xms.smx",
     #if defined REQUIRE_PLUGIN
-        required = 1, 
+        required = 1,
     #else
-        required = 0, 
+        required = 0,
     #endif
 };
 

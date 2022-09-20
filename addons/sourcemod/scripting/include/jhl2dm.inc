@@ -1,3 +1,7 @@
+#if !defined _smlib_included
+    #error "smlib required"
+#endif
+
 #if defined _jhl2dm_included
     #endinput
 #endif
@@ -8,10 +12,14 @@
 #define MAX_MAP_LENGTH  32
 #define MAX_SAY_LENGTH  192
 
-enum(+=1) {
-    TEAM_SPECTATORS = 1, TEAM_COMBINE, TEAM_REBELS,
-    SPECMODE_FIRSTPERSON, SPECMODE_THIRDPERSON, SPECMODE_ENEMYVIEW, SPECMODE_FREELOOK
-}
+#define TEAM_SPECTATORS 1
+#define TEAM_COMBINE    2
+#define TEAM_REBELS     3
+
+#define SPECMODE_FIRSTPERSON 4
+#define SPECMODE_THIRDPERSON 5
+#define SPECMODE_ENEMYVIEW   6
+#define SPECMODE_FREELOOK    7
 
 // clientprefs
 #if defined _clientprefs_included
@@ -122,7 +130,7 @@ stock bool IsClientAdmin(int iClient, int iFlag=ADMFLAG_GENERIC)
     return CheckCommandAccess(iClient, "generic_admin", iFlag, false);
 }
 
-stock char UnbufferedAuthId(int iClient, AuthIdType iType=AuthId_Engine)
+stock char[] UnbufferedAuthId(int iClient, AuthIdType iType=AuthId_Engine)
 {
     char sId[32];
 
@@ -205,15 +213,6 @@ stock int ClientArgToTarget(int iClient, int iArg, bool bExcludeBots=true)
     return iTarget;
 }
 
-stock int GetCmdArgInt(int iArg)
-{
-    char sArg[192];
-
-    GetCmdArg(iArg, sArg, sizeof(sArg));
-
-    return (StringToInt(sArg));
-}
-
 stock void ClientCommandAll(const char[] sFormat, any...)
 {
     char sCommand[PLATFORM_MAX_PATH];
@@ -285,7 +284,7 @@ stock int GetTopTeam()
     );
 }
 
-stock char Timestring(float fTime, bool bFloatingSeconds=false, bool bClockStyle=false)
+stock char[] Timestring(float fTime, bool bFloatingSeconds=false, bool bClockStyle=false)
 {
     char sTime[32];
     int  iHours   = RoundToNearest(fTime) / 3600,
@@ -317,14 +316,14 @@ stock char Timestring(float fTime, bool bFloatingSeconds=false, bool bClockStyle
     return sTime;
 }
 
-stock char BigNumber(int iValue)
+stock char[] BigNumber(int iValue)
 {
     char sBigNums[10][4] = { "０", "１", "２", "３", "４", "５", "６", "７", "８", "９" };
 
     return sBigNums[iValue];
 }
 
-stock char IntToChar(int iValue)
+stock char[] IntToChar(int iValue)
 {
     char sValue[32];
     IntToString(iValue, sValue, sizeof(sValue));
