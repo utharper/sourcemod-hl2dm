@@ -2,7 +2,7 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#define PLUGIN_VERSION     "1.92"
+#define PLUGIN_VERSION     "1.93"
 #define PLUGIN_URL         "www.hl2dm.community"
 #define PLUGIN_UPDATE      "http://raw.githubusercontent.com/utharper/sourcemod-hl2dm/master/addons/sourcemod/xms.upd"
 
