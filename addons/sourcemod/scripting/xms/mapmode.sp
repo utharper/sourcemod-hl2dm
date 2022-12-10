@@ -47,6 +47,10 @@ public void OnMapStart()
     }
 
     CreateTimer(0.1, T_CheckPlayerStates, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+    
+    if(gVoting.bAutomatic) {
+        gConVar.sm_nextmap.SetString(""); // fuck off
+    }
 }
 
 public void OnNextmapChanged(Handle hConvar, const char[] sOldValue, const char[] sNewValue)
