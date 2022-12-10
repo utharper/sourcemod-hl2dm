@@ -18,6 +18,7 @@ public Plugin myinfo = {
 
 #include <sourcemod>
 #include <steamworks>
+#include <smlib>
 
 #undef REQUIRE_PLUGIN
 #include <updater>

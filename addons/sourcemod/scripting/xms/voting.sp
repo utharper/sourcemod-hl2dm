@@ -7,6 +7,8 @@
 #define VOTE_SHUFFLE 6
 #define VOTE_INVERT 7
 #define VOTE_CUSTOM 8
+#define VOTE_KICK 9
+#define VOTE_MUTE 10
 
 char gsVoteMotion[5][192];
 
@@ -17,6 +19,7 @@ public Action T_Voting(Handle hTimer)
 {
     static bool bMultiChoice;
     static char sMotion[5][192];
+    static int iTarget;
 
     char sHud[1024];
     bool bContested,
@@ -38,6 +41,7 @@ public Action T_Voting(Handle hTimer)
             }
 
             gVoting.iElapsed = 0;
+            iTarget = 0;
         }
 
         return Plugin_Continue;
@@ -101,6 +105,30 @@ public Action T_Voting(Handle hTimer)
         else {
             for (int i = 0; i < 5; i++) {
                 strcopy(sMotion[i], sizeof(sMotion[]), gsVoteMotion[i]);
+            }
+        }
+        
+        if (gVoting.iType == VOTE_KICK || gVoting.iType == VOTE_MUTE)
+        {
+            switch (iTarget)
+            {
+                case -1: {
+                    gVoting.iStatus = -1;
+                }
+                
+                case 0: {
+                    char sTarget[8];
+                    SplitString(sMotion[0], ":", sTarget, sizeof(sTarget));
+                    strcopy(sTarget, sizeof(sTarget), sTarget[StrContains(sTarget, " ") + 1]);
+                    iTarget = StringToInt(sTarget);
+                }
+                
+                default:
+                {
+                    if(!IsClientInGame(iTarget)) {
+                        iTarget = -1;
+                    }
+                }
             }
         }
     }
@@ -260,6 +288,16 @@ public Action T_Voting(Handle hTimer)
                     else {
                         Cancel();
                     }
+                }
+                
+                case VOTE_KICK:
+                {
+                    KickClient(iTarget, "%T", "xms_votekicked", iTarget);
+                }
+                
+                case VOTE_MUTE:
+                {
+                    Client_Mute(iTarget);
                 }
 
                 case VOTE_CUSTOM: {

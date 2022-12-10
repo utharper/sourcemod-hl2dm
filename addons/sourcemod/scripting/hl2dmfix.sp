@@ -46,6 +46,7 @@ StringMap gmKills,
 public APLRes AskPluginLoad2(Handle hPlugin, bool bLate, char[] sError, int iLen)
 {
     RegPluginLibrary("hl2dmfix");
+    return APLRes_Success;
 }
 
 public void OnPluginStart()
@@ -181,6 +182,8 @@ public Action Event_RoundStart(Handle hEvent, const char[] sEvent, bool bDontBro
     gmTeams.Clear();
     gmKills.Clear();
     gmDeaths.Clear();
+    
+    return Plugin_Continue;
 }
 
 public void OnClientPutInServer(int iClient)
@@ -297,6 +300,8 @@ public Action Hook_WeaponCanSwitchTo(int iClient, int iWeapon)
 {
     // Hands animation fix by toizy >
     SetEntityFlags(iClient, GetEntityFlags(iClient) | FL_ONGROUND);
+    
+    return Plugin_Changed;
 }
 
 public void OnEntityCreated(int iEntity, const char[] sEntity)
@@ -305,6 +310,8 @@ public void OnEntityCreated(int iEntity, const char[] sEntity)
     if (StrEqual(sEntity, "env_sprite", false) || StrEqual(sEntity, "env_spritetrail", false)) {
         RequestFrame(GetSpriteData, EntIndexToEntRef(iEntity));
     }
+    
+    return;
 }
 
 void GetSpriteData(int iRef)
@@ -353,8 +360,8 @@ void GetSpriteData(int iRef)
 
 public Action T_CheckPlayerStates(Handle hTimer)
 {
-    static bool bWasAlive[MAXPLAYERS + 1] = false;
-    static int  iWasTeam[MAXPLAYERS + 1]  = -1;
+    static bool bWasAlive[MAXPLAYERS + 1] = {false};
+    static int  iWasTeam[MAXPLAYERS + 1]  = {-1};
 
     int iTeamScore[4];
 
@@ -402,6 +409,8 @@ public Action T_CheckPlayerStates(Handle hTimer)
     for (int i = 1; i < 4; i++) {
         Team_SetScore(i, iTeamScore[i]);
     }
+    
+    return Plugin_Continue;
 }
 
 void SavePlayerStates()
@@ -470,6 +479,8 @@ public Action T_BlockConnectMOTD(Handle hTimer, int iClient)
             EndMessage();
         }
     }
+    
+    return Plugin_Handled;
 }
 
 public Action UserMsg_VGUIMenu(UserMsg msg, Handle hMsg, const int[] iPlayers, int iNumPlayers, bool bReliable, bool bInit)
@@ -489,4 +500,6 @@ public Action Event_GameMessage(Event hEvent, const char[] sEvent, bool bDontBro
 {
     // block Server cvar spam
     hEvent.BroadcastDisabled = true;
+    
+    return Plugin_Changed;
 }

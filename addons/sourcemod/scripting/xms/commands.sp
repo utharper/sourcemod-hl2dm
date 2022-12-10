@@ -13,6 +13,8 @@ void RegisterCommands()
     RegConsoleCmd("cancel"     , Cmd_Cancel,   "[Vote to] cancel the match");
     RegConsoleCmd("shuffle"    , Cmd_Shuffle,  "[Vote to] shuffle teams");
     RegConsoleCmd("invert"     , Cmd_Invert,   "[Vote to] invert the teams");
+    RegConsoleCmd("votekick"   , Cmd_Votekick, "[Vote to] kick player");
+    RegConsoleCmd("votemute"   , Cmd_Votemute, "[Vote to] mute player voice");
     RegConsoleCmd("profile"    , Cmd_Profile,  "View player's steam profile");
     RegConsoleCmd("model"      , Cmd_Model,    "Change player model");
     RegConsoleCmd("hudcolor"   , Cmd_HudColor, "Change HUD color");
@@ -1065,6 +1067,101 @@ public Action Cmd_Invert(int iClient, int iArgs)
         else {
             CallVoteFor(VOTE_INVERT, iClient, "invert teams");
         }
+        return Plugin_Handled;
+    }
+
+    IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_COMMANDFAIL);
+    return Plugin_Handled;
+}
+
+/**************************************************************
+ * COMMAND: VOTEKICK
+ * (Vote to) kick player
+ *************************************************************/
+public Action Cmd_Votekick(int iClient, int iArgs)
+{
+    if(!iArgs) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_votekick_usage");
+    }
+    
+    int iTarget = ClientArgToTarget(iClient, 1);
+    
+    if (iTarget == -1)
+    {
+        return Plugin_Handled;
+    }
+    else if (iClient == 0)
+    {
+        KickClient(iTarget, "%T", "xms_adminkicked", iTarget);
+        return Plugin_Handled;
+    }
+    else if (gVoting.iStatus) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_vote_deny");
+    }
+    else if (VoteTimeout(iClient)  && !IsClientAdmin(iClient)) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_vote_timeout", VoteTimeout(iClient));
+    }
+    else if (IsClientObserver(iClient) && !IsClientAdmin(iClient)) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_spectator");
+    }
+    else if (gRound.iState == GAME_MATCH || gRound.iState == GAME_MATCHEX || gRound.iState == GAME_PAUSED) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_match");
+    }
+    else if (gRound.iState == GAME_CHANGING || gRound.iState == GAME_MATCHWAIT) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_changing");
+    }
+    else
+    {
+        CallVoteFor(VOTE_KICK, iClient, "kick %i:\"%N\"", iTarget, iTarget);
+        return Plugin_Handled;
+    }
+
+    IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_COMMANDFAIL);
+    return Plugin_Handled;
+}
+
+/**************************************************************
+ * COMMAND: VOTEMUTE
+ * (Vote to) mute player
+ *************************************************************/
+public Action Cmd_Votemute(int iClient, int iArgs)
+{
+    if(!iArgs) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_votemute_usage");
+    }
+    
+    int iTarget = ClientArgToTarget(iClient, 1);
+    
+    if (iTarget == -1)
+    {
+        return Plugin_Handled;
+    }
+    else if (iClient == 0)
+    {
+        Client_Mute(iTarget);
+        return Plugin_Handled;
+    }
+    else if (Client_IsMuted(iTarget)) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_votemute_already");
+    }
+    else if (gVoting.iStatus) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_vote_deny");
+    }
+    else if (VoteTimeout(iClient)  && !IsClientAdmin(iClient)) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_vote_timeout", VoteTimeout(iClient));
+    }
+    else if (IsClientObserver(iClient) && !IsClientAdmin(iClient)) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_spectator");
+    }
+    else if (gRound.iState == GAME_MATCH || gRound.iState == GAME_MATCHEX || gRound.iState == GAME_PAUSED) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_match");
+    }
+    else if (gRound.iState == GAME_CHANGING || gRound.iState == GAME_MATCHWAIT) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_changing");
+    }
+    else
+    {
+        CallVoteFor(VOTE_MUTE, iClient, "mute %i:\"%N\"", iTarget, iTarget);
         return Plugin_Handled;
     }
 

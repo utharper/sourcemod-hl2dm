@@ -407,4 +407,26 @@
         "#format"   "{1:i},{2:s}"
         "en"        "{I}The vote was won by option {H}{1} {I}({H}{2}){I}."
     }
+	
+	"xmsc_votekick_usage"
+	{
+		"en"        "{I}Usage: !votekick <player name or index>"
+	}
+	"xms_adminkicked"
+	{
+		"en"		"Kicked by admin"
+	}
+	"xms_votekicked"
+	{
+		"en"		"Kicked by player vote."
+	}
+	
+	"xmsc_votemute_usage"
+	{
+		"en"        "{I}Usage: !votemute <player name or index>"
+	}
+	"xmsc_votemute_already"
+	{
+		"en"		"{E}Player is already muted."
+	}
 }

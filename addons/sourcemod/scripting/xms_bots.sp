@@ -183,6 +183,8 @@ public Action T_BotAdd(Handle hTimer)
     if (GetRealClientCount(true, false) == 1 && giState == GAME_DEFAULT) {
         ServerCommand("rcbotd addbot");
     }
+    
+    return Plugin_Handled;
 }
 
 public Action T_BotAnnounce(Handle hTimer)
@@ -236,6 +238,7 @@ public Action T_BotAnnounce(Handle hTimer)
             iTimer++;
         }
     }
+    
     return Plugin_Continue;
 }
 
@@ -259,6 +262,8 @@ public Action T_BotRemove(Handle hTimer)
             giBotClient = 0;
         }
     }
+    
+    return Plugin_Handled;
 }
 
 public Action T_BotTaunt(Handle hTimer)
