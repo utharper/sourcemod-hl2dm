@@ -1,5 +1,6 @@
 #define MENU_ROWLEN        32
 #define XMENU_REFRESH_WAIT 15 // Time since last menu action to attempt refresh
+#define XMENU_REFRESH_BASE 2  // Time to refresh base menu (workaround for 'Close')
 
 /**************************************************************
  * NATIVES
@@ -325,7 +326,7 @@ public Action XMenuAction(int iClient, int iArgs)
                 return Plugin_Handled;
             }
 
-            gClient[iClient].iMenuRefresh = 0;
+            gClient[iClient].iMenuRefresh = XMENU_REFRESH_BASE;
         }
 
         // Change Team menu
