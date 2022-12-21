@@ -2,7 +2,7 @@
 
 #define PLUGIN_VERSION  "2.0"
 #define PLUGIN_URL      "www.hl2dm.community"
-#define PLUGIN_UPDATE   "http://raw.githubusercontent.com/utharper/sourcemod-hl2dm/master/addons/sourcemod/extended_fov.upd"
+#define PLUGIN_UPDATE   "http://raw.githubusercontent.com/utharper/sourcemod-hl2dm/master/addons/sourcemod/xfov.upd"
 
 public Plugin myinfo = {
     name              = "xfov (eXtended Field Of View)",
@@ -78,22 +78,22 @@ public void OnLibraryAdded(const char[] sName)
     }
 }
 
-public void OnClientPostAdminCheck(int iClient)
+public void OnClientPutInServer(int iClient)
 {
-    SDKHook(iClient, SDKHook_WeaponSwitchPost, OnClientSwitchWeapon);    
+    SDKHook(iClient, SDKHook_WeaponSwitchPost, OnClientSwitchWeapon);
 }
 
 public Action Command_FOV(int iClient, int iArgs)
 {
     RequestFOV(iClient, GetCmdArgInt(1));
-    
+
     return Plugin_Handled;
 }
 
 public Action OnClientChangeFOV(int iClient, const char[] sCommand, int iArgs)
 {
     RequestFOV(iClient, GetCmdArgInt(1));
-    
+
     return Plugin_Handled;
 }
 
@@ -195,8 +195,8 @@ public Action OnClientToggleZoom(int iClient, const char[] sCommand, int iArgs)
     else {
         giClientZoom[iClient] = ZOOM_TOGL;
     }
-    
-    return Plugin_Handled;
+
+    return Plugin_Continue;
 }
 
 public Action OnClientSwitchWeapon(int iClient, int iWeapon)
@@ -204,6 +204,6 @@ public Action OnClientSwitchWeapon(int iClient, int iWeapon)
     if (giClientZoom[iClient] == ZOOM_TOGL) {
         giClientZoom[iClient] = ZOOM_NONE;
     }
-    
-    return Plugin_Handled;
+
+    return Plugin_Continue;
 }
