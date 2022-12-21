@@ -775,8 +775,8 @@ public Action Cmd_Model(int iClient, int iArgs)
     if (!iArgs)
     {
         if (gClient[iClient].iMenuStatus == 2) {
-            gClient[iClient].iMenuRefresh = XMENU_REFRESH_WAIT;
-            ModelMenu(iClient).Display(iClient, XMENU_REFRESH_WAIT);
+            gClient[iClient].iMenuRefresh = 30;
+            ModelMenu(iClient).Display(iClient, 30);
         }
         else {
             MC_PrintToChat(iClient, "%t", "xmenu_fail");
@@ -974,7 +974,8 @@ public Action Cmd_CastVote(int iClient, int iArgs)
     }
 
     IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_COMMANDFAIL);
-
+    gClient[iClient].iMenuRefresh = 0;
+    
     return Plugin_Handled;
 }
 
@@ -1080,7 +1081,7 @@ public Action Cmd_Invert(int iClient, int iArgs)
  *************************************************************/
 public Action Cmd_Votekick(int iClient, int iArgs)
 {
-    if(!iArgs) {
+    if (!iArgs) {
         MC_ReplyToCommand(iClient, "%t", "xmsc_votekick_usage");
     }
     
@@ -1126,7 +1127,7 @@ public Action Cmd_Votekick(int iClient, int iArgs)
  *************************************************************/
 public Action Cmd_Votemute(int iClient, int iArgs)
 {
-    if(!iArgs) {
+    if (!iArgs) {
         MC_ReplyToCommand(iClient, "%t", "xmsc_votemute_usage");
     }
     
@@ -1323,7 +1324,7 @@ void Basecommands_Override(int iClient, const char[] sCommand, bool bBroadcast)
     }
     else if (StrEqual(sCommand, "nextmap"))
     {
-        if(!strlen(gRound.sNextMap))
+        if (!strlen(gRound.sNextMap))
         {
             if (bBroadcast) {
                 MC_PrintToChatAll("%t", "xmsc_nextmap_none");

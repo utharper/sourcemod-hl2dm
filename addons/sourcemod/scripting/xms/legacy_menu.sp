@@ -47,7 +47,7 @@ public int VotingMenuAction(Menu hMenu, MenuAction iAction, int iClient, int iPa
             FakeClientCommand(iClient, sCommand);
         }
 
-        FakeClientCommand(iClient, "sm_xmenu 0");
+        gClient[iClient].iMenuRefresh = 0;
     }
 
     return 1;
@@ -86,7 +86,7 @@ public int ModelMenuAction(Menu hMenu, MenuAction iAction, int iClient, int iPar
             IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_ACTIVATED);
         }
 
-        FakeClientCommand(iClient, "sm_xmenu 0");
+        gClient[iClient].iMenuRefresh = 0;
     }
 
     return 1;
