@@ -10,7 +10,7 @@ void GetClientColors(int iClient, int iColors[3])
  *************************************************************/
 public Action T_KeysHud(Handle hTimer)
 {
-    if (gRound.iState == GAME_OVER || gRound.iState == GAME_CHANGING || gRound.iState == GAME_PAUSED) {
+    if (!gCore.bReady || gRound.iState == GAME_OVER || gRound.iState == GAME_CHANGING || gRound.iState == GAME_PAUSED) {
         return Plugin_Continue;
     }
 
@@ -80,10 +80,10 @@ public Action T_TimeHud(Handle hTimer)
 {
     static int iTimer;
 
-    bool bRed = (gRound.iState == GAME_OVERTIME || gRound.iState == GAME_MATCHEX);
+    bool bRed;
     char sHud[48];
 
-    if (gRound.iState == GAME_MATCHWAIT || gRound.iState == GAME_CHANGING || gRound.iState == GAME_PAUSED)
+    if (!gCore.bReady || gRound.iState == GAME_MATCHWAIT || gRound.iState == GAME_CHANGING || gRound.iState == GAME_PAUSED)
     {
         Format(sHud, sizeof(sHud), ". . %s%s%s", iTimer >= 20 ? ". " : "", iTimer >= 15 ? ". " : "", iTimer >= 10 ? "." : "");
         iTimer++;
@@ -97,7 +97,7 @@ public Action T_TimeHud(Handle hTimer)
         float fTime = GetTimeRemaining(false);
 
         Format(sHud, sizeof(sHud), "%s%s", sHud, Timestring(fTime, fTime < 10, true));
-        bRed = (fTime < 60);
+        bRed = (gRound.iState == GAME_OVERTIME || gRound.iState == GAME_MATCHEX || fTime < 60);
     }
 
     for (int iClient = 1; iClient <= MaxClients; iClient++)

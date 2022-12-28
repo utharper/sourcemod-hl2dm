@@ -151,7 +151,7 @@ public Action T_CheckPlayerStates(Handle hTimer)
         }
         else if (iTeam != iWasTeam[iClient])
         {
-            if (gSpecialClient.iAllowed != iClient && ( IsGameMatch() || gRound.iState == GAME_OVER || ( iTeam == TEAM_SPECTATORS && !IsClientObserver(iClient) ) || ( iTeam != TEAM_SPECTATORS && IsClientObserver(iClient) ) ) )
+            if (gSpecialClient.iAllowed != iClient && ( IsGameMatch() || gRound.iState == GAME_OVERTIME || gRound.iState == GAME_OVER || ( iTeam == TEAM_SPECTATORS && !IsClientObserver(iClient) ) || ( iTeam != TEAM_SPECTATORS && IsClientObserver(iClient) ) ) )
             {
                 // Client has changed teams during match, or is a bugged spectator
                 // Usually caused by changing playermodel

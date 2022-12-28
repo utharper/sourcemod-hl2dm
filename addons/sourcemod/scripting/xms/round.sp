@@ -8,12 +8,12 @@ void SetGamestate(int iState)
     if (iState == gRound.iState) {
         return;
     }
-    
+
     OnSetGamestate_Pre(iState);
-    
+
     gRound.iState = iState;
     Forward_OnGamestateChanged(iState);
-    
+
     OnSetGamestate_Post();
 }
 
@@ -88,7 +88,7 @@ void OnSetGamestate_Post()
         InvertTeams();
     }
 }
- 
+
 public Action T_LoadDefaults(Handle hTimer)
 {
     if (!GetRealClientCount(false))
@@ -107,7 +107,7 @@ public Action T_LoadDefaults(Handle hTimer)
 
 public Action T_RestartMap(Handle hTimer)
 {
-    if(strlen(gRound.sMode)) {
+    if (strlen(gRound.sMode)) {
         SetGamemode(gRound.sMode);
     }
     else {
@@ -146,7 +146,7 @@ public void OnMatchCancelled()
     SetGamemode(gRound.sMode);
     Forward_OnMatchEnd(false);
 }
- 
+
 public void OnRoundEnd(bool bMatch)
 {
     gRound.fEndTime = GetGameTime();
@@ -167,11 +167,6 @@ public void OnRoundEnd(bool bMatch)
         }
 
         Forward_OnMatchEnd(true);
-    }
-
-    if (gRound.iState == GAME_OVERTIME || gRound.iState == GAME_MATCHEX)
-    {
-        MC_PrintToChatAll("%t", "xms_overtime_draw");
     }
 
     if (gRound.iState != GAME_CHANGING)
@@ -215,33 +210,35 @@ void CreateOverTimer(float fDelay=0.0)
 
 public Action T_PreOvertime(Handle hTimer)
 {
-    if (GetRealClientCount(true, true, false) > 1)
+    if(gRound.iState != GAME_OVERTIME && gRound.iState != GAME_MATCHEX)
     {
-        if (gRound.bTeamplay) {
-            if (GetTeamScore(TEAM_REBELS) - GetTeamScore(TEAM_COMBINE) == 0 && GetTeamClientCount(TEAM_REBELS) && GetTeamClientCount(TEAM_COMBINE)) {
+        if (GetRealClientCount(true, true, false) > 1)
+        {
+            if (gRound.bTeamplay) {
+                if (GetTeamScore(TEAM_REBELS) - GetTeamScore(TEAM_COMBINE) == 0 && GetTeamClientCount(TEAM_REBELS) && GetTeamClientCount(TEAM_COMBINE)) {
+                    StartOvertime();
+                }
+            }
+            else if (!GetTopPlayer(false)) {
                 StartOvertime();
             }
         }
-        else if (!GetTopPlayer(false)) {
-            StartOvertime();
-        }
+
+        gRound.hOvertime = INVALID_HANDLE;
+    }
+    else {
+        MC_PrintToChatAll("%t", "xms_overtime_draw");
     }
 
-    gRound.hOvertime = INVALID_HANDLE;
-
-    return Plugin_Handled;
+    return Plugin_Stop;
 }
 
 void StartOvertime()
 {
     gConVar.mp_timelimit.IntValue += OVERTIME_TIME;
 
-    if (gRound.bTeamplay || GetRealClientCount(true, false, false) == 2) {
-        MC_PrintToChatAll("%t", "xms_overtime_start1", gRound.bTeamplay ? "team" : "player");
-    }
-    else {
-        MC_PrintToChatAll("%t", "xms_overtime_start2");
-    }
+    MC_PrintToChatAll("%t", "xms_overtime_start", gRound.bTeamplay ? "team" : "player");
+    gConVar.mp_forcerespawn.BoolValue = true;
 
     CreateTimer(0.1, T_Overtime, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 

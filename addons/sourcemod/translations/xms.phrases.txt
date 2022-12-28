@@ -260,6 +260,10 @@
     {
         "en"        "{E}[!] {I}A match is in progress. Please wait your turn to play."
     }
+	"xmsc_teamchange_overtime"
+	{
+		"en"		"{E}[!] {I}You can't change teams during overtime."
+	}
     "xms_auto_spectate"
     {
         "en"        "{N}You are currently spectating. Say {H}!join {I}to play."
@@ -288,14 +292,10 @@
     {
         "en"        "{E}Overtime: {N}Nobody took the lead, so the game is a draw."
     }
-    "xms_overtime_start1"
+    "xms_overtime_start"
     {
         "#format"   "{1:s}"
         "en"        "{E}Overtime: {N}The next {1} to score wins!"
-    }
-    "xms_overtime_start2"
-    {
-        "en"        "{E}Overtime: {N}Whoever takes the lead wins!"
     }
     "xms_overtime_teamwin"
     {
