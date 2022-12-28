@@ -9,6 +9,7 @@ void RegisterCommands()
     RegConsoleCmd("run"        , Cmd_Run,      "[Vote to] change the current map");
     RegConsoleCmd("runnow"     , Cmd_Run,      "[Vote to] change the current map");
     RegConsoleCmd("runnext"    , Cmd_Run,      "[Vote to] set the next map");
+    RegConsoleCmd("runrandom"  , Cmd_Run,      "Call a random map/mode vote.");
     RegConsoleCmd("start"      , Cmd_Start,    "[Vote to] start a match");
     RegConsoleCmd("cancel"     , Cmd_Cancel,   "[Vote to] cancel the match");
     RegConsoleCmd("shuffle"    , Cmd_Shuffle,  "[Vote to] shuffle teams");
@@ -39,12 +40,12 @@ void RegisterCommands()
     AddCommandListener(ListenCmd_Base , "nextmap");
     AddCommandListener(ListenCmd_Base , "currentmap");
     AddCommandListener(ListenCmd_Base , "ff");
-    
+
     // Internal plugin use:
     RegConsoleCmd("sm_xmenu"     , XMenuAction);
     RegConsoleCmd("sm_xmenu_back", XMenuBack);
     RegConsoleCmd("sm_xmenu_next", XMenuNext);
-    
+
     AddCommandListener(OnMapChanging, "changelevel");
     AddCommandListener(OnMapChanging, "changelevel_next");
 }
@@ -121,31 +122,60 @@ public Action Cmd_Maplist(int iClient, int iArgs)
  *************************************************************/
 public Action Cmd_Run(int iClient, int iArgs)
 {
-    static int iFailCount [MAXPLAYERS+1],
-               iMultiCount[MAXPLAYERS+1];
+    static int iFailCount [MAXPLAYERS+1];
+    static int iMultiCount[MAXPLAYERS+1];
 
-    int iVoteType;
-    bool bMulti,
-         bProceed;
-    char sParam     [5][512],               // <mode>:<map> OR <map>:<mode> OR <mode> OR <map>
-         sResultMode[5][MAX_BUFFER_LENGTH], // processed mode parameter(s)
-         sResultMap [5][MAX_BUFFER_LENGTH], // processed map parameter(s)
-         sCommand[16];
+    int  iVoteType;
+    bool bMulti;
+    bool bProceed;
+    char sParam     [5][512];            // <mode>:<map> OR <map>:<mode> OR <mode> OR <map>
+    char sResultMode[5][MAX_MODE_LENGTH];// processed mode parameter(s)
+    char sResultMap [5][MAX_MAP_LENGTH]; // processed map parameter(s)
+    char sCommand   [16];
 
+    // Get and preformat params
     GetCmdArg(0, sCommand, sizeof(sCommand));
+    GetCmdArgString(sParam[0], sizeof(sParam[]));
+    String_ToLower(sParam[0], sParam[0], sizeof(sParam[]));
+    
+    if(StrEqual(sParam[0], "1v1") || StrEqual(sParam[0], "2v2") || StrEqual(sParam[0], "3v3") || StrEqual(sParam[0], "4v4") || StrEqual(sParam[0], "duel"))
+    {
+        // VG !run compatibility
+        FakeClientCommandEx(iClient, "say !start");
+        return Plugin_Handled;
+    }
 
-    iVoteType = (
-        StrContains(sCommand, "runnext", false) == 0 ?
-            iClient == 0 ? VOTE_RUNNEXT_AUTO
-            : VOTE_RUNNEXT
-        : VOTE_RUN
-    );
+    // Determine command type
+    if (StrEqual(sCommand, "runrandom", false) || StrEqual(sParam[0], "random", false))
+    {
+        if (iClient == 0) {
+            iVoteType = VOTE_RUNAUTO;
+        }
+        else {
+            iVoteType = VOTE_RUNRANDOM;
+        }
+    }
+    else if (StrContains(sCommand, "runnext", false) == 0) {
+        iVoteType = VOTE_RUNNEXT;
+    }
+    else {
+        iVoteType = VOTE_RUN;
+    }
 
     // Initial checks
-    if (!iArgs) {
-        MC_ReplyToCommand(iClient, "%t", "xmsc_run_usage");
-    }
-    else if (gVoting.iStatus) {
+    if (!iArgs)
+    {
+        if (iVoteType == VOTE_RUN) {
+            MC_ReplyToCommand(iClient, "%t", "xmsc_run_usage");
+            return Plugin_Handled;
+        }
+        else if (iVoteType == VOTE_RUNNEXT) {
+            MC_ReplyToCommand(iClient, "%t", "xmsc_runnext_usage");
+            return Plugin_Handled;
+        }
+     }
+
+    if (gVoting.iStatus) {
         MC_ReplyToCommand(iClient, "%t", "xmsc_vote_deny");
     }
     else if (VoteTimeout(iClient) && !IsClientAdmin(iClient)) {
@@ -164,198 +194,244 @@ public Action Cmd_Run(int iClient, int iArgs)
         bProceed = true;
     }
 
-    if (!bProceed)
-    {
-        if (iArgs) {
-            IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_COMMANDFAIL);
-        }
+    if (!bProceed) {
+        IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_COMMANDFAIL);
         return Plugin_Handled;
     }
 
-    // Get and preformat params
-    GetCmdArgString(sParam[0], sizeof(sParam[]));
-    String_ToLower(sParam[0], sParam[0], sizeof(sParam[]));
-
-    int iPos[3];
-    do
+    if (iVoteType == VOTE_RUNAUTO || iVoteType == VOTE_RUNRANDOM)
     {
-        iPos[0] = SplitString(sParam[0][iPos[2]], ",", sParam[iPos[1]], sizeof(sParam[]));
-        ReplaceString(sParam[iPos[1]], sizeof(sParam[]), " ", ":");
+        // the command will generate a random map/mode vote.
 
-        if (iPos[0] > 1)
+        bMulti = true;
+
+        for (int i = view_as<int>(iVoteType == VOTE_RUNRANDOM); i < 5; i++)
         {
-            iPos[2] += iPos[0];
-            if (sParam[0][iPos[2]] == ' ') {
-                iPos[2]++;
-            }
-
-            iPos[1]++;
-
-            if (iPos[1] < 5) {
-                strcopy(sParam[iPos[1]], sizeof(sParam[]), sParam[0][iPos[2]]);
+            char sMapcycle[PLATFORM_MAX_PATH];
+            char sMaps    [512][MAX_MAP_LENGTH];
+            int  iHits;
+            
+            // retain current mode for the first 2/3 picks, then choose at random if possible
+            if (i < 5 - view_as<int>(GetModeCount() > 1) - view_as<int>(GetModeCount() > 2)) {
+                strcopy(sResultMode[i], sizeof(sResultMode[]), gRound.sMode);
             }
             else {
-                MC_ReplyToCommand(iClient, "%t", "xmsc_run_denyparams");
-                IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_COMMANDFAIL);
-                return Plugin_Handled;
+                do {
+                    GetRandomMode(sResultMode[i], sizeof(sResultMode[]), true);
+                }
+                while (StrEqual(sResultMode[i], sResultMode[i - 1]));
+            }
+
+            if (!GetConfigString(sMapcycle, sizeof(sMapcycle), "Mapcycle", "Gamemodes", sResultMode[i])) {
+                continue;
+            }
+
+            iHits = GetMapsArray(sMaps, 512, MAX_MAP_LENGTH, sMapcycle);
+            if (iHits > 1)
+            {
+                for (int y = 0; y < 5; y++)
+                {
+                    if (! (i == 0 && y > 2) || (i == 1 && y != 3) || (i == 2 && y != 4) )
+                    {
+                        int iRan;
+
+                        do {
+                            // pick a random map
+                            iRan = Math_GetRandomInt(0, iHits);
+                        }
+                        while (!strlen(sMaps[iRan]) || StrEqual(sMaps[iRan], gRound.sMap));
+
+                        strcopy(sResultMap[i], sizeof(sResultMap[]), sMaps[iRan]);
+                        sMaps[iRan] = "";
+                    }
+                }
             }
         }
     }
-    while (iPos[0] > 1 && iPos[1] < 5);
-
-    bMulti = strlen(sParam[1]) > 0;
-
-    // Match params to results:
-    for (int i = 0; i < 5; i++)
+    else
     {
-        if (!strlen(sParam[i])) {
-            break;
-        }
-
-        char sMode[MAX_MODE_LENGTH],
-             sMap [MAX_MAP_LENGTH];
-        bool bModeMatched,
-             bMapMatched;
-        int  iSplit = SplitString(sParam[i], ":", sMode, sizeof(sMode));
-
-        if (iSplit > 0) {
-            sMode[iSplit - 1] = '\0';
-        }
-        else {
-            strcopy(sMode, sizeof(sMode), sParam[i]);
-        }
-
-        bModeMatched = IsValidGamemode(sMode);
-
-        if (!bModeMatched)
+        int iPos[3];
+        do
         {
-            // Did not match, so the first part must be the map.
-            strcopy(sMap, sizeof(sMap), sMode);
+            iPos[0] = SplitString(sParam[0][iPos[2]], ",", sParam[iPos[1]], sizeof(sParam[]));
+            ReplaceString(sParam[iPos[1]], sizeof(sParam[]), " ", ":");
 
-            if (iSplit > 0)
+            if (iPos[0] > 1)
             {
-                strcopy(sMode, sizeof(sMode), sParam[i][iSplit]);
-                if (!IsValidGamemode(sMode))
+                iPos[2] += iPos[0];
+                if (sParam[0][iPos[2]] == ' ') {
+                    iPos[2]++;
+                }
+
+                iPos[1]++;
+
+                if (iPos[1] < 5) {
+                    strcopy(sParam[iPos[1]], sizeof(sParam[]), sParam[0][iPos[2]]);
+                }
+                else {
+                    MC_ReplyToCommand(iClient, "%t", "xmsc_run_denyparams");
+                    IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_COMMANDFAIL);
+                    return Plugin_Handled;
+                }
+            }
+        }
+        while (iPos[0] > 1 && iPos[1] < 5);
+
+        bMulti = strlen(sParam[1]) > 0;
+
+        // Match params to results:
+        for (int i = 0; i < 5; i++)
+        {
+            if (!strlen(sParam[i])) {
+                break;
+            }
+
+            char sMode[MAX_MODE_LENGTH];
+            char sMap [MAX_MAP_LENGTH];
+            bool bModeMatched;
+            bool bMapMatched;
+            int  iSplit = SplitString(sParam[i], ":", sMode, sizeof(sMode));
+
+            if (iSplit > 0) {
+                sMode[iSplit - 1] = '\0';
+            }
+            else {
+                strcopy(sMode, sizeof(sMode), sParam[i]);
+            }
+
+            bModeMatched = IsValidGamemode(sMode);
+
+            if (!bModeMatched)
+            {
+                // Did not match, so the first part must be the map.
+                strcopy(sMap, sizeof(sMap), sMode);
+
+                if (iSplit > 0)
                 {
-                    // Fail - multiple params, but neither of them is a valid mode.
-                    MC_ReplyToCommand(iClient, "%t", "xmsc_run_notfound", sMode);
+                    strcopy(sMode, sizeof(sMode), sParam[i][iSplit]);
+                    if (!IsValidGamemode(sMode))
+                    {
+                        // Fail - multiple params, but neither of them is a valid mode.
+                        MC_ReplyToCommand(iClient, "%t", "xmsc_run_notfound", sMode);
+                        IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_COMMANDFAIL);
+                        return Plugin_Handled;
+                    }
+
+                    bModeMatched = true;
+                }
+            }
+            else if (iSplit > 0)
+            {
+                // Matched the mode, second part is the map.
+                strcopy(sMap, sizeof(sMap), sParam[i][iSplit]);
+            }
+            else
+            {
+                // Matched the mode but no map was provided.
+
+                if (StrEqual(gRound.sMode, sMode) && !bMulti)
+                {
+                    // Fail - same gamemode as current.
+                    MC_ReplyToCommand(iClient, "%t", "xmsc_run_denymode", sMode);
                     IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_COMMANDFAIL);
                     return Plugin_Handled;
                 }
 
-                bModeMatched = true;
-            }
-        }
-        else if (iSplit > 0)
-        {
-            // Matched the mode, second part is the map.
-            strcopy(sMap, sizeof(sMap), sParam[i][iSplit]);
-        }
-        else
-        {
-            // Matched the mode but no map was provided.
+                // Detect map:
+                if (!(GetConfigString(sMap, sizeof(sMap), "DefaultMap", "Gamemodes", sMode) && IsMapValid(sMap) && !( IsItemDistinctInList(gRound.sMode, gCore.sRetainModes) && IsItemDistinctInList(sMode, gCore.sRetainModes) ) )) {
+                    strcopy(sMap, sizeof(sMap), gRound.sMap);
+                }
 
-            if (StrEqual(gRound.sMode, sMode) && !bMulti)
-            {
-                // Fail - same gamemode as current.
-                MC_ReplyToCommand(iClient, "%t", "xmsc_run_denymode", sMode);
-                IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_COMMANDFAIL);
-                return Plugin_Handled;
-            }
-
-            // Detect map:
-            if (!(GetConfigString(sMap, sizeof(sMap), "DefaultMap", "Gamemodes", sMode) && IsMapValid(sMap) && !( IsItemDistinctInList(gRound.sMode, gCore.sRetainModes) && IsItemDistinctInList(sMode, gCore.sRetainModes) ) )) {
-                strcopy(sMap, sizeof(sMap), gRound.sMap);
-            }
-
-            bMapMatched = true;
-        }
-
-        if (!bMapMatched)
-        {
-            int iHits[2];
-            char sHits      [256][MAX_MAP_LENGTH],
-                 sOutput    [140],
-                 sFullOutput[600];
-
-            if (GetMapByAbbrev(sResultMap[i], MAX_MAP_LENGTH, sMap) && IsMapValid(sResultMap[i])) {
                 bMapMatched = true;
-            }
-            else
-            {
-                iHits[0] = GetMapsArray(sHits, 256, MAX_MAP_LENGTH, "", "", sMap, true, false);
-
-                if (iHits[0] == 1) {
-                    strcopy(sResultMap[i], sizeof(sResultMap[]), sHits[0]);
-                }
-                else if (!bMulti)
-                {
-                    for (int iHit = 0; iHit < iHits[0]; iHit++)
-                    {
-                        // pass more results to console
-                        Format(sFullOutput, sizeof(sFullOutput), "%s　%s", sFullOutput, sHits[iHit]);
-
-                        if (GetCmdReplySource() != SM_REPLY_TO_CONSOLE)
-                        {
-                            char sQuery2[256];
-                            Format(sQuery2, sizeof(sQuery2), "{H}%s{I}", sMap);
-                            ReplaceString(sHits[iHit], sizeof(sHits[]), sMap, sQuery2, false);
-
-                            if (strlen(sOutput) + strlen(sHits[iHit]) + (!iHits[1] ? 0 : 3) < 140) {
-                                Format(sOutput, sizeof(sOutput), "%s%s%s", sOutput, !iHits[1] ? "" : ", ", sHits[iHit]);
-                                iHits[1]++;
-                            }
-                        }
-                    }
-                }
-
-                bMapMatched = (iHits[0] == 1);
             }
 
             if (!bMapMatched)
             {
-                if (iHits[0] == 0)
-                {
-                    iFailCount[iClient]++;
-                    MC_ReplyToCommand(iClient, "%t", "xmsc_run_notfound", sMap);
-                    IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_COMMANDFAIL);
-                }
-                else if (bMulti) {
-                    MC_ReplyToCommand(iClient, "%t", "xmsc_run_found_multi", iHits[0], sMap);
+                int  iHits      [2];
+                char sHits      [256][MAX_MAP_LENGTH];
+                char sOutput    [140];
+                char sFullOutput[600];
+
+                if (GetMapByAbbrev(sResultMap[i], MAX_MAP_LENGTH, sMap) && IsMapValid(sResultMap[i])) {
+                    bMapMatched = true;
                 }
                 else
                 {
-                    if (GetCmdReplySource() != SM_REPLY_TO_CONSOLE) {
-                        MC_ReplyToCommand(iClient, "%t", "xmsc_run_found", sOutput, iHits[0] - iHits[1]);
+                    iHits[0] = GetMapsArray(sHits, 256, MAX_MAP_LENGTH, "", "", sMap, true, false);
+
+                    if (iHits[0] == 1) {
+                        strcopy(sResultMap[i], sizeof(sResultMap[]), sHits[0]);
+                    }
+                    else if (!bMulti)
+                    {
+                        for (int iHit = 0; iHit < iHits[0]; iHit++)
+                        {
+                            // pass more results to console
+                            Format(sFullOutput, sizeof(sFullOutput), "%s　%s", sFullOutput, sHits[iHit]);
+
+                            if (GetCmdReplySource() != SM_REPLY_TO_CONSOLE)
+                            {
+                                char sQuery2[256];
+                                
+                                Format(sQuery2, sizeof(sQuery2), "{H}%s{I}", sMap);
+                                ReplaceString(sHits[iHit], sizeof(sHits[]), sMap, sQuery2, false);
+
+                                if (strlen(sOutput) + strlen(sHits[iHit]) + (!iHits[1] ? 0 : 3) < 140) {
+                                    Format(sOutput, sizeof(sOutput), "%s%s%s", sOutput, !iHits[1] ? "" : ", ", sHits[iHit]);
+                                    iHits[1]++;
+                                }
+                            }
+                        }
                     }
 
-                    PrintToConsole(iClient, "%t", "xmsc_run_results", sMap, sFullOutput, iHits[0]);
-                    iMultiCount[iClient]++;
+                    bMapMatched = (iHits[0] == 1);
                 }
 
-                if (iMultiCount[iClient] >= 3 && iHits[0] != 1 && iHits[0] > iHits[1] && GetCmdReplySource() != SM_REPLY_TO_CONSOLE) {
-                    MC_ReplyToCommand(iClient, "%t", "xmsc_run_tip1");
-                    iMultiCount[iClient] = 0;
-                }
-                else if (iFailCount[iClient] >= 3) {
-                    MC_ReplyToCommand(iClient, "%t", "xmsc_run_tip2");
-                    iFailCount[iClient] = 0;
+                if (!bMapMatched)
+                {
+                    if (iHits[0] == 0)
+                    {
+                        iFailCount[iClient]++;
+                        MC_ReplyToCommand(iClient, "%t", "xmsc_run_notfound", sMap);
+                        IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_COMMANDFAIL);
+                    }
+                    else if (bMulti) {
+                        MC_ReplyToCommand(iClient, "%t", "xmsc_run_found_multi", iHits[0], sMap);
+                    }
+                    else
+                    {
+                        if (GetCmdReplySource() != SM_REPLY_TO_CONSOLE) {
+                            MC_ReplyToCommand(iClient, "%t", "xmsc_run_found", sOutput, iHits[0] - iHits[1]);
+                        }
+
+                        PrintToConsole(iClient, "%t", "xmsc_run_results", sMap, sFullOutput, iHits[0]);
+                        iMultiCount[iClient]++;
+                    }
+
+                    if (iMultiCount[iClient] >= 3 && iHits[0] != 1 && iHits[0] > iHits[1] && GetCmdReplySource() != SM_REPLY_TO_CONSOLE) {
+                        MC_ReplyToCommand(iClient, "%t", "xmsc_run_tip1");
+                        iMultiCount[iClient] = 0;
+                    }
+                    else if (iFailCount[iClient] >= 3) {
+                        MC_ReplyToCommand(iClient, "%t", "xmsc_run_tip2");
+                        iFailCount[iClient] = 0;
+                    }
+
+                    return Plugin_Handled;
                 }
 
-                return Plugin_Handled;
+            }
+            else {
+                strcopy(sResultMap[i], sizeof(sResultMap[]), sMap);
             }
 
-        }
-        else {
-            strcopy(sResultMap[i], sizeof(sResultMap[]), sMap);
-        }
-
-        if (!bModeMatched) {
-            GetModeForMap(sResultMode[i], sizeof(sResultMode[]), sResultMap[i]);
-            bModeMatched = true;
-        }
-        else {
-            strcopy(sResultMode[i], sizeof(sResultMode[]), sMode);
+            if (!bModeMatched) {
+                GetModeForMap(sResultMode[i], sizeof(sResultMode[]), sResultMap[i]);
+                bModeMatched = true;
+            }
+            else {
+                strcopy(sResultMode[i], sizeof(sResultMode[]), sMode);
+            }
         }
     }
 
@@ -827,7 +903,12 @@ public Action ListenCmd_Team(int iClient, const char[] sCommand, int iArgs)
     {
         MC_PrintToChat(iClient, "%t", "xmsc_teamchange_deny");
         IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_COMMANDFAIL);
-
+        return Plugin_Handled;
+    }
+    else if (gRound.iState == GAME_OVERTIME)
+    {
+        MC_PrintToChat(iClient, "%t", "xmsc_teamchange_overtime");
+        IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_COMMANDFAIL);
         return Plugin_Handled;
     }
     else if (gRound.bTeamplay && iTeam == TEAM_COMBINE)
@@ -909,6 +990,12 @@ public Action Cmd_CallVote(int iClient, int iArgs)
     else if (VoteTimeout(iClient)  && !IsClientAdmin(iClient)) {
         MC_ReplyToCommand(iClient, "%t", "xmsc_callvote_denywait", VoteTimeout(iClient));
     }
+    else if (gRound.iState == GAME_MATCH || gRound.iState == GAME_MATCHEX || gRound.iState == GAME_PAUSED) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_match");
+    }
+    else if (gRound.iState == GAME_CHANGING || gRound.iState == GAME_MATCHWAIT) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_deny_changing");
+    }
     else
     {
         char sMotion[64];
@@ -959,23 +1046,23 @@ public Action Cmd_CastVote(int iClient, int iArgs)
     else if (bMulti && !bNumeric) {
         MC_ReplyToCommand(iClient, "%t", "xmsc_castvote_denybinary");
     }
+    if (bNumeric && iVote != 0 && !strlen(gsVoteMotion[iVote])) {
+        MC_ReplyToCommand(iClient, "%t", "xmsc_castvote_denynumber");
+    }
     else
     {
-        if (!(bNumeric && !strlen(gsVoteMotion[iVote])))
-        {
-            char sName[MAX_NAME_LENGTH];
+        char sName[MAX_NAME_LENGTH];
 
-            GetClientName(iClient, sName, sizeof(sName));
-            gClient[iClient].iVote = iVote;
-            PrintToConsoleAll("%t", "xmsc_castvote", sName, sVote);
-        }
+        GetClientName(iClient, sName, sizeof(sName));
+        gClient[iClient].iVote = iVote;
+        PrintToConsoleAll("%t", "xmsc_castvote", sName, sVote);
 
         return Plugin_Handled;
     }
 
     IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_COMMANDFAIL);
     gClient[iClient].iMenuRefresh = 0;
-    
+
     return Plugin_Handled;
 }
 
@@ -1084,9 +1171,9 @@ public Action Cmd_Votekick(int iClient, int iArgs)
     if (!iArgs) {
         MC_ReplyToCommand(iClient, "%t", "xmsc_votekick_usage");
     }
-    
+
     int iTarget = ClientArgToTarget(iClient, 1);
-    
+
     if (iTarget == -1)
     {
         return Plugin_Handled;
@@ -1130,9 +1217,9 @@ public Action Cmd_Votemute(int iClient, int iArgs)
     if (!iArgs) {
         MC_ReplyToCommand(iClient, "%t", "xmsc_votemute_usage");
     }
-    
+
     int iTarget = ClientArgToTarget(iClient, 1);
-    
+
     if (iTarget == -1)
     {
         return Plugin_Handled;
@@ -1182,11 +1269,46 @@ public Action OnClientSayCommand(int iClient, const char[] sCommand, const char[
         // spam be gone
         return Plugin_Handled;
     }
-    else if (gRound.iState == GAME_PAUSED && !bCommand)
+    
+    if (gRound.iState == GAME_PAUSED && !bCommand)
     {
         // fix chat when paused
         MC_PrintToChatAllFrom(iClient, StrEqual(sCommand, "say_team", false), sArgs);
 
+        return Plugin_Stop;
+    }
+    
+    int i = view_as<int>(bCommand);
+    
+    if (StrEqual(sArgs[i], "timeleft") || StrEqual(sArgs[i], "nextmap") || StrEqual(sArgs[i], "currentmap") || StrEqual(sArgs[i], "ff"))
+    {
+        // override outputs from basecommands plugin
+        Basecommands_Override(iClient, sArgs[view_as<int>(bCommand)], true);
+    }
+    else if (StrEqual(sArgs[i], "yes") || StrEqual(sArgs[i], "no") || StrEqual(sArgs[i], "1") || StrEqual(sArgs[i], "2") || StrEqual(sArgs[i], "3") || StrEqual(sArgs[i], "4") || StrEqual(sArgs[i], "5"))
+    {
+        if (gVoting.iStatus == 1)
+        {
+            // make all votes silent
+            if(StrContains(sArgs, "/", false) != 0)
+            {
+                bool bMulti   = strlen(gsVoteMotion[1]) > 0,
+                     bNumeric = String_IsNumeric(sArgs[i]);
+    
+                if (!bMulti && !bNumeric || bMulti && bNumeric) {
+                    FakeClientCommandEx(iClient, "say /%s", sArgs[i]);
+                    return Plugin_Stop;
+                }
+            }
+        }
+    }
+    else if (StrEqual(sArgs[i], "rtv"))
+    {
+        MC_PrintToChat(iClient, "%t", "xmsc_rtv");
+        return Plugin_Stop;
+    }
+    else if (StrEqual(sArgs[i], "nominate")) {
+        MC_PrintToChat(iClient, "%t", "xmsc_nominate");
         return Plugin_Stop;
     }
     else if (bCommand)
@@ -1208,11 +1330,6 @@ public Action OnClientSayCommand(int iClient, const char[] sCommand, const char[
             MC_PrintToChatAllFrom(iClient, false, "%t", "xmsc_coinflip", Math_GetRandomInt(0, 1) ? "Heads" : "Tails");
         }
 
-        // VG run compatability
-        else if (StrContains(sArgs, "run") == 1 && (StrEqual(sArgs[5], "1v1") || StrEqual(sArgs[5], "2v2") || StrEqual(sArgs[5], "3v3") || StrEqual(sArgs[5], "4v4") || StrEqual(sArgs[5], "duel"))) {
-            FakeClientCommandEx(iClient, "say !start");
-        }
-
         // more minor commands
         else if (StrEqual(sArgs[1], "stop")) {
             FakeClientCommandEx(iClient, "say !cancel");
@@ -1220,7 +1337,7 @@ public Action OnClientSayCommand(int iClient, const char[] sCommand, const char[
         else if (StrEqual(sArgs[1], "pause") || StrEqual(sArgs[1], "unpause")) {
             FakeClientCommandEx(iClient, "pause");
         }
-        else if (StrContains(sArgs, "jointeam ") == 1) {
+        else if (StrContains(sArgs[1], "jointeam ") == 0) {
             FakeClientCommandEx(iClient, "jointeam %s", sArgs[10]);
         }
         else if (StrEqual(sArgs[1], "join")) {
@@ -1229,38 +1346,22 @@ public Action OnClientSayCommand(int iClient, const char[] sCommand, const char[
         else if (StrEqual(sArgs[1], "spec") || StrEqual(sArgs[1], "spectate")) {
             FakeClientCommandEx(iClient, "spectate");
         }
+        else if (StrContains(sArgs[1], "next ") == 0) {
+            FakeClientCommandEx(iClient, "say !runnext %s", sArgs[5]);
+        }
+        else if (StrEqual(sArgs[1], "random")) {
+            FakeClientCommandEx(iClient, "say !runrandom");
+        }
         else {
             return Plugin_Continue;
         }
 
         return Plugin_Stop;
     }
-    else if (StrEqual(sArgs, "timeleft") || StrEqual(sArgs, "nextmap") || StrEqual(sArgs, "currentmap") || StrEqual(sArgs, "ff"))
-    {
-        Basecommands_Override(iClient, sArgs, true);
-
-        return Plugin_Stop;
-    }
     else if (StrEqual(sArgs, "gg", false) && ( gRound.iState == GAME_OVER || gRound.iState == GAME_CHANGING ) )
     {
+        // guh guh guh
         IfCookiePlaySoundAll(gSounds.cMisc, SOUND_GG);
-
-        return Plugin_Continue;
-    }
-    else if (gVoting.iStatus == 1)
-    {
-        if (StrEqual(sArgs, "yes") || StrEqual(sArgs, "no") || StrEqual(sArgs, "1") || StrEqual(sArgs, "2") || StrEqual(sArgs, "3") || StrEqual(sArgs, "4") || StrEqual(sArgs, "5"))
-        {
-            bool bMulti   = strlen(gsVoteMotion[1]) > 0,
-                 bNumeric = String_IsNumeric(sArgs);
-
-            if (!bMulti && !bNumeric || bMulti && bNumeric)
-            {
-                FakeClientCommandEx(iClient, sArgs);
-
-                return Plugin_Stop;
-            }
-        }
     }
 
     return Plugin_Continue;
@@ -1280,10 +1381,6 @@ public Action ListenCmd_Base(int iClient, const char[] sCommand, int iArgs)
 
 void Basecommands_Override(int iClient, const char[] sCommand, bool bBroadcast)
 {
-    if (bBroadcast) {
-        MC_PrintToChatAllFrom(iClient, false, sCommand);
-    }
-
     if (StrEqual(sCommand, "timeleft"))
     {
         float fTime  = GetTimeRemaining(gRound.iState == GAME_OVER);

@@ -5,9 +5,10 @@
 #define PLUGIN_VERSION     "1.93"
 #define PLUGIN_URL         "www.hl2dm.community"
 #define PLUGIN_UPDATE      "http://raw.githubusercontent.com/utharper/sourcemod-hl2dm/master/addons/sourcemod/xms.upd"
+#define PLUGIN_CONFLICT    {"mapchooser", "nominations", "rockthevote", "randomcycle"}
 
 public Plugin myinfo = {
-    name                 = "XMS (eXtended Match System)",
+    name                 = "XMS - eXtended Match System",
     version              = PLUGIN_VERSION,
     description          = "Multi-gamemode match plugin for competitive HL2DM servers",
     author               = "harper",
@@ -48,6 +49,7 @@ enum struct _gConVar
     ConVar      tv_enable;
     ConVar      sm_nextmap;
     ConVar      mp_restartgame;
+    ConVar      mp_forcerespawn;
 }
 _gConVar        gConVar;
  
@@ -255,6 +257,7 @@ public void OnPluginStart()
     gConVar.mp_chattime     = FindConVar("mp_chattime");
     gConVar.mp_friendlyfire = FindConVar("mp_friendlyfire");
     gConVar.mp_restartgame  = FindConVar("mp_restartgame");
+    gConVar.mp_forcerespawn = FindConVar("mp_forcerespawn");
     gConVar.mp_restartgame  . AddChangeHook(OnGameRestarting);
     gConVar.sm_nextmap      = FindConVar("sm_nextmap");
     gConVar.sm_nextmap      . AddChangeHook(OnNextmapChanged);
@@ -334,11 +337,27 @@ public void OnLibraryRemoved(const char[] sName)
 
 public void OnAllPluginsLoaded()
 {
-    if (!gCore.bReady) {
-        // Restart on first load - avoids issues with SourceTV (etc)
-        CreateTimer(1.0, T_RestartMap, _, TIMER_FLAG_NO_MAPCHANGE);
-    }
-    else if (!LibraryExists("hl2dmfix")) {
+    if (!LibraryExists("hl2dmfix")) {
         LogError("hl2dmfix is not loaded !");
+    }
+    
+    if (!gCore.bReady)
+    {
+        // Warn about conflicting plugins.
+        char sConflict[][32] = PLUGIN_CONFLICT;
+        
+        for (int i = 0; i < sizeof(sConflict); i++)
+        {
+            char sPath[PLATFORM_MAX_PATH];
+            
+            BuildPath(Path_SM, sPath, sizeof(sPath), "plugins/%s.smx", sConflict[i]);   
+            
+            if(FileExists(sPath)) {
+                LogError("Plugin %s conflicts with xms and should be disabled!", sConflict[i]);
+            }
+        }
+        
+        // Restart on first load - avoids issues with SourceTV (etc)
+        CreateTimer(2.0, T_RestartMap, _, TIMER_FLAG_NO_MAPCHANGE);
     }
 }

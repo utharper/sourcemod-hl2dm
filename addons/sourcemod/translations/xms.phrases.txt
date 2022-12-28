@@ -58,9 +58,21 @@
         "#format"   "{1:i}"
         "en"        "{N}Map will change in {H}{1} {N}seconds."
     }
+	"xmsc_rtv"
+	{
+		"en"		"{I}RTV function is disabled. Say {H}!runrandom{I} to call a random vote."
+	}
+	"xmsc_nominate"
+	{
+		"en"		"{I}Nominate function is disabled. Say {H}!run <name>{I} to call a vote."
+	}
     "xmsc_run_usage"
     {
-        "en"        "{I}Usage: !run <mode>:<map>\n Only one parameter is required. Examples:\n !run dm:lockdown\n !run tdm:overwatch\n !run tdm\n !run overwatch"
+        "en"        "{I}!RUN - Vote to change the mode/map immediately.\n Usage: !run <mode>:<map>\n Only one parameter is required. Examples:\n ~ !run dm:lockdown ~ !run tdm:overwatch\n ~ !run tdm ~ !run overwatch"
+    }
+    "xmsc_runnext_usage"
+    {
+        "en"        "{I}!RUNNEXT - Vote for the next mode/map [alias: !NEXT]\n Usage: !runnext <mode>:<map>\n Only one parameter is required. Examples:\n ~ !runnext dm:lockdown ~ !runnext tdm:overwatch\n ~ !runnext tdm ~ !next overwatch"
     }
     "xmsc_run_notfound"
     {
@@ -363,6 +375,10 @@
     {
         "en"        "{E}[!] {I}This vote is single choice. Please vote yes or no."
     }
+	"xmsc_castvote_denynumber"
+	{
+		"en"        "{E}[!] {I}You must vote for a valid option."
+	}
     "xmsc_castvote_denyspec"
     {
         "en"        "{E}[!] {I}Spectators can't participate in this vote."

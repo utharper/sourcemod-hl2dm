@@ -249,6 +249,10 @@
     {
         "en"        "Change Gamemode >"
     }
+    "xmenu2_random"
+    {
+        "en"        "Random Vote"
+    }
     "xmenu2_start"
     {
         "en"        "Start Match >"

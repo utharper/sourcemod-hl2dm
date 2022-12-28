@@ -177,7 +177,7 @@ public void OnRoundEnd(bool bMatch)
                 LogError("\"mp_chattime\" must be more than xms.cfg:\"VoteMaxTime\" !");
             }
             else {
-                CallRandomMapVote();
+                ServerCommand("runrandom");
             }
         }
         else if (strlen(gRound.sNextMap)) {

@@ -301,7 +301,7 @@ public Action XMenuAction(int iClient, int iArgs)
                      sModeName[32];
 
                 Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_0", iClient, PLUGIN_VERSION);
-                if(strlen(gRound.sModeDescription)) {
+                if (strlen(gRound.sModeDescription)) {
                     Format(sModeName, sizeof(sModeName), "(%s)", gRound.sModeDescription);
                 }
                 Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_0", iClient, gRound.sMode, sModeName, gRound.sMap, gCore.sServerName, GameVersion(), PLUGIN_VERSION, Tickrate(), bLan ? "local" : "dedicated", gCore.sServerMessage);
@@ -381,11 +381,12 @@ public Action XMenuAction(int iClient, int iArgs)
                 {
                     Format(sOptions[0], sizeof(sOptions[]), "xmenu2_map;selectmap");
                     Format(sOptions[1], sizeof(sOptions[]), "xmenu2_mode;selectmode");
-                    Format(sOptions[2], sizeof(sOptions[]), "xmenu2_start;start");
+                    Format(sOptions[2], sizeof(sOptions[]), "xmenu2_random;runrandom");
+                    Format(sOptions[3], sizeof(sOptions[]), "xmenu2_start;start");
 
                     if (gRound.bTeamplay) {
-                        Format(sOptions[3], sizeof(sOptions[]), "xmenu2_shuffle;shuffle");
-                        Format(sOptions[4], sizeof(sOptions[]), "xmenu2_invert;invert");
+                        Format(sOptions[4], sizeof(sOptions[]), "xmenu2_shuffle;shuffle");
+                        Format(sOptions[5], sizeof(sOptions[]), "xmenu2_invert;invert");
                     }
                 }
                 else {
@@ -558,7 +559,7 @@ public Action XMenuAction(int iClient, int iArgs)
                         {
                             char sModeName[32];
 
-                            if(GetModeFullName(sModeName, sizeof(sModeName), sModes[i])) {
+                            if (GetModeFullName(sModeName, sizeof(sModeName), sModes[i])) {
                                 Format(sModeName, sizeof(sModeName), "(%s)", sModeName);
                             }
                             Format(sOption, sizeof(sOption), "%s %s;%s", sModes[i], sModeName, sModes[i]);
@@ -1135,46 +1136,52 @@ public Action XMenuBack(int iClient, int iArgs)
 // Attempt to display root menu:
 public void ShowMenuIfVisible(QueryCookie cookie, int iClient, ConVarQueryResult result, char[] sCvarName, char[] sCvarValue)
 {
-    if (!StringToInt(sCvarValue))
+    if (IsClientConnected(iClient) && IsClientInGame(iClient) && !IsFakeClient(iClient))
     {
-        if (gClient[iClient].iMenuStatus == 0)
+        if (!StringToInt(sCvarValue))
         {
-            MC_PrintToChat(iClient, "%t", "xmenu_fail");
-            IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_COMMANDFAIL);
-            gClient[iClient].iMenuStatus = 1;
+            if (gClient[iClient].iMenuStatus == 0)
+            {
+                MC_PrintToChat(iClient, "%t", "xmenu_fail");
+                IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_COMMANDFAIL);
+                gClient[iClient].iMenuStatus = 1;
+            }
         }
-    }
-    else
-    {
-        if(gClient[iClient].iMenuStatus != 2)
+        else
         {
-            MC_PrintToChat(iClient, "%t", "xmenu_announce");
-            gClient[iClient].iMenuStatus = 2;
+            if (gClient[iClient].iMenuStatus != 2)
+            {
+                MC_PrintToChat(iClient, "%t", "xmenu_announce");
+                gClient[iClient].iMenuStatus = 2;
+            }
+    
+            FakeClientCommand(iClient, "sm_xmenu -1");
         }
-
-        FakeClientCommand(iClient, "sm_xmenu -1");
     }
 }
 
 // Timer to (re)attempt displaying root menu:
 public Action T_MenuRefresh(Handle hTimer)
 {
-    for (int iClient = 1; iClient <= MaxClients; iClient++)
+    if(gCore.bReady)
     {
-        if (gClient[iClient].iMenuRefresh <= 0)
+        for (int iClient = 1; iClient <= MaxClients; iClient++)
         {
-            if (IsClientConnected(iClient) && IsClientInGame(iClient) && !IsFakeClient(iClient))
+            if (gClient[iClient].iMenuRefresh <= 0)
             {
-
-                if(!gVoting.iStatus || gClient[iClient].iVote != -1) {
-                    QueryClientConVar(iClient, "cl_showpluginmessages", ShowMenuIfVisible, iClient);
+                if (IsClientConnected(iClient) && IsClientInGame(iClient) && !IsFakeClient(iClient))
+                {
+    
+                    if (!gVoting.iStatus || gClient[iClient].iVote != -1) {
+                        QueryClientConVar(iClient, "cl_showpluginmessages", ShowMenuIfVisible, iClient);
+                    }
                 }
             }
+            else {
+                gClient[iClient].iMenuRefresh--;
+            }
         }
-        else {
-            gClient[iClient].iMenuRefresh--;
-        }
-    }
+     }
 
     return Plugin_Continue;
 }
@@ -1245,7 +1252,7 @@ int FormatMenuMessage(const char[] sMsg, char[] sOutput, int iMaxlen)
         strcopy(sOutput, iMaxlen, sArray[0]);
 
         for (int iRow = 1; iRow <= iRows; iRow++) {
-            StrCat(sOutput, iMaxlen, "\n  ");
+            StrCat(sOutput, iMaxlen, "\n");
             StrCat(sOutput, iMaxlen, sArray[iRow]);
         }
 

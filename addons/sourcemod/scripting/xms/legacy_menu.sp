@@ -21,7 +21,10 @@ Menu VotingMenu(int iClient)
         Format(sOption, sizeof(sOption), "%T", "xms_menu_decision_multi", iClient);
         hMenu.SetTitle(sOption);
 
-        for (int i = 1; i < 6; i++)
+        if (gVoting.iType == VOTE_RUNRANDOM) {
+            hMenu.AddItem("1", "Don't change");
+        }
+        for (int i = (1 + view_as<int>(gVoting.iType == VOTE_RUNRANDOM)); i < 6; i++)
         {
             if (strlen(gsVoteMotion[i - 1])) {
                 hMenu.AddItem(IntToChar(i), gsVoteMotion[i - 1]);
@@ -29,8 +32,10 @@ Menu VotingMenu(int iClient)
         }
     }
 
-    Format(sOption, sizeof(sOption), "%T", "xms_menu_decision_abstain", iClient);
-    hMenu.AddItem("abstain", sOption);
+    if (gVoting.iType != VOTE_RUNRANDOM && gVoting.iType != VOTE_RUNAUTO) {
+        Format(sOption, sizeof(sOption), "%T", "xms_menu_decision_abstain", iClient);
+        hMenu.AddItem("abstain", sOption);
+    }
 
     return hMenu;
 }
@@ -51,6 +56,12 @@ public int VotingMenuAction(Menu hMenu, MenuAction iAction, int iClient, int iPa
     }
 
     return 1;
+}
+
+public Action T_VotingMenu(Handle timer, int iClient)
+{
+    VotingMenu(iClient).Display(iClient, gVoting.iMaxTime);
+    return Plugin_Stop;
 }
 
 /**************************************************************

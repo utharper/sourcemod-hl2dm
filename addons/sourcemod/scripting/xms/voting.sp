@@ -1,8 +1,7 @@
-#define VOTE_RUN 0
-#define VOTE_RUNNEXT 1
-#define VOTE_RUNNEXT_AUTO 2
-#define VOTE_RUNMULTI 3
-#define VOTE_RUNMULTINEXT 4
+#define VOTE_RUN 0     // Standard vote
+#define VOTE_RUNNEXT 1 // Next round vote
+#define VOTE_RUNAUTO 2 // End-of-round random vote
+#define VOTE_RUNRANDOM 3 // Random vote called by player
 #define VOTE_MATCH 5
 #define VOTE_SHUFFLE 6
 #define VOTE_INVERT 7
@@ -52,14 +51,19 @@ public Action T_Voting(Handle hTimer)
         // Prepare vote motion(s)
         bMultiChoice = view_as<bool>(strlen(gsVoteMotion[1]));
 
-        if (gVoting.iType == VOTE_RUN || gVoting.iType == VOTE_RUNNEXT || gVoting.iType == VOTE_RUNNEXT_AUTO)
+        if (gVoting.iType == VOTE_RUN || gVoting.iType == VOTE_RUNNEXT || gVoting.iType == VOTE_RUNAUTO || gVoting.iType == VOTE_RUNRANDOM)
         {
             bool bCurrentModeOnly = true;
             int  iDisplayLen      = 40,
                  iCount,
                  iPos[5];
 
-            for (int i = 0; i < 5; i++)
+            if(gVoting.iType == VOTE_RUNRANDOM) {
+                Format(sMotion[0], sizeof(sMotion[]), "Don't change");
+                iCount++;
+            }
+
+            for (int i = view_as<int>(gVoting.iType == VOTE_RUNRANDOM); i < 5; i++)
             {
                 if (strlen(gsVoteMotion[i]))
                 {
@@ -73,7 +77,7 @@ public Action T_Voting(Handle hTimer)
                 }
             }
 
-            for (int i = 0; i < iCount; i++)
+            for (int i = view_as<int>(gVoting.iType == VOTE_RUNRANDOM); i < iCount; i++)
             {
                 char sMap[MAX_MAP_LENGTH];
                 strcopy(sMap, sizeof(sMap), DeprefixMap(gsVoteMotion[i][iPos[i]]));
@@ -107,7 +111,7 @@ public Action T_Voting(Handle hTimer)
                 strcopy(sMotion[i], sizeof(sMotion[]), gsVoteMotion[i]);
             }
         }
-        
+
         if (gVoting.iType == VOTE_KICK || gVoting.iType == VOTE_MUTE)
         {
             switch (iTarget)
@@ -115,17 +119,17 @@ public Action T_Voting(Handle hTimer)
                 case -1: {
                     gVoting.iStatus = -1;
                 }
-                
+
                 case 0: {
                     char sTarget[8];
                     SplitString(sMotion[0], ":", sTarget, sizeof(sTarget));
                     strcopy(sTarget, sizeof(sTarget), sTarget[StrContains(sTarget, " ") + 1]);
                     iTarget = StringToInt(sTarget);
                 }
-                
+
                 default:
                 {
-                    if(!IsClientInGame(iTarget)) {
+                    if (!IsClientInGame(iTarget)) {
                         iTarget = -1;
                     }
                 }
@@ -191,27 +195,35 @@ public Action T_Voting(Handle hTimer)
                     // Nobody voted. Fail.
                     iLead = -1;
                 }
-                else {
-                    // Draw. Pick winner at random from the first 2 equal choices
-                    int iWinner[2] = {-1, -1};
-
-                    for (int i = 0; i < 6; i++)
+                else
+                {
+                    if(gVoting.iType == VOTE_RUNRANDOM) {
+                        iLead = 0; // no change
+                    }
+                    else
                     {
-                        if (iTally[i] == iHighest)
+                        // Draw. Pick winner at random from the first 2 equal choices
+                        int iWinner[2] = {-1, -1};
+
+                        for (int i = 0; i < 6; i++)
                         {
-                            if (iWinner[0] == -1) {
-                                iWinner[0] = i;
-                            }
-                            else if (iWinner[1] == -1) {
-                                iWinner[1] = i;
-                            }
-                            else {
-                                break;
+                            if (iTally[i] == iHighest)
+                            {
+                                if (iWinner[0] == -1) {
+                                    iWinner[0] = i;
+                                }
+                                else if (iWinner[1] == -1) {
+                                    iWinner[1] = i;
+                                }
+                                else {
+                                    break;
+                                }
                             }
                         }
+
+                        iLead = iWinner[Math_GetRandomInt(0, 1)];
                     }
 
-                    iLead = iWinner[Math_GetRandomInt(0, 1)];
                     MC_PrintToChatAll("%t", "xms_vote_draw", iLead + 1, sMotion[iLead]);
                 }
             }
@@ -220,7 +232,7 @@ public Action T_Voting(Handle hTimer)
             }
         }
 
-        gVoting.iStatus = iLead > -1 ? 2 : -1;
+        gVoting.iStatus = iLead > (-1 + view_as<int>(gVoting.iType == VOTE_RUNRANDOM)) ? 2 : -1;
     }
 
 
@@ -248,7 +260,7 @@ public Action T_Voting(Handle hTimer)
 
             char sMotionLead[192];
 
-            if(iLead == i) {
+            if (iLead == i) {
                 String_ToUpper(sMotion[i], sMotionLead, 192);
             }
 
@@ -289,12 +301,12 @@ public Action T_Voting(Handle hTimer)
                         Cancel();
                     }
                 }
-                
+
                 case VOTE_KICK:
                 {
                     KickClient(iTarget, "%T", "xms_votekicked", iTarget);
                 }
-                
+
                 case VOTE_MUTE:
                 {
                     Client_Mute(iTarget);
@@ -310,7 +322,7 @@ public Action T_Voting(Handle hTimer)
 
                     gConVar.sm_nextmap.SetString(gsVoteMotion[i][SplitString(gsVoteMotion[i], ":", gRound.sNextMode, sizeof(gRound.sNextMode))]);
 
-                    if (gVoting.iType != VOTE_RUN)
+                    if (gVoting.iType != VOTE_RUN && gVoting.iType != VOTE_RUNRANDOM)
                     {
                         if (!bDraw) {
                             MC_PrintToChatAll("%t", "xmsc_run_next", gRound.sNextMode, DeprefixMap(gRound.sNextMap));
@@ -338,7 +350,7 @@ public Action T_Voting(Handle hTimer)
             continue;
         }
 
-        if (gVoting.iType == VOTE_RUNNEXT_AUTO) {
+        if (gVoting.iType == VOTE_RUNAUTO) {
             Format(sHud2, sizeof(sHud2), "%T %s", "xms_autovote", iClient, sHud);
         }
         else {
@@ -347,7 +359,7 @@ public Action T_Voting(Handle hTimer)
 
         if (gVoting.iStatus != 1)
         {
-            if (!AreClientCookiesCached(iClient) || GetClientCookieInt(iClient, gSounds.cMisc) == 1 && gVoting.iType != VOTE_RUNNEXT_AUTO) {
+            if (!AreClientCookiesCached(iClient) || GetClientCookieInt(iClient, gSounds.cMisc) == 1 && gVoting.iType != VOTE_RUNAUTO) {
                 ClientCommand(iClient, "playgamesound %s", gVoting.iStatus == -1 ? SOUND_VOTEFAILED : SOUND_VOTESUCCESS);
             }
             else if (!bMultiChoice) {
@@ -387,18 +399,23 @@ void CallVote(int iType, int iCaller)
     if (iCaller != 0) {
         MC_PrintToChatAllFrom(iCaller, false, "%t", "xmsc_callvote");
     }
+    else if(iType == VOTE_RUNAUTO) {
+        MC_PrintToChatAll("%t", "xms_autovote_chat");
+    }
 
     IfCookiePlaySoundAll(gSounds.cMisc, SOUND_VOTECALLED);
 
     for (int iClient = 1; iClient <= MaxClients; iClient++)
     {
+
         if (!IsClientConnected(iClient) || !IsClientInGame(iClient) || IsFakeClient(iClient)) {
             continue;
         }
 
         if ( (iClient != iCaller || bMulti) && (!IsClientObserver(iClient) || iType != VOTE_MATCH) ) {
             gClient[iClient].iVote = -1;
-            VotingMenu(iClient).Display(iClient, gVoting.iMaxTime);
+            gClient[iClient].iMenuRefresh = gVoting.iMaxTime;
+            CreateTimer(0.1, T_VotingMenu, iClient, TIMER_FLAG_NO_MAPCHANGE);
         }
     }
 }
@@ -407,72 +424,6 @@ void CallVoteFor(int iType, int iCaller, const char[] sMotion, any ...)
 {
     VFormat(gsVoteMotion[0], sizeof(gsVoteMotion[]), sMotion, 4);
     CallVote(iType, iCaller);
-}
-
-void CallRandomMapVote()
-{
-    char sModes   [3][MAX_MODE_LENGTH],
-         sChoices [5][MAX_MAP_LENGTH + MAX_MODE_LENGTH + 1],
-         sCommand [512];
-
-    for (int i = 0; i < 3; i++)
-    {
-        char sMapcycle[PLATFORM_MAX_PATH];
-
-        // pick a mode
-        if (i == 0) {
-            // current mode for first 3 choices
-            strcopy(sModes[i], sizeof(sModes[]), gRound.sMode);
-        }
-        else {
-            // pick random
-            do {
-                if (!GetRandomMode(sModes[i], sizeof(sModes[]), true)) {
-                    break;
-                }
-            }
-            while (StrEqual(sModes[i], sModes[i - 1]));
-        }
-
-        // get mapcycle
-        if (!GetConfigString(sMapcycle, sizeof(sMapcycle), "Mapcycle", "Gamemodes", sModes[i])) {
-            continue;
-        }
-
-        // fetch available maps with GetMapsArray
-        char sMaps[512][MAX_MAP_LENGTH];
-        int  iHits = GetMapsArray(sMaps, 512, MAX_MAP_LENGTH, sMapcycle);
-
-        if (iHits > 1)
-        {
-            for (int y = 0; y < 5; y++)
-            {
-                int iRan;
-
-                if ( (i == 0 && y > 2) || (i == 1 && y != 3) || (i == 2 && y != 4) ) {
-                    continue;
-                }
-
-                do {
-                    // pick a random map
-                    iRan = Math_GetRandomInt(0, iHits);
-                }
-                while (!strlen(sMaps[iRan]) || StrEqual(sMaps[iRan], gRound.sMap));
-
-                Format(sChoices[y], sizeof(sChoices[]), "%s:%s", sModes[i], sMaps[iRan]);
-                sMaps[iRan] = "";
-            }
-        }
-    }
-
-    for (int i = 0; i < 5; i++) {
-        if (strlen(sChoices[i]) > 1) {
-            Format(sCommand, sizeof(sCommand), "%s%s%s", sCommand, i > 0 ? "," : "", sChoices[i]);
-        }
-    }
-
-    ServerCommand("runnext %s", sCommand);
-    MC_PrintToChatAll("%t", "xms_autovote_chat");
 }
 
 int VoteTimeout(int iClient)

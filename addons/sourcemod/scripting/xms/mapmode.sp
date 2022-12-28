@@ -12,14 +12,15 @@ public void OnMapStart()
     gCore.iMapChanges++;
     GetCurrentMap(gRound.sMap, sizeof(gRound.sMap));
     strcopy(gRound.sNextMode, sizeof(gRound.sNextMode), gRound.sMode);
-
     strcopy(sModeDesc, sizeof(sModeDesc), gRound.sMode);
-    if(GetConfigString(gRound.sModeDescription, sizeof(gRound.sModeDescription), "Name", "Gamemodes", gRound.sMode) == 1) {
+    
+    if (GetConfigString(gRound.sModeDescription, sizeof(gRound.sModeDescription), "Name", "Gamemodes", gRound.sMode) == 1) {
         Format(sModeDesc, sizeof(sModeDesc), "%s (%s)", sModeDesc, gRound.sModeDescription);
     }
     else {
         gRound.sModeDescription[0] = '\0';
     }
+    
     Steam_SetGameDescription(sModeDesc);
 
     PrepareSound(SOUND_GG);
@@ -36,7 +37,17 @@ public void OnMapStart()
     SetGamemode(gRound.sMode);
 
     gRound.fStartTime = GetGameTime() - 1.0;
-    gVoting.iStatus = 0;
+    
+    gVoting.iStatus             = 0;
+    for (int i = 0; i <= MaxClients; i++)
+    {
+        gClient[i].bForceKilled = false;
+        gClient[i].iVote        = 0;
+        gClient[i].iVoteTick    = 0;
+        gClient[i].iMenuRefresh = 0;
+    }
+    gSpecialClient.iAllowed     = 0;
+    gSpecialClient.iPauser      = 0;
 
     if (gRound.bOvertime) {
         CreateOverTimer();
@@ -48,7 +59,7 @@ public void OnMapStart()
 
     CreateTimer(0.1, T_CheckPlayerStates, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
     
-    if(gVoting.bAutomatic) {
+    if (gVoting.bAutomatic) {
         gConVar.sm_nextmap.SetString(""); // fuck off
     }
 }
@@ -248,7 +259,7 @@ int GetMapsArray(char[][] sArray, int iLen1, int iLen2, const char[] sMapcycle =
 
 public Action T_MapChangeFailsafe(Handle hTimer, int iMapcount)
 {
-    if(gCore.iMapChanges > iMapcount) {
+    if (gCore.iMapChanges > iMapcount) {
         return Plugin_Stop;
     }
 
@@ -257,12 +268,12 @@ public Action T_MapChangeFailsafe(Handle hTimer, int iMapcount)
 
     LogError("[%i] Map change failed! Check your mapcycles for missing maps or typos! Reverting to DefaultMap ...", i++);
 
-    if(!GetConfigString(sMap, sizeof(sMap), "DefaultMap", "Gamemodes", gRound.sMode) || !IsMapValid(sMap))
+    if (!GetConfigString(sMap, sizeof(sMap), "DefaultMap", "Gamemodes", gRound.sMode) || !IsMapValid(sMap))
     {
         LogError("[%i] DefaultMap for gamemode \"%s\" is undefined or unavailable! Reverting to DefaultMode ...", i++, gRound.sMode);
         SetGamemode(gCore.sDefaultMode);
 
-        if(!GetConfigString(sMap, sizeof(sMap), "DefaultMap", "Gamemodes", gCore.sDefaultMode) || !IsMapValid(sMap))
+        if (!GetConfigString(sMap, sizeof(sMap), "DefaultMap", "Gamemodes", gCore.sDefaultMode) || !IsMapValid(sMap))
         {
             LogError("[%i] DefaultMap for default gamemode \"%s\" is also undefined or unavailable!", i++, gCore.sDefaultMode);
             LogError("[%i] SHUTTING DOWN - Unrecoverable errors in XMS config.", i++);
@@ -333,6 +344,12 @@ int GetModeForMap(char[] sOutput, int iLen, const char[] sMap)
         }
     }
     return 1;
+}
+
+int GetModeCount()
+{
+    char sModes[32][MAX_MODE_LENGTH];
+    return ExplodeString(gCore.sGamemodes, ",", sModes, 32, MAX_MODE_LENGTH);
 }
 
 int GetRandomMode(char[] sOutput, int iLen, bool bExcludeCurrent)
