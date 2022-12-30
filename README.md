@@ -1,18 +1,18 @@
 This page hosts my public Sourcemod plugins for [Half-Life 2 Deathmatch](https://store.steampowered.com/app/320/HalfLife_2_Deathmatch/) servers.
 
-These were originally created for Australian Deathmatch server (IP: ausdm.hl2dm.community:27015), and can be seen in action on there.
+These were originally created for Australian Deathmatch (IP: [au.hl2dm.community:27015](https://hl2dm.community/connect/?au.hl2dm.community:27015)), and can be seen in action on there.
 
 For discussion and feedback, join us in the [HL2DM Community](https://hl2dm.community) (#development channel)
 
-* [xfov](#xfov) - Extended field-of-view for players
-* [hl2dmfix](#hl2dmfix) - Fixes various game bugs/exploits/annoyances
-* [xms](#xms) - eXtended Match System for competitive servers
+* [xFov](#xFov) - Extended field-of-view for players
+* [xFix](#xFix) - Fixes various game bugs/exploits/annoyances (previously called hl2dmfix)
+* [XMS](#XMS) - eXtended Match System for competitive servers
   * [xms_bots](#xms_bots) - RCBot2 controller for XMS servers
   * [xms_discord](#xms_discord) - Publish match results to discord server(s).
 * [gameme_hud](#gameme_hud) - Displays a stats HUD in the scoreboard, using gameME data.
 
 
-# xfov
+# xFov
 ![FOV demonstration](https://i.imgur.com/8XydE9f.png)
 
 HL2DM restricts player field-of-view to a value of 90, which is not ideal for widescreen monitors and can make the game feel very 'zoomed in' compared to other shooters.
@@ -34,7 +34,7 @@ You can configure these in `cfg/sourcemod/plugins.xfov.cfg` after first load.
 * [Source](addons/sourcemod/scripting/xfov.sp)
 
 
-# hl2dmfix
+# xFix
 **Requires [VPhysics](https://builds.limetech.io/?project=vphysics) extension**
 
 This plugin workarounds some of the issues with the game, such as scoring bugs, and aims to improve the overall player experience without compromising gameplay in any way.
@@ -60,8 +60,8 @@ This has not really been developed far but already fixes a few things:
 No configuration is required.
 
 ### Download
-* [Download](https://github.com/utharper/sourcemod-hl2dm/releases/download/latest/hl2dmfix.smx)
-* [Source](addons/sourcemod/scripting/hl2dmfix.sp)
+* [Download](https://github.com/utharper/sourcemod-hl2dm/releases/download/latest/xfix.smx)
+* [Source](addons/sourcemod/scripting/xfix.sp)
 
 
 # XMS
@@ -76,9 +76,9 @@ Everything is configured and explained in `addons\sourcemod\configs\xms.cfg`.
 ### Menu
 XMS provides a simple menu which automatically opens and stays open. This allows players to quickly press ESC and access most functionality without having to type in commands:
 
-![menu](https://i.imgur.com/019FgqV.png)
+![menu](https://i.imgur.com/Qt1PFL0.png)
 
-From this menu players can choose their team, call a vote to change the map/gamemode, start/stop/pause a match, view other player's steam profiles, set their FOV (if xfov is in use), change their player model, etc etc.
+From this menu players can choose their team, call a vote to change the map/gamemode, start/stop/pause a match, view other player's steam profiles, set their FOV (if xFov is in use), change their player model, etc etc.
 
 Players need to set `cl_showpluginmessages 1` for the menu to be visible (in common with all Sourcemod menus in HL2DM, after a game update a few years ago). If they have not set this, a warning message will be displayed in their chat advising them how to do so.
 
@@ -91,9 +91,13 @@ For the map query, first a list of predefined map abbreviations (in xms.cfg) is 
 
 You can input multiple modes/maps to create a multiple choice vote. eg: `!run lockdown, halls3, dm:runoff, tdm:runoff, arcade:powerhouse` (one command)
 
-**!runnext** `<gamemode>`:`<map>`
+**!runnext** `<gamemode>`:`<map>`  _(or **!next**)_
 
 Exactly the same as !run, but it sets the next map rather than changing immediately.
+
+**!runrandom** _(or **!random**)_
+
+Calls a vote to change to one of a selection of random maps and gamemodes.
 
 **!start**
 
@@ -109,9 +113,9 @@ Display a list of available maps in the current gamemode. This can be overriden 
 - `!list jm` will show all maps from the jm mode's mapcycle (mapcycle_jm.txt)
 - `!list all` will show every map on the server.
 
-**!coinflip**
+**!coinflip** _(or **!flip**)_
 
-Randomly returns heads or tails. Useful for determining who gets first map choice, etc.
+Inherited from the old PMS plugin, this randomly returns heads or tails. Useful for determining who gets first map choice, etc.
 
 **!profile** `<player name>`
 
@@ -137,6 +141,14 @@ Open the given player's Steam profile in a MOTD window.
 
 Call a custom yes/no vote. No action is taken on the outcome.
 
+**!votekick** `<player name or id>`
+
+Calls a vote to kick this player.
+
+**!votemute** `<player name or id>`
+
+Calls a vote to mute this player. They will not be able to chat or talk on the mic.
+
 **!pause**
 
 Pause/unpause the game
@@ -153,7 +165,7 @@ Shortcut to open the player model submenu
 
 Shortcut to open the hud color submenu
 
-### Other features (not an exhaustive list)
+### Some other features (extremely out of date)
 
 - Scripting natives if a gamemode requires custom code
 - Configurable voting system for core commands, with vote announce sounds taken from [Xonotic](https://xonotic.org/). 
@@ -174,7 +186,9 @@ After extracting the contents of xms.zip, you will want to edit `cfg/server.cfg`
 
 Make sure the server works, and then you can proceed to edit `xms.cfg` to your desired values. Everything is explained in there.
 
-Finally, you will need to configure your mapcycles (these are also in the `cfg` folder). Be sure to only include maps that are actually in your maps folder.
+Finally, you will need to configure your mapcycles (these are also in the `cfg` folder). Be sure to only include maps that are actually in your maps folder. If maps in the mapcycle do not actually exist on the server, this may cause errors (and will be logged).
+
+You can refer to any `error_` log files in `addons/sourcemod/logs` to help identify problems. If you need help, post in the #development channel on Discord.
 
 ### Download
 * [Download zip](https://github.com/utharper/sourcemod-hl2dm/releases/download/latest/xms.zip)
@@ -196,7 +210,7 @@ The bot also has a few little taunts and other messages which you can modify in 
 ## xms_discord
 **Requires XMS and the [SteamWorks](https://forums.alliedmods.net/showthread.php?t=229556) extension**
 
-![xms_discord output example](https://i.imgur.com/Gc4iH3e.png)
+![xms_discord output example](https://i.imgur.com/o41mcaN.png)
 
 This plugin was created for the [HL2DM Community Discord server](https://hl2dm.community). It posts the results of all matches, along with links to download the match demo and view the participant's profiles. This is done via webhook(s), you can set up multiple webhooks if you wish.
 It will also optionally post player feedback (submitted via the XMS menu) to a seperate webhook/channel.
