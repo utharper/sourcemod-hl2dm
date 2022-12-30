@@ -1,19 +1,21 @@
 #pragma semicolon 1
+#pragma newdecls required
 
 #define PLUGIN_VERSION  "1.2"
 #define PLUGIN_URL      "www.hl2dm.community"
-#define PLUGIN_UPDATE   "http://raw.githubusercontent.com/utharper/sourcemod-hl2dm/master/addons/sourcemod/hl2dmfix.upd"
+#define PLUGIN_UPDATE   "http://raw.githubusercontent.com/utharper/sourcemod-hl2dm/master/addons/sourcemod/xfix.upd"
 
 public Plugin myinfo = {
-    name              = "hl2dmfix",
+    name              = "xFix - HL2DM Fixes & Enhancements",
     version           = PLUGIN_VERSION,
     description       = "Various fixes and enhancements for HL2DM servers",
     author            = "harper, toizy, v952, sidezz",
     url               = PLUGIN_URL
 };
 
-/**************************************************************/
-
+/**************************************************************
+ * INCLUDES
+ *************************************************************/
 #include <sourcemod>
 #include <vphysics>
 #include <sdkhooks>
@@ -22,30 +24,35 @@ public Plugin myinfo = {
 #undef REQUIRE_PLUGIN
 #include <updater>
 
-#pragma newdecls required
+#define REQUIRE_PLUGIN
 #include <jhl2dm>
 
-/**************************************************************/
+/**************************************************************
+ * GLOBAL VARS
+ *************************************************************/
+enum struct _gConVar
+{
+    ConVar sv_gravity;
+    ConVar mp_falldamage;
+    ConVar mp_teamplay;
+    ConVar sv_tags;
+}
+_gConVar gConVar;
 
-bool      gbRoundEnd,
-          gbMOTDExists,
-          gbTeamplay,
-          gbModTags;
+bool gbRoundEnd;
+bool gbMOTDExists;
+bool gbTeamplay;
+bool gbModtags;
 
-ConVar    ghConVarGravity,
-          ghConVarFalldamage,
-          ghConVarTeamplay,
-          ghConVarTags;
-
-StringMap gmKills,
-          gmDeaths,
-          gmTeams;
+StringMap gmKills;
+StringMap gmDeaths;
+StringMap gmTeams;
 
 /**************************************************************/
 
 public APLRes AskPluginLoad2(Handle hPlugin, bool bLate, char[] sError, int iLen)
 {
-    RegPluginLibrary("hl2dmfix");
+    RegPluginLibrary("xfix");
     return APLRes_Success;
 }
 
@@ -55,13 +62,13 @@ public void OnPluginStart()
     gmDeaths = CreateTrie();
     gmTeams  = CreateTrie();
 
-    ghConVarFalldamage = FindConVar("mp_falldamage");
-    ghConVarTeamplay   = FindConVar("mp_teamplay");
-    ghConVarGravity    = FindConVar("sv_gravity");
-    ghConVarTags       = FindConVar("sv_tags");
+    gConVar.mp_falldamage = FindConVar("mp_falldamage");
+    gConVar.mp_teamplay   = FindConVar("mp_teamplay");
+    gConVar.sv_gravity    = FindConVar("sv_gravity");
+    gConVar.sv_tags       = FindConVar("sv_tags");
 
-    ghConVarGravity.AddChangeHook(OnGravityChanged);
-    ghConVarTags.AddChangeHook(OnTagsChanged);
+    gConVar.sv_gravity.AddChangeHook(OnGravityChanged);
+    gConVar.sv_tags.AddChangeHook(OnTagsChanged);
 
     HookEvent("server_cvar", Event_GameMessage, EventHookMode_Pre);
     HookUserMessage(GetUserMessageId("TextMsg"),  UserMsg_TextMsg,  true);
@@ -71,7 +78,7 @@ public void OnPluginStart()
         Updater_AddPlugin(PLUGIN_UPDATE);
     }
 
-    CreateConVar("hl2dmfix_version", PLUGIN_VERSION, _, FCVAR_NOTIFY);
+    CreateConVar("xfix_version", PLUGIN_VERSION, _, FCVAR_NOTIFY);
     AddPluginTag();
 }
 
@@ -84,7 +91,7 @@ public void OnLibraryAdded(const char[] sName)
 
 public void OnTagsChanged(Handle hConvar, const char[] sOldValue, const char[] sNewValue)
 {
-    if (!gbModTags) {
+    if (!gbModtags) {
         AddPluginTag();
     }
 }
@@ -93,14 +100,14 @@ void AddPluginTag()
 {
     char sTags[128];
 
-    ghConVarTags.GetString(sTags, sizeof(sTags));
+    gConVar.sv_tags.GetString(sTags, sizeof(sTags));
 
-    if (StrContains(sTags, "hl2dmfix") == -1)
+    if (StrContains(sTags, "xFix") == -1)
     {
-        StrCat(sTags, sizeof(sTags), sTags[0] != 0 ? ",hl2dmfix" : "hl2dmfix");
-        gbModTags = true;
-        ghConVarTags.SetString(sTags);
-        gbModTags = false;
+        StrCat(sTags, sizeof(sTags), sTags[0] != 0 ? ",xFix" : "xFix");
+        gbModtags = true;
+        gConVar.sv_tags.SetString(sTags);
+        gbModtags = false;
     }
 }
 
@@ -165,7 +172,7 @@ public Action UserMsg_TextMsg(UserMsg msg, Handle hMsg, const int[] iPlayers, in
 public void OnMapStart()
 {
     gbMOTDExists = (FileExists("cfg/motd.txt") && FileSize("cfg/motd.txt") > 2);
-    gbTeamplay   = ghConVarTeamplay.BoolValue;
+    gbTeamplay   = gConVar.mp_teamplay.BoolValue;
     gbRoundEnd   = false;
 
     CreateTimer(0.1, T_CheckPlayerStates, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
@@ -281,7 +288,7 @@ public Action Hook_OnTakeDamage(int iClient, int &iAttacker, int &iInflictor, fl
     if (iDamageType & DMG_FALL)
     {
         // Fix mp_falldamage value not having any effect >
-        fDamage = ghConVarFalldamage.FloatValue;
+        fDamage = gConVar.mp_falldamage.FloatValue;
     }
     else if (iDamageType & DMG_BLAST)
     {

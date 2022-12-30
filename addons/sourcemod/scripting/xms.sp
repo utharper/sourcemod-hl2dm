@@ -10,7 +10,7 @@
 public Plugin myinfo = {
     name                 = "XMS - eXtended Match System",
     version              = PLUGIN_VERSION,
-    description          = "Multi-gamemode match plugin for competitive HL2DM servers",
+    description          = "Multi-gamemode server plugin for competitive HL2DM servers",
     author               = "harper",
     url                  = PLUGIN_URL
 };
@@ -337,8 +337,8 @@ public void OnLibraryRemoved(const char[] sName)
 
 public void OnAllPluginsLoaded()
 {
-    if (!LibraryExists("hl2dmfix")) {
-        LogError("hl2dmfix is not loaded !");
+    if (!LibraryExists("xfix")) {
+        LogError("xFix is not loaded !");
     }
     
     if (!gCore.bReady)
