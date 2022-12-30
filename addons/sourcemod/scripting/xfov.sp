@@ -1,45 +1,54 @@
 #pragma semicolon 1
+#pragma newdecls required
 
-#define PLUGIN_VERSION  "2.0"
+#define PLUGIN_VERSION  "2.1"
 #define PLUGIN_URL      "www.hl2dm.community"
-#define PLUGIN_UPDATE   "http://raw.githubusercontent.com/utharper/sourcemod-hl2dm/master/addons/sourcemod/extended_fov.upd"
+#define PLUGIN_UPDATE   "http://raw.githubusercontent.com/utharper/sourcemod-hl2dm/master/addons/sourcemod/xfov.upd"
 
 public Plugin myinfo = {
-    name              = "xfov (eXtended Field Of View)",
+    name              = "xFov - eXtended Field Of View",
     version           = PLUGIN_VERSION,
     description       = "Enables support for custom player FOV values",
     author            = "harper",
     url               = PLUGIN_URL
 };
 
-/**************************************************************/
-
+/**************************************************************
+ * INCLUDES
+ *************************************************************/
 #include <sourcemod>
 #include <clientprefs>
 #include <morecolors>
+#include <sdkhooks>
+#include <smlib>
 
 #undef REQUIRE_PLUGIN
 #include <updater>
 
 #define REQUIRE_PLUGIN
-#pragma newdecls required
 #include <jhl2dm>
 
-/**************************************************************/
+/**************************************************************
+ * GLOBAL VARS
+ *************************************************************/
+#define ZOOM_NONE 0
+#define ZOOM_XBOW 1
+#define ZOOM_SUIT 2
+#define ZOOM_TOGL 3
+#define FIRSTPERSON 4
 
-enum(+=1) {
-    ZOOM_NONE, ZOOM_XBOW, ZOOM_SUIT, ZOOM_TOGL, FIRSTPERSON
+enum struct _gConVar
+{
+    ConVar sv_tags;
+    ConVar xfov_minfov;
+    ConVar xfov_defaultfov;
+    ConVar xfov_maxfov;
 }
+_gConVar gConVar;
 
-/**************************************************************/
-
-int    giClientZoom[MAXPLAYERS + 1];
-
-Handle ghCookie;
-
-ConVar ghConVarMin,
-       ghConVarDefault,
-       ghConVarMax;
+int    giZoom[MAXPLAYERS + 1];
+bool   gbModtags;
+Handle gcFov;
 
 /**************************************************************/
 
@@ -47,14 +56,13 @@ public void OnPluginStart()
 {
     LoadTranslations("xfov.phrases.txt");
 
-    ghCookie = RegClientCookie("hl2dm_fov", "Field-of-view value", CookieAccess_Public);
+    gcFov = RegClientCookie("hl2dm_fov", "Field-of-view value", CookieAccess_Public);
 
-    ghConVarMin     = CreateConVar("xfov_minfov", "90", "Minimum FOV allowed on server");
-    ghConVarDefault = CreateConVar("xfov_defaultfov", "90", "Default FOV of players on server");
-    ghConVarMax     = CreateConVar("xfov_maxfov", "110", "Maximum FOV allowed on server");
+    gConVar.xfov_minfov     = CreateConVar("xfov_minfov", "90", "Minimum FOV allowed on server");
+    gConVar.xfov_defaultfov = CreateConVar("xfov_defaultfov", "90", "Default FOV of players on server");
+    gConVar.xfov_maxfov     = CreateConVar("xfov_maxfov", "110", "Maximum FOV allowed on server");
+    gConVar.sv_tags         = FindConVar("sv_tags");
     AutoExecConfig();
-
-    CreateConVar("xfov_version", PLUGIN_VERSION, _, FCVAR_NOTIFY);
 
     RegConsoleCmd("sm_fov", Command_FOV, "Set your desired field-of-view value");
     AddCommandListener(OnClientChangeFOV, "fov");
@@ -65,6 +73,9 @@ public void OnPluginStart()
     if (LibraryExists("updater")) {
         Updater_AddPlugin(PLUGIN_UPDATE);
     }
+
+    CreateConVar("xfov_version", PLUGIN_VERSION, _, FCVAR_NOTIFY);
+    AddPluginTag();
 }
 
 public void OnLibraryAdded(const char[] sName)
@@ -74,27 +85,59 @@ public void OnLibraryAdded(const char[] sName)
     }
 }
 
+public void OnTagsChanged(Handle hConvar, const char[] sOldValue, const char[] sNewValue)
+{
+    if (!gbModtags) {
+        AddPluginTag();
+    }
+}
+
+void AddPluginTag()
+{
+    char sTags[128];
+
+    gConVar.sv_tags.GetString(sTags, sizeof(sTags));
+
+    if (StrContains(sTags, "xFov") == -1)
+    {
+        StrCat(sTags, sizeof(sTags), sTags[0] != 0 ? ",xFov" : "xFov");
+        gbModtags = true;
+        gConVar.sv_tags.SetString(sTags);
+        gbModtags = false;
+    }
+}
+
+public void OnClientPutInServer(int iClient)
+{
+    SDKHook(iClient, SDKHook_WeaponSwitchPost, OnClientSwitchWeapon);
+}
+
 public Action Command_FOV(int iClient, int iArgs)
 {
     RequestFOV(iClient, GetCmdArgInt(1));
+
+    return Plugin_Handled;
 }
 
 public Action OnClientChangeFOV(int iClient, const char[] sCommand, int iArgs)
 {
     RequestFOV(iClient, GetCmdArgInt(1));
+
+    return Plugin_Handled;
 }
 
 void RequestFOV(int iClient, int iFov)
 {
-    if (iFov < GetConVarInt(ghConVarMin) || iFov > GetConVarInt(ghConVarMax)) {
-        MC_ReplyToCommand(iClient, "%t", "xfov_fail", GetConVarInt(ghConVarMin), GetConVarInt(ghConVarMax));
+    if (iFov < GetConVarInt(gConVar.xfov_minfov) || iFov > GetConVarInt(gConVar.xfov_maxfov))
+    {
+        MC_ReplyToCommand(iClient, "%t", "xfov_fail", GetConVarInt(gConVar.xfov_minfov), GetConVarInt(gConVar.xfov_maxfov));
     }
     else
     {
         char sFov[4];
 
         IntToString(iFov, sFov, sizeof(sFov));
-        SetClientCookie(iClient, ghCookie, sFov);
+        SetClientCookie(iClient, gcFov, sFov);
         MC_ReplyToCommand(iClient, "%t", "xfov_success", iFov);
     }
 }
@@ -105,11 +148,11 @@ public Action OnPlayerRunCmd(int iClient, int &iButtons, int &iImpulse, float fV
     {
         static int iLastButtons[MAXPLAYERS + 1];
 
-        int iFov = GetClientCookieInt(iClient, ghCookie);
+        int iFov = GetClientCookieInt(iClient, gcFov);
 
-        if (iFov < GetConVarInt(ghConVarMin) || iFov > GetConVarInt(ghConVarMax)) {
+        if (iFov < GetConVarInt(gConVar.xfov_minfov) || iFov > GetConVarInt(gConVar.xfov_maxfov)) {
             // fov is out of bounds, reset
-            iFov = GetConVarInt(ghConVarDefault);
+            iFov = GetConVarInt(gConVar.xfov_defaultfov);
         }
 
         if (!IsClientObserver(iClient) && IsPlayerAlive(iClient))
@@ -118,12 +161,12 @@ public Action OnPlayerRunCmd(int iClient, int &iButtons, int &iImpulse, float fV
 
             GetClientWeapon(iClient, sWeapon, sizeof(sWeapon));
 
-            if (giClientZoom[iClient] == ZOOM_XBOW || giClientZoom[iClient] == ZOOM_TOGL) {
+            if (giZoom[iClient] == ZOOM_XBOW || giZoom[iClient] == ZOOM_TOGL) {
                 // block suit zoom while xbow/toggle-zoomed
                 iButtons &= ~IN_ZOOM;
             }
 
-            if (giClientZoom[iClient] == ZOOM_TOGL)
+            if (giZoom[iClient] == ZOOM_TOGL)
             {
                 if (StrEqual(sWeapon, "weapon_crossbow")) {
                     // block xbow zoom while toggle zoomed
@@ -136,31 +179,31 @@ public Action OnPlayerRunCmd(int iClient, int &iButtons, int &iImpulse, float fV
 
             if (iButtons & IN_ZOOM)
             {
-                if (!(iLastButtons[iClient] & IN_ZOOM) && !giClientZoom[iClient]) {
+                if (!(iLastButtons[iClient] & IN_ZOOM) && !giZoom[iClient]) {
                     // suit zooming
-                    giClientZoom[iClient] = ZOOM_SUIT;
+                    giZoom[iClient] = ZOOM_SUIT;
                 }
             }
-            else if (giClientZoom[iClient] == ZOOM_SUIT) {
+            else if (giZoom[iClient] == ZOOM_SUIT) {
                 // no longer suit zooming
-                giClientZoom[iClient] = ZOOM_NONE;
+                giZoom[iClient] = ZOOM_NONE;
             }
 
-            if ((StrEqual(sWeapon, "weapon_crossbow") && (iButtons & IN_ATTACK2) && !(iLastButtons[iClient] & IN_ATTACK2)) || (!StrEqual(sWeapon, "weapon_crossbow") && giClientZoom[iClient] == ZOOM_XBOW))
+            if ((StrEqual(sWeapon, "weapon_crossbow") && (iButtons & IN_ATTACK2) && !(iLastButtons[iClient] & IN_ATTACK2)) || (!StrEqual(sWeapon, "weapon_crossbow") && giZoom[iClient] == ZOOM_XBOW))
             {
                 // xbow zoom cycle
-                giClientZoom[iClient] = (giClientZoom[iClient] == ZOOM_XBOW ? ZOOM_NONE : ZOOM_XBOW);
+                giZoom[iClient] = (giZoom[iClient] == ZOOM_XBOW ? ZOOM_NONE : ZOOM_XBOW);
             }
         }
         else {
-            giClientZoom[iClient] = ZOOM_NONE;
+            giZoom[iClient] = ZOOM_NONE;
         }
 
         // set values
-        if (giClientZoom[iClient] || (IsClientObserver(iClient) && GetEntProp(iClient, Prop_Send, "m_iObserverMode") == FIRSTPERSON)) {
+        if (giZoom[iClient] || (IsClientObserver(iClient) && GetEntProp(iClient, Prop_Send, "m_iObserverMode") == FIRSTPERSON)) {
             SetEntProp(iClient, Prop_Send, "m_iDefaultFOV", 90);
         }
-        else if (giClientZoom[iClient] == ZOOM_NONE) {
+        else if (giZoom[iClient] == ZOOM_NONE) {
             SetEntProp(iClient, Prop_Send, "m_iFOV", iFov);
             SetEntProp(iClient, Prop_Send, "m_iDefaultFOV", iFov);
         }
@@ -173,13 +216,24 @@ public Action OnPlayerRunCmd(int iClient, int &iButtons, int &iImpulse, float fV
 
 public Action OnClientToggleZoom(int iClient, const char[] sCommand, int iArgs)
 {
-    if (giClientZoom[iClient] != ZOOM_NONE)
+    if (giZoom[iClient] != ZOOM_NONE)
     {
-        if (giClientZoom[iClient] == ZOOM_TOGL || giClientZoom[iClient] == ZOOM_SUIT) {
-            giClientZoom[iClient] = ZOOM_NONE;
+        if (giZoom[iClient] == ZOOM_TOGL || giZoom[iClient] == ZOOM_SUIT) {
+            giZoom[iClient] = ZOOM_NONE;
         }
     }
     else {
-        giClientZoom[iClient] = ZOOM_TOGL;
+        giZoom[iClient] = ZOOM_TOGL;
     }
+
+    return Plugin_Continue;
+}
+
+public Action OnClientSwitchWeapon(int iClient, int iWeapon)
+{
+    if (giZoom[iClient] == ZOOM_TOGL) {
+        giZoom[iClient] = ZOOM_NONE;
+    }
+
+    return Plugin_Continue;
 }

@@ -1,4 +1,5 @@
 #pragma semicolon 1
+#pragma newdecls required
 
 #define PLUGIN_VERSION  "1.2"
 #define PLUGIN_URL      "www.hl2dm.community"
@@ -13,8 +14,9 @@ public Plugin myinfo = {
     url               = PLUGIN_URL
 };
 
-/**************************************************************/
-
+/**************************************************************
+ * INCLUDES
+ *************************************************************/
 #include <sourcemod>
 #include <morecolors>
 #include <smlib>
@@ -23,12 +25,22 @@ public Plugin myinfo = {
 #include <updater>
 
 #define REQUIRE_PLUGIN
-#pragma newdecls required
 #include <jhl2dm>
 #include <xms>
 
-/**************************************************************/
+/**************************************************************
+ * GLOBAL VARS
+ *************************************************************/
+int  giBotClient;
+int  giState;
+int  giJoinDelay;
+int  giLeaveDelay;
 
+bool gbEnabled;
+bool gbContinue;
+bool gbSourceTV;
+
+char gsBotName[MAX_NAME_LENGTH];
 char gsKnownMaps[8][MAX_MAP_LENGTH] =
 {
     // the bot is familiar with these maps and shouldn't get stuck. (just stock maps for now)
@@ -41,19 +53,6 @@ char gsKnownMaps[8][MAX_MAP_LENGTH] =
     "dm_underpass",
     "halls3"
 };
-
-/**************************************************************/
-
-int  giBotClient,
-     giState,
-     giJoinDelay,
-     giLeaveDelay;
-
-bool gbEnabled,
-     gbContinue,
-     gbSourceTV;
-
-char gsBotName[MAX_NAME_LENGTH];
 
 /**************************************************************/
 
@@ -106,7 +105,7 @@ public void OnClientPutInServer(int iClient)
 
 public Action OnClientSayCommand(int iClient, const char[] sCommand, const char[] sArgs)
 {
-    if (!iClient || !giBotClient) {
+    if (!iClient || !giBotClient || !IsClientInGame(giBotClient)) {
         return Plugin_Continue;
     }
 
@@ -151,8 +150,8 @@ public Action T_CheckBots(Handle hTimer)
     if (gbEnabled && (GetTimeElapsed() >= giJoinDelay || gbContinue))
     {
         int iTotal       = GetRealClientCount(true, true) - view_as<int>(gbSourceTV);
-        int iPlayers     = GetRealClientCount(true, false),
-            iConnecting  = GetRealClientCount(false, false) - iPlayers;
+        int iPlayers     = GetRealClientCount(true, false);
+        int iConnecting  = GetRealClientCount(false, false) - iPlayers;
 
         if (iPlayers == 1)
         {
@@ -183,12 +182,14 @@ public Action T_BotAdd(Handle hTimer)
     if (GetRealClientCount(true, false) == 1 && giState == GAME_DEFAULT) {
         ServerCommand("rcbotd addbot");
     }
+    
+    return Plugin_Handled;
 }
 
 public Action T_BotAnnounce(Handle hTimer)
 {
-    static int iTimer,
-               iRan;
+    static int iTimer;
+    static int iRan;
 
     if (giBotClient > 0 && IsClientInGame(giBotClient))
     {
@@ -236,6 +237,7 @@ public Action T_BotAnnounce(Handle hTimer)
             iTimer++;
         }
     }
+    
     return Plugin_Continue;
 }
 
@@ -259,6 +261,8 @@ public Action T_BotRemove(Handle hTimer)
             giBotClient = 0;
         }
     }
+    
+    return Plugin_Handled;
 }
 
 public Action T_BotTaunt(Handle hTimer)
@@ -321,8 +325,8 @@ public Action Event_PlayerDeath(Event hEvent, const char[] sEvent, bool bDontBro
         return Plugin_Continue;
     }
 
-    bool bBotAttacker = (giBotClient == GetClientOfUserId(GetEventInt(hEvent, "attacker"))),
-         bBotVictim   = (giBotClient == GetClientOfUserId(GetEventInt(hEvent, "userid")));
+    bool bBotAttacker = (giBotClient == GetClientOfUserId(GetEventInt(hEvent, "attacker")));
+    bool bBotVictim   = (giBotClient == GetClientOfUserId(GetEventInt(hEvent, "userid")));
 
     if (bBotAttacker && bBotVictim)
     {
@@ -351,9 +355,9 @@ bool BotsAvailable()
 {
     static bool bBotSupport;
 
-    char sCurrentMode   [MAX_MODE_LENGTH],
-         sSupportedModes[192],
-         sCommand       [16];
+    char sCurrentMode   [MAX_MODE_LENGTH];
+    char sSupportedModes[192];
+    char sCommand       [16];
 
     if (!bBotSupport)
     {
