@@ -117,10 +117,10 @@ void LoadConfigValues()
     GetConfigString(gCore.sEmptyMapcycle  , sizeof(gCore.sEmptyMapcycle)  , "EmptyMapcycle");
 
     gCore.iAdFrequency       = GetConfigInt("Frequency", "ServerAds");
+    gCore.iRevertTime        = GetConfigInt("RevertTime");
     gVoting.iMinPlayers      = GetConfigInt("VoteMinPlayers");
     gVoting.iMaxTime         = GetConfigInt("VoteMaxTime");
     gVoting.iCooldown        = GetConfigInt("VoteCooldown");
-    gCore.iRevertTime        = GetConfigInt("RevertTime");
     gVoting.bAutomatic       = GetConfigInt("AutoVoting") == 1;
 
     // Gamemode settings:

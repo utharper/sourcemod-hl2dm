@@ -14,8 +14,9 @@ public Plugin myinfo = {
     url               = PLUGIN_URL
 };
 
-/**************************************************************/
-
+/**************************************************************
+ * INCLUDES
+ *************************************************************/
 #include <sourcemod>
 #include <clientprefs>
 #include <gameme>
@@ -31,25 +32,24 @@ public Plugin myinfo = {
 #define REQUIRE_PLUGIN
 #include <gameme_hud>
 
-/**************************************************************/
-
+/**************************************************************
+ * GLOBAL VARS
+ *************************************************************/
 #define QUERYINTERVAL 1.0 // must be a whole number
 #define HUDINTERVAL   1.0
 
-/**************************************************************/
+Handle ghHud;
+/*Cookie*/Handle gcColor[3];
 
-Handle ghHud,
-       ghCookieColor [3];
+int giStatsVisible[MAXPLAYERS + 1];
+int giTop10Points [10];
+int giTotalPlayers;
 
-int    giStatsVisible[MAXPLAYERS+1],
-       giTop10Points [10],
-       giTotalPlayers;
+bool gbStayVisible[MAXPLAYERS + 1];
+bool gbUsingXMS;
 
-bool   gbStayVisible [MAXPLAYERS + 1],
-       gbUsingXMS;
-
-any    gValues       [32][MAXPLAYERS + 1];
-char   gsTop10Names  [10][MAX_NAME_LENGTH];
+any  gValues      [32][MAXPLAYERS + 1];
+char gsTop10Names [10][MAX_NAME_LENGTH];
 
 /**************************************************************/
 
@@ -77,10 +77,10 @@ public int Native_FetchTop10PlayerData(Handle hPlugin, int iParams)
 
 public int Native_FetchPlayerData(Handle hPlugin, int iParams)
 {
-    int  iClient = GetNativeCell(3),
-         iField = GetNativeCell(4),
-         iBytes;
     char sValue[32];
+    int  iClient = GetNativeCell(3);
+    int  iField  = GetNativeCell(4);
+    int  iBytes;
 
     if (iField == GM_HPK || iField == GM_PRE_HPK || iField == GM_ACCURACY || iField == GM_PRE_ACCURACY || iField == GM_KPD || iField == GM_PRE_KPD)
     {
@@ -142,9 +142,9 @@ public void OnAllPluginsLoaded()
     gbUsingXMS = LibraryExists("xms");
 
     if (gbUsingXMS) {
-        ghCookieColor[0] = FindClientCookie("hudcolor_r");
-        ghCookieColor[1] = FindClientCookie("hudcolor_g");
-        ghCookieColor[2] = FindClientCookie("hudcolor_b");
+        gcColor[0] = FindClientCookie("hudcolor_r");
+        gcColor[1] = FindClientCookie("hudcolor_g");
+        gcColor[2] = FindClientCookie("hudcolor_b");
     }
     else {
         HookEvent("round_start", Event_RoundStart, EventHookMode_Post);
@@ -292,7 +292,7 @@ void ShowStats(int iClient)
         if (gbUsingXMS)
         {
             for (int i = 0; i < 3; i++) {
-                iColor[i] = clamp(GetClientCookieInt(iClient, ghCookieColor[i]), 0, 255);
+                iColor[i] = clamp(GetClientCookieInt(iClient, gcColor[i]), 0, 255);
             }
         }
 
@@ -331,8 +331,8 @@ public FetchPlayerData(iCommand, iPayload, iClient, &Handle: hDataPack) //?
         for (int i = 0; i < 5; i++) {
             ReadPackCell(hData);
         }
-        gValues[iClient][GM_KILLSPREE]      = ReadPackCell(hData);
-        gValues[iClient][GM_DEATHSPREE]     = ReadPackCell(hData);
+        gValues[iClient][GM_KILLSPREE] = ReadPackCell(hData);
+        gValues[iClient][GM_DEATHSPREE] = ReadPackCell(hData);
 
         gValues[iClient][GM_MAPTIME]       += RoundToNearest(QUERYINTERVAL);
         gValues[iClient][GM_PLAYTIME]       = gValues[iClient][GM_PRETIME]   + gValues[iClient][GM_MAPTIME];
@@ -356,7 +356,7 @@ public FetchTop10Data(iCommand, iPayload, &Handle: hDataPack)
 {
     if (iCommand == RAW_MESSAGE_CALLBACK_TOP10)
     {
-        int      iTotal;
+        int    iTotal;
         Handle hData = CloneHandle(hDataPack);
 
         ResetPack(hData);

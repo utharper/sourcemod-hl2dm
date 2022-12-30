@@ -189,7 +189,7 @@ public Action Event_RoundStart(Handle hEvent, const char[] sEvent, bool bDontBro
     gmTeams.Clear();
     gmKills.Clear();
     gmDeaths.Clear();
-    
+
     return Plugin_Continue;
 }
 
@@ -307,7 +307,7 @@ public Action Hook_WeaponCanSwitchTo(int iClient, int iWeapon)
 {
     // Hands animation fix by toizy >
     SetEntityFlags(iClient, GetEntityFlags(iClient) | FL_ONGROUND);
-    
+
     return Plugin_Changed;
 }
 
@@ -317,7 +317,7 @@ public void OnEntityCreated(int iEntity, const char[] sEntity)
     if (StrEqual(sEntity, "env_sprite", false) || StrEqual(sEntity, "env_spritetrail", false)) {
         RequestFrame(GetSpriteData, EntIndexToEntRef(iEntity));
     }
-    
+
     return;
 }
 
@@ -416,7 +416,7 @@ public Action T_CheckPlayerStates(Handle hTimer)
     for (int i = 1; i < 4; i++) {
         Team_SetScore(i, iTeamScore[i]);
     }
-    
+
     return Plugin_Continue;
 }
 
@@ -486,7 +486,7 @@ public Action T_BlockConnectMOTD(Handle hTimer, int iClient)
             EndMessage();
         }
     }
-    
+
     return Plugin_Handled;
 }
 
@@ -507,6 +507,6 @@ public Action Event_GameMessage(Event hEvent, const char[] sEvent, bool bDontBro
 {
     // block Server cvar spam
     hEvent.BroadcastDisabled = true;
-    
+
     return Plugin_Changed;
 }

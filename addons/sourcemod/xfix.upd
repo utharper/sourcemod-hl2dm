@@ -10,7 +10,7 @@
 
     "Files"
     {
-        "Plugin"    "Path_SM/plugins/hl2dmfix.smx"
-        "Source"    "Path_SM/scripting/hl2dmfix.sp"
+        "Plugin"    "Path_SM/plugins/xfix.smx"
+        "Source"    "Path_SM/scripting/xfix.sp"
     }
 }

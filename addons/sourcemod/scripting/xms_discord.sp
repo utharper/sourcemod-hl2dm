@@ -1,5 +1,6 @@
 #pragma dynamic 131072
 #pragma semicolon 1
+#pragma newdecls required
 //#define PLUGIN_DEBUG
 
 #define PLUGIN_VERSION  "1.3"
@@ -14,8 +15,9 @@ public Plugin myinfo = {
     url               = PLUGIN_URL
 };
 
-/**************************************************************/
-
+/**************************************************************
+ * INCLUDES
+ *************************************************************/
 #include <sourcemod>
 #include <steamworks>
 #include <smlib>
@@ -24,27 +26,26 @@ public Plugin myinfo = {
 #include <updater>
 
 #define REQUIRE_PLUGIN
-#pragma newdecls required
 #include <jhl2dm>
 #include <xms>
 
-/**************************************************************/
-
+/**************************************************************
+ * GLOBAL VARS
+ *************************************************************/
 bool gbTeamplay;
-
-char gsMatchHook [99][PLATFORM_MAX_PATH],
-     gsReportHook[PLATFORM_MAX_PATH],
-     gsServerName[32],
-     gsDemoURL   [PLATFORM_MAX_PATH],
-     gsDemoExt   [8],
-     gsGameID    [128],
-     gsMap       [MAX_MAP_LENGTH],
-     gsMode      [MAX_MODE_LENGTH],
-     gsModeName  [32],
-     gsPlayerURL [PLATFORM_MAX_PATH],
-     gsThumbsURL [PLATFORM_MAX_PATH],
-     gsFooter    [256],
-     gsFlagCode  [3];
+char gsMatchHook [99][PLATFORM_MAX_PATH];
+char gsReportHook[PLATFORM_MAX_PATH];
+char gsServerName[32];
+char gsDemoURL   [PLATFORM_MAX_PATH];
+char gsDemoExt   [8];
+char gsGameID    [128];
+char gsMap       [MAX_MAP_LENGTH];
+char gsMode      [MAX_MODE_LENGTH];
+char gsModeName  [32];
+char gsPlayerURL [PLATFORM_MAX_PATH];
+char gsThumbsURL [PLATFORM_MAX_PATH];
+char gsFooter    [256];
+char gsFlagCode  [3];
 
 /**************************************************************/
 
@@ -145,17 +146,15 @@ public void OnMatchEnd(bool bSuccess)
 
 void GenerateMatchReport()
 {
-    int  iPlayers,
-         iTeamScore [2];
-
+    int  iPlayers;
+    int  iTeamScore [2];
     bool bSent;
-
-    char sDemoURL   [PLATFORM_MAX_PATH],
-         sThumbURL  [PLATFORM_MAX_PATH],
-         sPlayers   [2][2096],
-         sScores    [2][384],
-         sPlayerJson[10000],
-         sFullJson  [12000];
+    char sDemoURL   [PLATFORM_MAX_PATH];
+    char sThumbURL  [PLATFORM_MAX_PATH];
+    char sPlayers   [2][2096];
+    char sScores    [2][384];
+    char sPlayerJson[10000];
+    char sFullJson  [12000];
 
     // Generate URLs
     if (strlen(gsDemoURL)) {
@@ -170,11 +169,10 @@ void GenerateMatchReport()
     {
         if (IsClientInGame(i) && !IsClientObserver(i))
         {
-            int  iTeam,
-                 iIndex;
-
-            char sId[32],
-                 sPlayer[128];
+            int iTeam;
+            int iIndex;
+            char sId    [32];
+            char sPlayer[128];
 
             iPlayers++;
             GetClientAuthId(i, AuthId_Engine, sId, sizeof(sId));
