@@ -205,7 +205,7 @@ public Action T_Voting(Handle hTimer)
                         // Draw. Pick winner at random from the first 2 equal choices
                         int iWinner[2] = {-1, -1};
 
-                        for (int i = 0; i < 6; i++)
+                        for (int i = 0; i < 5; i++)
                         {
                             if (iTally[i] == iHighest)
                             {
