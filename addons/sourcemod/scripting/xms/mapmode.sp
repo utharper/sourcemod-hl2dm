@@ -1,6 +1,43 @@
 /**************************************************************
  * MAP MANAGEMENT
  *************************************************************/
+public void OnMapInit()
+{
+    char sKeys[4096];
+    char sEntity[2][2048][256];
+    
+    if(EntityLump.Length() && GetConfigKeys(sKeys, sizeof(sKeys), "Gamemodes", gRound.sNextMode, "ReplaceEntities"))
+    {
+        int iReplacements = ExplodeString(sKeys, ",", sEntity[0], 2048, 256);
+        
+        for (int i = 0; i <= iReplacements; i++)
+        {
+            if(GetConfigString(sEntity[1][i], 256, sEntity[0][i], "Gamemodes", gRound.sNextMode, "ReplaceEntities") == 0) {
+                // if no replacement entity is provided, 'beam' seems to work for null without triggering a console error.
+                strcopy(sEntity[1][i], 256, "beam");
+            }
+            
+        }
+        
+        for (int x = 0; x < EntityLump.Length(); x++)
+        {
+            char sClass[256];
+            EntityLumpEntry e = EntityLump.Get(x);
+        
+            for (int y = -1; (y = e.GetNextKey("classname", sClass, sizeof(sClass), y)) != -1;)
+            {
+                for (int z = 0; z <= iReplacements; z++)
+                {
+                    if(strlen(sEntity[0][z]) && StrEqual(sClass, sEntity[0][z])) {
+                        e.Update(y, NULL_STRING, sEntity[1][z]);
+                    }
+                }
+            }
+            delete e;
+        }
+    }
+}
+
 public void OnMapStart()
 {
     char sModeDesc[32];

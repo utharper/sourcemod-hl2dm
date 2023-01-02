@@ -23,6 +23,7 @@ public Plugin myinfo = {
 #include <steamtools>
 #include <smlib>
 #include <sdkhooks>
+#include <entitylump>
 #include <vphysics>
 #include <morecolors>
 #include <basecomm>
@@ -304,9 +305,9 @@ void AddPluginTag()
 
     gConVar.sv_tags.GetString(sTags, sizeof(sTags));
 
-    if (StrContains(sTags, "xms") == -1)
+    if (StrContains(sTags, "XMS") == -1)
     {
-        StrCat(sTags, sizeof(sTags), sTags[0] != 0 ? ",xms" : "xms");
+        StrCat(sTags, sizeof(sTags), sTags[0] != 0 ? ",XMS" : "XMS");
         gCore.bChangingTags = true;
         gConVar.sv_tags.SetString(sTags);
         gCore.bChangingTags = false;
