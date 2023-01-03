@@ -130,6 +130,7 @@ void LoadConfigValues()
     gRound.bDisableCollisions= GetConfigInt("NoCollisions", "Gamemodes", gRound.sMode) == 1;
     gRound.bUnlimitedAux     = GetConfigInt("UnlimitedAux", "Gamemodes", gRound.sMode) == 1;
     gRound.bDisableProps     = GetConfigInt("DisableProps", "Gamemodes", gRound.sMode) == 1;
+    gRound.bReplenish        = GetConfigInt("Replenish",    "Gamemodes", gRound.sMode) == 1;
     gHud.bSelfKeys           = GetConfigInt("Selfkeys",     "Gamemodes", gRound.sMode) == 1;
 
     // Weapon settings:

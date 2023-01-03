@@ -105,6 +105,11 @@ public Action Event_PlayerDeath(Event hEvent, const char[] sEvent, bool bDontBro
 
         gClient[iClient].bForceKilled = false;
     }
+    else if (gRound.bReplenish)
+    {
+        int iAttacker = GetClientOfUserId(GetEventInt(hEvent, "attacker"));
+        CreateTimer(0.1, T_Replenish, iAttacker, TIMER_FLAG_NO_MAPCHANGE);
+    }
 
     return Plugin_Continue;
 }
@@ -195,26 +200,42 @@ public void OnGameRestarting(Handle hConvar, const char[] sOldValue, const char[
 /**************************************************************
  * MODIFY MAP ENTITIES
  *************************************************************/
-/* TODO: migrate to OnMapInit();
-public Action OnLevelInit(const char[] sMap, char sEntities[2097152])
+public void OnMapInit()
 {
-    char sKeys[4096],
-         sEntity[2][2048][512];
-
-    if (!strlen(sEntities) || !GetConfigKeys(sKeys, sizeof(sKeys), "Gamemodes", gRound.sNextMode, "ReplaceEntities")) {
-        return Plugin_Continue;
-    }
-
-    for (int i = 0; i <= ExplodeString(sKeys, ",", sEntity[0], 2048, 512); i++)
+    char sKeys[4096];
+    char sEntity[2][2048][256];
+    
+    if (EntityLump.Length() && GetConfigKeys(sKeys, sizeof(sKeys), "Gamemodes", gRound.sNextMode, "ReplaceEntities"))
     {
-        if (GetConfigString(sEntity[1][i], 512, sEntity[0][i], "Gamemodes", gRound.sNextMode, "ReplaceEntities") == 1) {
-            ReplaceString(sEntities, sizeof(sEntities), sEntity[0][i], sEntity[1][i], false);
+        int iReplacements = ExplodeString(sKeys, ",", sEntity[0], 2048, 256);
         
+        for (int i = 0; i <= iReplacements; i++)
+        {
+            if (GetConfigString(sEntity[1][i], 256, sEntity[0][i], "Gamemodes", gRound.sNextMode, "ReplaceEntities") == 0) {
+                // if no replacement entity is provided, 'beam' seems to work for null without triggering a console error.
+                strcopy(sEntity[1][i], 256, "beam");
+            }
+            
+        }
+        
+        for (int x = 0; x < EntityLump.Length(); x++)
+        {
+            char sClass[256];
+            EntityLumpEntry e = EntityLump.Get(x);
+        
+            for (int y = -1; (y = e.GetNextKey("classname", sClass, sizeof(sClass), y)) != -1;)
+            {
+                for (int z = 0; z <= iReplacements; z++)
+                {
+                    if (strlen(sEntity[0][z]) && StrEqual(sClass, sEntity[0][z])) {
+                        e.Update(y, NULL_STRING, sEntity[1][z]);
+                    }
+                }
+            }
+            delete e;
+        }
     }
-
-    return Plugin_Changed;
 }
-*/
 
 /**************************************************************
  * GENERAL
@@ -259,34 +280,123 @@ void Game_Restart(int iTime = 1)
 
 public Action T_RemoveWeapons(Handle hTimer, int iClient)
 {
-    Client_RemoveAllWeapons(iClient);
+    if (IsClientConnected(iClient) && IsClientInGame(iClient) && IsPlayerAlive(iClient)) {
+        Client_RemoveAllWeapons(iClient);
+    }
 
     return Plugin_Handled;
 }
 
 public Action T_SetWeapons(Handle hTimer, int iClient)
 {
-    Client_RemoveAllWeapons(iClient);
-
-    for (int i = 0; i < 16; i++)
+    if (IsClientConnected(iClient) && IsClientInGame(iClient) && IsPlayerAlive(iClient))
     {
-        if (!strlen(gsSpawnWeapon[i])) {
-            break;
-        }
-
-        if (giSpawnAmmo[i][0] == -1 && giSpawnAmmo[i][1] == -1) {
-            Client_GiveWeapon(iClient, gsSpawnWeapon[i], false);
-        }
-        else if (StrEqual(gsSpawnWeapon[i], "weapon_rpg") || StrEqual(gsSpawnWeapon[i], "weapon_frag")) {
-            Client_GiveWeaponAndAmmo(iClient, gsSpawnWeapon[i], false, giSpawnAmmo[i][0], giSpawnAmmo[i][1], -1, -1);
-        }
-        else if (StrEqual(gsSpawnWeapon[i], "weapon_slam")) {
-            Client_GiveWeaponAndAmmo(iClient, gsSpawnWeapon[i], false, -1, giSpawnAmmo[i][0], -1, -1);
-        }
-        else {
-            Client_GiveWeaponAndAmmo(iClient, gsSpawnWeapon[i], false, giSpawnAmmo[i][0], giSpawnAmmo[i][1], 0, 0);
+        Client_RemoveAllWeapons(iClient);
+        
+        for (int i = 0; i < 16; i++)
+        {
+            if (!strlen(gsSpawnWeapon[i])) {
+                break;
+            }
+            
+            int iPrimary;
+            int iSecondary;
+            int iClip = (
+                StrEqual(gsSpawnWeapon[i], "weapon_357", false)      ? 6
+              : StrEqual(gsSpawnWeapon[i], "weapon_ar2", false)      ? 30
+              : StrEqual(gsSpawnWeapon[i], "weapon_crossbow", false) ? 5
+              : StrEqual(gsSpawnWeapon[i], "weapon_pistol", false)   ? 18
+              : StrEqual(gsSpawnWeapon[i], "weapon_rpg", false)      ? 3
+              : StrEqual(gsSpawnWeapon[i], "weapon_shotgun", false)  ? 6
+              : StrEqual(gsSpawnWeapon[i], "weapon_slam", false)     ? 3
+              : StrEqual(gsSpawnWeapon[i], "weapon_smg1", false)     ? 45
+              : StrEqual(gsSpawnWeapon[i], "weapon_frag", false)     ? 2
+              : -1
+            );
+            
+            if (giSpawnAmmo[i][0] == -1)
+            {
+                if (StrEqual(gsSpawnWeapon[i], "weapon_ar2", false)) {
+                    giSpawnAmmo[i][0] = 60;
+                }
+                else {
+                    giSpawnAmmo[i][0] = iClip;
+                }
+            }
+            
+            if (StrEqual(gsSpawnWeapon[i], "weapon_slam", false)) {
+                iSecondary = giSpawnAmmo[i][0];
+            }
+            else
+            {
+                iPrimary   = clamp(giSpawnAmmo[i][0], 0, 99999);
+                iSecondary = clamp(giSpawnAmmo[i][1], 0, 99999);
+                
+                if (StrEqual(gsSpawnWeapon[i], "weapon_rpg", false) || StrEqual(gsSpawnWeapon[i], "weapon_frag", false) || StrEqual(gsSpawnWeapon[i], "weapon_crossbow"), false) {
+                    iClip = -1;
+                }
+                else if (giSpawnAmmo[i][0] >= iClip && iClip != -1) {
+                    iPrimary -= iClip;
+                }
+                else {
+                    iClip = iPrimary;
+                    iPrimary = 0;
+                }
+            }
+            
+            Client_GiveWeaponAndAmmo(iClient, gsSpawnWeapon[i], false, iPrimary, iSecondary, iClip, -1);
         }
     }
 
+    return Plugin_Handled;
+}
+
+public Action T_Replenish(Handle hTimer, int iClient)
+{
+    if (IsClientConnected(iClient) && IsClientInGame(iClient) && IsPlayerAlive(iClient))
+    {
+        if (GetEntProp(iClient, Prop_Data, "m_iHealth") < gRound.iSpawnHealth) {
+            SetEntProp(iClient, Prop_Data, "m_iHealth", gRound.iSpawnHealth);
+        }
+        
+        if (GetEntProp(iClient, Prop_Data, "m_ArmorValue") < gRound.iSpawnArmor) {
+            SetEntProp(iClient, Prop_Data, "m_ArmorValue", gRound.iSpawnArmor);
+        }
+        
+        for (int i = 0; i < 16; i++)
+        {
+            int iWeapon = Client_GetWeapon(iClient, gsSpawnWeapon[i]);
+            int iPrimary;
+            int iSecondary;
+            int iClip;
+            
+            if (!strlen(gsSpawnWeapon[i])) {
+                break;
+            }
+            if (iWeapon == INVALID_ENT_REFERENCE) {
+                continue;
+            }
+            
+            Client_GetWeaponPlayerAmmo(iClient, gsSpawnWeapon[i], iPrimary, iSecondary);
+            iClip = clamp(Weapon_GetPrimaryClip(iWeapon), 0, 99999);
+            
+            if (StrEqual(gsSpawnWeapon[i], "weapon_slam", false)) {
+                Client_SetWeaponAmmo(iClient, gsSpawnWeapon[i], -1, giSpawnAmmo[i][0], -1, -1);
+            }
+            else
+            {
+                if (giSpawnAmmo[i][0] > (iPrimary + iClip)) {
+                    Client_SetWeaponAmmo(iClient, gsSpawnWeapon[i], giSpawnAmmo[i][0] - iClip, -1, -1, -1);
+                }
+                
+                if (giSpawnAmmo[i][1] > iSecondary) {
+                    Client_SetWeaponAmmo(iClient, gsSpawnWeapon[i], -1, giSpawnAmmo[i][1], -1, -1);
+                }
+            }
+        }
+        
+        ClientCommand(iClient, "playgamesound %s", SOUND_REPLENISH);
+    }
+    
     return Plugin_Handled;
 }

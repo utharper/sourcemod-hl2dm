@@ -148,6 +148,7 @@ enum struct _gRound
     
     int         iSpawnHealth;                       // Custom spawn health value (-1 if not defined)
     int         iSpawnArmor;                        // Custom spawn suit value (-1 if not defined)
+    bool        bReplenish;                         // Replenish health/suit to (at least) spawn values on player kill?
     
     bool        bDisableProps;                      // Remove props from map ?
     bool        bDisableCollisions;                 // Disable player collisions ?
@@ -188,8 +189,8 @@ _gSpecialClient gSpecialClient;
  * COMPONENTS
  *************************************************************/
 #include "xms/natives_forwards.sp"  // General natives and forwards for extending functionality (custom gamemodes etc)
-#include "xms/gamemod.sp"           // Functions to modify game/engine behaviour
 #include "xms/sounds.sp"            // Game and custom sound functions
+#include "xms/gamemod.sp"           // Functions to modify game/engine behaviour
 #include "xms/mapmode.sp"           // Map and gamemode functions
 #include "xms/round.sp"             // Game round & match functions
 #include "xms/clients.sp"           // General client functions

@@ -7,6 +7,7 @@
 #define SOUND_ACTIVATED      "hl1/fvox/activated.wav"
 #define SOUND_DEACTIVATED    "hl1/fvox/deactivated.wav"
 #define SOUND_MENUACTION     "weapons/slam/buttonclick.wav"
+#define SOUND_REPLENISH      "items/medshot4.wav"
 char gsMusicPath[6][PLATFORM_MAX_PATH] =
 {
     "music/hl2_song14.mp3",
