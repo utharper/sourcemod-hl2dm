@@ -91,7 +91,7 @@ void OnSetGamestate_Post()
 
 public Action T_LoadDefaults(Handle hTimer)
 {
-    if (!GetRealClientCount(false))
+    if (!GetClientCount2(false))
     {
         if (!StrEqual(gRound.sMode, gCore.sDefaultMode))
         {
@@ -129,8 +129,8 @@ void GenerateGameID()
 
 void OnMatchPre()
 {
-    char sStatus[MAX_BUFFER_LENGTH],
-         sCommand[MAX_BUFFER_LENGTH];
+    char sStatus [MAX_BUFFER_LENGTH];
+    char sCommand[MAX_BUFFER_LENGTH];
 
     ServerCommandEx(sStatus, sizeof(sStatus), "status");
     PrintToConsoleAll("\n\n\n%s\n\n\n", sStatus);
@@ -151,7 +151,7 @@ public void OnRoundEnd(bool bMatch)
 {
     gRound.fEndTime = GetGameTime();
 
-    if (gConVar.mp_chattime.IntValue > 1 && !GetRealClientCount(true))
+    if (gConVar.mp_chattime.IntValue > 1 && !GetClientCount2(true))
     {
         // Nobody is in game, just skip to the next map
         ServerCommand("changelevel_next");
@@ -210,9 +210,9 @@ void CreateOverTimer(float fDelay=0.0)
 
 public Action T_PreOvertime(Handle hTimer)
 {
-    if(gRound.iState != GAME_OVERTIME && gRound.iState != GAME_MATCHEX)
+    if (gRound.iState != GAME_OVERTIME && gRound.iState != GAME_MATCHEX)
     {
-        if (GetRealClientCount(true, true, false) > 1)
+        if (GetClientCount2(true, true, false) > 1)
         {
             if (gRound.bTeamplay) {
                 if (GetTeamScore(TEAM_REBELS) - GetTeamScore(TEAM_COMBINE) == 0 && GetTeamClientCount(TEAM_REBELS) && GetTeamClientCount(TEAM_COMBINE)) {

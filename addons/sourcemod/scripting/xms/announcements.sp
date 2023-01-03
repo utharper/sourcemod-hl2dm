@@ -26,7 +26,7 @@ public Action T_Adverts(Handle hTimer)
 
     char sText[MAX_SAY_LENGTH];
 
-    if (!GetRealClientCount() || IsGameMatch()) {
+    if (!GetClientCount2() || IsGameMatch()) {
         return Plugin_Continue;
     }
 

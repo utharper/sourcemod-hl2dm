@@ -68,7 +68,7 @@ public void OnPluginStart()
     AddCommandListener(OnClientChangeFOV, "fov");
     AddCommandListener(OnClientToggleZoom, "toggle_zoom");
 
-    RegisterColors();
+    MC_AddJColors();
 
     if (LibraryExists("updater")) {
         Updater_AddPlugin(PLUGIN_UPDATE);

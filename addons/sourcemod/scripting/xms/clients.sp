@@ -19,6 +19,7 @@ public void OnClientPutInServer(int iClient)
     if (gRound.iState != GAME_MATCH && gRound.iState != GAME_MATCHEX && gRound.iState != GAME_MATCHWAIT)
     {
         char sName[MAX_NAME_LENGTH];
+
         GetClientName(iClient, sName, sizeof(sName));
         MC_PrintToChatAll("%t", "xms_join", sName);
     }
@@ -73,7 +74,7 @@ public void OnClientDisconnect(int iClient)
 {
     if (!IsFakeClient(iClient))
     {
-        if (GetRealClientCount(IsGameMatch()) == 1 && gRound.iState != GAME_CHANGING)
+        if (GetClientCount2(IsGameMatch()) == 1 && gRound.iState != GAME_CHANGING)
         {
             if (IsGameMatch()) {
                 CreateTimer(1.0, T_RestartMap, _, TIMER_FLAG_NO_MAPCHANGE);
@@ -96,7 +97,7 @@ public void OnClientDisconnect(int iClient)
 
 public void OnClientDisconnect_Post(int iClient)
 {
-    if (iClient == gSpecialClient.iPauser || GetRealClientCount(false) == 0) {
+    if (iClient == gSpecialClient.iPauser || GetClientCount2(false) == 0) {
         gSpecialClient.iPauser = 0;
     }
 }

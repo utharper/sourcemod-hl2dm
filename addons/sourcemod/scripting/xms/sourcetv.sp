@@ -12,8 +12,7 @@ void StartRecord()
     if (!gConVar.tv_enable.BoolValue) {
         LogError("SourceTV is not active!");
     }
-
-    if (!gRound.bRecording) {
+    else if (!gRound.bRecording) {
         ServerCommand("tv_name \"%s - %s\";tv_record %s/incomplete/%s", gCore.sServerName, gRound.sUID, gPath.sDemo, gRound.sUID);
         gRound.bRecording = true;
     }
@@ -58,11 +57,11 @@ void GenerateDemoTxt(const char[] sPath)
     static char sHost[16];
     static int  iPort;
 
-    char sPath2 [PLATFORM_MAX_PATH],
-         sTime  [32],
-         sTitle [256],
-         sPlayers[2][2048];
-    bool bDuel = GetRealClientCount(true, false, false) == 2;
+    char sPath2 [PLATFORM_MAX_PATH];
+    char sTime  [32];
+    char sTitle [256];
+    char sPlayers[2][2048];
+    bool bDuel = GetClientCount2(true, false, false) == 2;
     File hFile;
 
     if (!strlen(sHost)) {
@@ -82,7 +81,7 @@ void GenerateDemoTxt(const char[] sPath)
     {
         int z;
 
-        if (!IsClientConnected(i) || !IsClientInGame(i) || IsFakeClient(i) || IsClientObserver(i)) {
+        if (!IsClientInGame(i) || IsFakeClient(i) || IsClientObserver(i)) {
             continue;
         }
 
@@ -90,7 +89,7 @@ void GenerateDemoTxt(const char[] sPath)
             z = GetClientTeam(i) - 2;
         }
 
-        Format(sPlayers[z], sizeof(sPlayers[]), "%s\"%N\" %s [%i kills, %i deaths]\n", sPlayers[z], i, UnbufferedAuthId(i), GetClientFrags(i), GetClientDeaths(i));
+        Format(sPlayers[z], sizeof(sPlayers[]), "%s\"%N\" %s [%i kills, %i deaths]\n", sPlayers[z], i, AuthId(i), GetClientFrags(i), GetClientDeaths(i));
 
         if (bDuel) {
             Format(sTitle, sizeof(sTitle), "%s%N%s", sTitle, i, !strlen(sTitle) ? " vs " : "");

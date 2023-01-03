@@ -42,13 +42,13 @@ Menu VotingMenu(int iClient)
 
 public int VotingMenuAction(Menu hMenu, MenuAction iAction, int iClient, int iParam)
 {
-    if (iClient > 0 && IsClientConnected(iClient) && IsClientInGame(iClient) && !IsFakeClient(iClient))
+    if (iClient > 0 && IsClientInGame(iClient) && !IsFakeClient(iClient))
     {
         if (iAction == MenuAction_Select)
         {
             char sCommand[8];
-            hMenu.GetItem(iParam, sCommand, sizeof(sCommand));
 
+            hMenu.GetItem(iParam, sCommand, sizeof(sCommand));
             FakeClientCommand(iClient, sCommand);
         }
 
@@ -58,7 +58,7 @@ public int VotingMenuAction(Menu hMenu, MenuAction iAction, int iClient, int iPa
     return 1;
 }
 
-public Action T_VotingMenu(Handle timer, int iClient)
+public Action T_VotingMenu(Handle hTimer, int iClient)
 {
     VotingMenu(iClient).Display(iClient, gVoting.iMaxTime);
     return Plugin_Stop;
@@ -70,8 +70,8 @@ public Action T_VotingMenu(Handle timer, int iClient)
 Menu ModelMenu(int iClient)
 {
     Menu hMenu = new Menu(ModelMenuAction);
-    char sFile[70],
-         sTitle[512];
+    char sFile[70];
+    char sTitle[512];
 
     Format(sTitle, sizeof(sTitle), "%T", "xms_menu_model", iClient);
     hMenu.SetTitle(sTitle);
@@ -86,13 +86,13 @@ Menu ModelMenu(int iClient)
 
 public int ModelMenuAction(Menu hMenu, MenuAction iAction, int iClient, int iParam)
 {
-    if (iClient > 0 && IsClientConnected(iClient) && IsClientInGame(iClient) && !IsFakeClient(iClient))
+    if (iClient > 0 && IsClientInGame(iClient) && !IsFakeClient(iClient))
     {
         if (iAction == MenuAction_Select)
         {
             char sCommand[70];
-            hMenu.GetItem(iParam, sCommand, sizeof(sCommand));
 
+            hMenu.GetItem(iParam, sCommand, sizeof(sCommand));
             ClientCommand(iClient, "cl_playermodel %s", sCommand);
             IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_ACTIVATED);
         }

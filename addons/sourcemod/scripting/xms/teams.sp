@@ -3,10 +3,10 @@
  *************************************************************/
 void ShuffleTeams(bool bBroadcast=true)
 {
-    int iCount = GetRealClientCount(true, true, false),
-        iClient,
-        iTeam [MAXPLAYERS + 1],
-        iTeams[2];
+    int iCount = GetClientCount2(true, true, false);
+    int iClient;
+    int iTeam [MAXPLAYERS + 1];
+    int iTeams[2];
 
     do
     {
@@ -14,27 +14,23 @@ void ShuffleTeams(bool bBroadcast=true)
         {
             iClient = Math_GetRandomInt(1, MaxClients);
 
-            if (!IsClientConnected(iClient) || !IsClientInGame(iClient) || IsClientObserver(iClient)) {
+            if (!IsClientInGame(iClient) || IsClientObserver(iClient)) {
                 iTeam[iClient] = -1;
             }
             else
             {
                 iTeam[iClient] = (
                     iTeams[0] > iTeams[1] ? TEAM_COMBINE
-                    : iTeams[1] > iTeams[0] ? TEAM_REBELS
-                    : Math_GetRandomInt(TEAM_COMBINE, TEAM_REBELS)
+                  : iTeams[1] > iTeams[0] ? TEAM_REBELS
+                  : Math_GetRandomInt(TEAM_COMBINE, TEAM_REBELS)
                 );
 
                 iTeams[0] += view_as<int>(iTeam[iClient] == TEAM_REBELS);
                 iTeams[1] += view_as<int>(iTeam[iClient] == TEAM_COMBINE);
                 iCount--;
 
-                if (IsGameOver() && !IsFakeClient(iClient))
-                {
-                    char sId[32];
-
-                    GetClientAuthId(iClient, AuthId_Engine, sId, sizeof(sId));
-                    gRound.mTeams.SetValue(sId, iTeam[iClient]);
+                if (IsGameOver() && !IsFakeClient(iClient)) {
+                    gRound.mTeams.SetValue(AuthId(iClient), iTeam[iClient]);
                 }
                 else
                 {
@@ -42,8 +38,10 @@ void ShuffleTeams(bool bBroadcast=true)
                         ForceTeamSwitch(iClient, iTeam[iClient]);
                     }
 
-                    if (bBroadcast) {
+                    if (bBroadcast)
+                    {
                         char sName[MAX_TEAM_NAME_LENGTH];
+
                         GetTeamName(iTeam[iClient], sName, sizeof(sName));
                         MC_PrintToChat(iClient, "%t", "xms_team_assigned", sName);
                     }
@@ -59,19 +57,14 @@ void InvertTeams(bool bBroadcast=true)
 {
     for (int iClient = 1; iClient <= MaxClients; iClient++)
     {
-        if (!IsClientConnected(iClient) || !IsClientInGame(iClient) || IsClientObserver(iClient)) {
+        if (!IsClientInGame(iClient) || IsClientObserver(iClient)) {
             continue;
         }
 
-        int iTeam = GetClientTeam(iClient) == TEAM_REBELS ? TEAM_COMBINE
-                                            : TEAM_REBELS;
+        int iTeam = GetClientTeam(iClient) == TEAM_REBELS ? TEAM_COMBINE : TEAM_REBELS;
 
-        if (IsGameOver() && !IsFakeClient(iClient))
-        {
-            char sId[32];
-
-            GetClientAuthId(iClient, AuthId_Engine, sId, sizeof(sId));
-            gRound.mTeams.SetValue(sId, iTeam);
+        if (IsGameOver() && !IsFakeClient(iClient)) {
+            gRound.mTeams.SetValue(AuthId(iClient), iTeam);
         }
         else
         {
@@ -100,9 +93,10 @@ int GetOptimalTeam()
         iCount[1] = GetTeamClientCount(TEAM_COMBINE);
 
         iTeam = (
-            iCount[0] > iCount[1] ? TEAM_COMBINE
-            : iCount[1] > iCount[0] ? TEAM_REBELS
-            : Math_GetRandomInt(0,1) ? TEAM_REBELS : TEAM_COMBINE
+            iCount[0] > iCount[1]  ? TEAM_COMBINE
+          : iCount[1] > iCount[0]  ? TEAM_REBELS
+          : Math_GetRandomInt(0,1) ? TEAM_REBELS
+          : TEAM_COMBINE
         );
     }
 
@@ -153,8 +147,7 @@ public Action T_CheckPlayerStates(Handle hTimer)
         {
             if (gSpecialClient.iAllowed != iClient && ( IsGameMatch() || gRound.iState == GAME_OVERTIME || gRound.iState == GAME_OVER || ( iTeam == TEAM_SPECTATORS && !IsClientObserver(iClient) ) || ( iTeam != TEAM_SPECTATORS && IsClientObserver(iClient) ) ) )
             {
-                // Client has changed teams during match, or is a bugged spectator
-                // Usually caused by changing playermodel
+                // Client has changed teams during match, or is a bugged spectator. Usually caused by changing playermodel.
                 ForceTeamSwitch(iClient, iWasTeam[iClient]);
                 continue;
             }
@@ -163,7 +156,7 @@ public Action T_CheckPlayerStates(Handle hTimer)
         iWasTeam[iClient] = iTeam;
 
         if (gClient[iClient].bReady && !IsGameOver()) {
-            gRound.mTeams.SetValue(UnbufferedAuthId(iClient), iTeam);
+            gRound.mTeams.SetValue(AuthId(iClient), iTeam);
         }
     }
 
@@ -177,12 +170,11 @@ public Action T_TeamAutoAssign(Handle hTimer, int iClient)
     if (!IsClientInGame(iClient)) {
         return Plugin_Stop;
     }
-
-    if (gRound.iState == GAME_PAUSED || IsGameOver()) {
+    else if (gRound.iState == GAME_PAUSED || IsGameOver()) {
         return Plugin_Continue;
     }
 
-    gRound.mTeams.GetValue(UnbufferedAuthId(iClient), iTeam);
+    gRound.mTeams.GetValue(AuthId(iClient), iTeam);
 
     if (IsGameMatch()) {
         MC_PrintToChat(iClient, "%t", "xmsc_teamchange_deny");
@@ -206,7 +198,8 @@ public Action T_TeamAutoAssign(Handle hTimer, int iClient)
 
 void ForceTeamSwitch(int iClient, int iTeam)
 {
-    gSpecialClient.iAllowed = iClient;
+    gSpecialClient.iAllowed       = iClient;
     gClient[iClient].bForceKilled = IsPlayerAlive(iClient);
+
     FakeClientCommandEx(iClient, "jointeam %i", iTeam);
 }

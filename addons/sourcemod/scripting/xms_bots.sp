@@ -105,7 +105,7 @@ public void OnClientPutInServer(int iClient)
 
 public Action OnClientSayCommand(int iClient, const char[] sCommand, const char[] sArgs)
 {
-    if (!iClient || !giBotClient || !IsClientInGame(giBotClient)) {
+    if (!iClient || giBotClient < 0 || !IsClientInGame(giBotClient)) {
         return Plugin_Continue;
     }
 

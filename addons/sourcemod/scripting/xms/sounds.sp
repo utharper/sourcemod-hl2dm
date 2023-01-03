@@ -32,8 +32,13 @@ void PlayRoundEndMusic()
     static int iRan;
 
     float fTime = gConVar.mp_chattime.IntValue - 4.5;
+    int   i;
 
-    iRan = Math_GetRandomIntNot(0, 5, iRan);
+    do {
+        i = Math_GetRandomInt(0, 5);
+    } while (i == iRan);
+
+    iRan = i;
 
     for (int iClient = 1; iClient <= MaxClients; iClient++) {
         if (IsCookieEnabled(gSounds.cMusic, iClient)) {

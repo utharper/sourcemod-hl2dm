@@ -13,14 +13,14 @@ public void OnMapStart()
     GetCurrentMap(gRound.sMap, sizeof(gRound.sMap));
     strcopy(gRound.sNextMode, sizeof(gRound.sNextMode), gRound.sMode);
     strcopy(sModeDesc, sizeof(sModeDesc), gRound.sMode);
-    
+
     if (GetConfigString(gRound.sModeDescription, sizeof(gRound.sModeDescription), "Name", "Gamemodes", gRound.sMode) == 1) {
         Format(sModeDesc, sizeof(sModeDesc), "%s (%s)", sModeDesc, gRound.sModeDescription);
     }
     else {
         gRound.sModeDescription[0] = '\0';
     }
-    
+
     Steam_SetGameDescription(sModeDesc);
 
     PrepareSound(SOUND_GG);
@@ -37,7 +37,7 @@ public void OnMapStart()
     SetGamemode(gRound.sMode);
 
     gRound.fStartTime = GetGameTime() - 1.0;
-    
+
     gVoting.iStatus             = 0;
     for (int i = 0; i <= MaxClients; i++)
     {
@@ -58,7 +58,7 @@ public void OnMapStart()
     }
 
     CreateTimer(0.1, T_CheckPlayerStates, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
-    
+
     if (gVoting.bAutomatic) {
         gConVar.sm_nextmap.SetString(""); // fuck off
     }
@@ -159,8 +159,8 @@ int GetMapsArray(char[][] sArray, int iLen1, int iLen2, const char[] sMapcycle =
     else
     {
         int  iLine;
-        char sPath[PLATFORM_MAX_PATH],
-             sMap [2][256];
+        char sPath[PLATFORM_MAX_PATH];
+        char sMap [2][256];
         File hFile;
 
         Format(sPath, sizeof(sPath), "cfg/%s", sMapcycle);
@@ -296,13 +296,13 @@ bool GetMapByAbbrev(char[] sOutput, int iLen, const char[] sAbbrev)
 
 char[] DeprefixMap(const char[] sMap)
 {
-    char sPrefix[16],
-         sResult[MAX_MAP_LENGTH];
-    int  iPos = SplitString(sMap, "_", sPrefix, sizeof(sPrefix));
+    char sPrefix[16];
+    char sResult[MAX_MAP_LENGTH];
+    int  iPos   = SplitString(sMap, "_", sPrefix, sizeof(sPrefix));
 
     StrCat(sPrefix, sizeof(sPrefix), "_");
 
-    if (iPos && IsItemDistinctInList(sPrefix, gCore.sRemoveMapPrefix)) {
+    if (iPos && IsItemInList(sPrefix, gCore.sRemoveMapPrefix)) {
         strcopy(sResult, sizeof(sResult), sMap[iPos]);
     }
     else {
@@ -331,7 +331,7 @@ int GetModeForMap(char[] sOutput, int iLen, const char[] sMap)
             }
 
             strcopy(sOutput, iLen, gCore.sRetainModes);
-            if (!strlen(gRound.sMode) || !IsItemDistinctInList(gRound.sMode, sOutput))
+            if (!strlen(gRound.sMode) || !IsItemInList(gRound.sMode, sOutput))
             {
                 if (StrContains(sOutput, ",")) {
                     SplitString(sOutput, ",", sOutput, iLen);
@@ -356,8 +356,8 @@ int GetRandomMode(char[] sOutput, int iLen, bool bExcludeCurrent)
 {
     char sModes[32][MAX_MODE_LENGTH];
     bool bFound;
-    int  iCount = ExplodeString(gCore.sGamemodes, ",", sModes, 32, MAX_MODE_LENGTH),
-         iRan;
+    int  iCount = ExplodeString(gCore.sGamemodes, ",", sModes, 32, MAX_MODE_LENGTH);
+    int  iRan;
 
     if (!iCount || (iCount == 1 && bExcludeCurrent)) {
         return 0;
@@ -420,7 +420,7 @@ void SetMapcycle()
 {
     char sMapcycle[PLATFORM_MAX_PATH];
 
-    if (strlen(gCore.sEmptyMapcycle) && !GetRealClientCount(false) && StrEqual(gCore.sDefaultMode, gRound.sMode)) {
+    if (strlen(gCore.sEmptyMapcycle) && !GetClientCount2(false) && StrEqual(gCore.sDefaultMode, gRound.sMode)) {
         strcopy(sMapcycle, sizeof(sMapcycle), gCore.sEmptyMapcycle);
     }
     else if (!GetModeMapcycle(sMapcycle, sizeof(sMapcycle), gRound.sMode)) {

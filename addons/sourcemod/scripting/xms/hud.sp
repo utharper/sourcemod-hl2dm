@@ -17,10 +17,10 @@ public Action T_KeysHud(Handle hTimer)
     for (int iClient = 1; iClient <= MaxClients; iClient++)
     {
         char sHud[1024];
-        int  iTarget,
-             iColor[3];
+        int  iTarget;
+        int  iColor[3];
 
-        if (!IsClientConnected(iClient) || !IsClientInGame(iClient) || IsFakeClient(iClient)) {
+        if (!IsClientInGame(iClient) || IsFakeClient(iClient)) {
             continue;
         }
 
@@ -37,7 +37,7 @@ public Action T_KeysHud(Handle hTimer)
 
         GetClientColors(iClient, iColor);
 
-        if (GetEntProp(iClient, Prop_Send, "m_iObserverMode") != 7 && iTarget > 0 && IsClientConnected(iTarget) && IsClientInGame(iTarget))
+        if (GetEntProp(iClient, Prop_Send, "m_iObserverMode") != 7 && iTarget > 0 && IsClientInGame(iTarget))
         {
             int   iButtons = GetClientButtons(iTarget);
             float fAngles[3];
@@ -102,7 +102,7 @@ public Action T_TimeHud(Handle hTimer)
 
     for (int iClient = 1; iClient <= MaxClients; iClient++)
     {
-        if (!IsClientConnected(iClient) || !IsClientInGame(iClient) || (IsFakeClient(iClient) && !IsClientSourceTV(iClient)) ) {
+        if (!IsClientInGame(iClient) || (IsFakeClient(iClient) && !IsClientSourceTV(iClient)) ) {
             continue;
         }
 

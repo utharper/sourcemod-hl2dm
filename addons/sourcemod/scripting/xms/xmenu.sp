@@ -7,20 +7,21 @@
  *************************************************************/
 public int Native_XMenu(Handle hPlugin, int iParams)
 {
-    int         iClient     = GetNativeCell(1),
-                iPage       = 0,
-                iOptions    [2];
-    bool        bBackButton = GetNativeCell(2),
-                bExitButton,
-                bNumbered   = GetNativeCell(3),
-                bNextButton;
-    char        sCommandBase[64],
-                sCommandBack[64],
-                sTitle      [64],
-                sMessage    [1024];
+    int         iClient     = GetNativeCell(1);
+    bool        bBackButton = GetNativeCell(2);
+    bool        bNumbered   = GetNativeCell(3);
+    char        sCommandBase[64];
+    char        sTitle      [64];
+    char        sMessage    [1024];
+    DataPack    dOptions    = view_as<DataPack>(GetNativeCell(7));
+
+    int         iPage       = 0;
+    int         iOptions    [2];
+    bool        bExitButton;
+    bool        bNextButton;
+    char        sCommandBack[64];
     KeyValues   kPanel      [64];
     StringMap   mMenu       = CreateTrie();
-    DataPack    dOptions    = view_as<DataPack>(GetNativeCell(7));
     DataPackPos dOptionsEnd = GetPackPosition(dOptions);
 
     GetNativeString(4, sCommandBase, sizeof(sCommandBase));
@@ -41,8 +42,8 @@ public int Native_XMenu(Handle hPlugin, int iParams)
 
     do // Loop through pages
     {
-        char sOption [256],
-             sCommand[128];
+        char sOption [256];
+        char sCommand[128];
 
         iOptions[0]     = 0;
         kPanel  [iPage] = new KeyValues("menu");
@@ -175,11 +176,11 @@ public int Native_XMenu(Handle hPlugin, int iParams)
 
 public int Native_XMenuQuick(Handle hPlugin, int iParams)
 {
-    int      iClient    = GetNativeCell(1),
-             iTranslate = GetNativeCell(2);
-    char     sCommandBase[64],
-             sTitle      [64],
-             sMessage    [1024];
+    int      iClient    = GetNativeCell(1);
+    int      iTranslate = GetNativeCell(2);
+    char     sCommandBase[64];
+    char     sTitle      [64];
+    char     sMessage    [1024];
     DataPack dOptions   = CreateDataPack();
 
     GetNativeString(5, sCommandBase, sizeof(sCommandBase));
@@ -202,6 +203,7 @@ public int Native_XMenuQuick(Handle hPlugin, int iParams)
     for (int i = 8; i <= iParams; i++)
     {
         char sOption[2][512];
+
         GetNativeString(i, sOption[0], sizeof(sOption[]));
 
         if (strlen(sOption[0]))
@@ -231,12 +233,12 @@ public int Native_XMenuQuick(Handle hPlugin, int iParams)
 
 public int Native_XMenuBox(Handle hPlugin, int iParams)
 {
-    int       iType  = GetNativeCell(4);
-    char      sCommandBase[64],
-              sTitle      [64],
-              sMessage    [MAX_BUFFER_LENGTH];
-    StringMap mMenu  = CreateTrie();
-    KeyValues kPanel = new KeyValues("menu");
+    char      sCommandBase[64];
+    char      sTitle      [64];
+    char      sMessage    [MAX_BUFFER_LENGTH];
+    int       iType       = GetNativeCell(4);
+    StringMap mMenu       = CreateTrie();
+    KeyValues kPanel      = new KeyValues("menu");
 
     GetNativeString(1, sCommandBase, sizeof(sCommandBase));
     GetNativeString(2, sTitle      , sizeof(sTitle));
@@ -260,8 +262,8 @@ public int Native_XMenuBox(Handle hPlugin, int iParams)
 public Action XMenuAction(int iClient, int iArgs)
 {
     int  iMenuId;
-    char sParam[3][256];
     bool bSilent;
+    char sParam[3][256];
 
     if (iClient == 0) {
         return Plugin_Handled;
@@ -290,20 +292,21 @@ public Action XMenuAction(int iClient, int iArgs)
 
     switch (iMenuId)
     {
-        // Base menu
-        case 0:
+        case 0: // Base menu
         {
             if (iArgs <= 1)
             {
                 bool bLan = FindConVar("sv_lan").BoolValue;
-                char sTitle[64],
-                     sMessage[1024],
-                     sModeName[32];
+                char sTitle[64];
+                char sMessage[1024];
+                char sModeName[32];
 
                 Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_0", iClient, PLUGIN_VERSION);
+
                 if (strlen(gRound.sModeDescription)) {
                     Format(sModeName, sizeof(sModeName), "(%s)", gRound.sModeDescription);
                 }
+
                 Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_0", iClient, gRound.sMode, sModeName, gRound.sMap, gCore.sServerName, GameVersion(), PLUGIN_VERSION, Tickrate(), bLan ? "local" : "dedicated", gCore.sServerMessage);
 
                 gClient[iClient].mMenu = XMenuQuick(iClient, 7, false, false, "sm_xmenu 0", sTitle, sMessage, !IsGameMatch() ? "xmenu0_team" : "xmenu0_pause;pause",
@@ -323,19 +326,19 @@ public Action XMenuAction(int iClient, int iArgs)
             }
             else {
                 FakeClientCommand(iClient, "sm_xmenu %s", sParam[0]);
+
                 return Plugin_Handled;
             }
 
             gClient[iClient].iMenuRefresh = XMENU_REFRESH_BASE;
         }
 
-        // Change Team menu
-        case 1:
+        case 1: // Change Team menu
         {
             if (iArgs == 1)
             {
-                char sTitle  [64],
-                     sMessage[512];
+                char sTitle  [64];
+                char sMessage[512];
                 DataPack dOptions = CreateDataPack();
 
                 dOptions.Reset();
@@ -367,13 +370,12 @@ public Action XMenuAction(int iClient, int iArgs)
             }
         }
 
-        // Call Vote menu
-        case 2:
+        case 2: // Call Vote menu
         {
             if (iArgs == 1)
             {
-                char sMessage[1024],
-                     sOptions[8][64];
+                char sMessage[1024];
+                char sOptions[8][64];
 
                 Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_2", iClient, gVoting.iMinPlayers);
 
@@ -395,15 +397,14 @@ public Action XMenuAction(int iClient, int iArgs)
 
                 gClient[iClient].mMenu = XMenuQuick(iClient, 4, true, false, "sm_xmenu 2", "xmenutitle_2", sMessage, sOptions[0], sOptions[1], sOptions[2], sOptions[3], sOptions[4]);
             }
-
             else if (StrContains(sParam[0], "selectmap") != -1)
             {
                 bool     bMode;
-                char     sMode       [MAX_MODE_LENGTH],
-                         sCommandBase[256],
-                         sOption     [512],
-                         sTitle      [64],
-                         sMessage    [512];
+                char     sMode       [MAX_MODE_LENGTH];
+                char     sCommandBase[256];
+                char     sOption     [512];
+                char     sTitle      [64];
+                char     sMessage    [512];
                 DataPack dOptions = CreateDataPack();
 
                 dOptions.Reset();
@@ -423,8 +424,8 @@ public Action XMenuAction(int iClient, int iArgs)
                 {
                     int  iResults;
                     bool bLetter = (StrContains(sParam[0], "byletter") != -1);
-                    char sResults[256][MAX_MAP_LENGTH*2],
-                         sMapcycle[PLATFORM_MAX_PATH];
+                    char sResults[256][MAX_MAP_LENGTH * 2];
+                    char sMapcycle[PLATFORM_MAX_PATH];
 
                     GetModeMapcycle(sMapcycle, sizeof(sMapcycle), sMode);
 
@@ -432,7 +433,7 @@ public Action XMenuAction(int iClient, int iArgs)
                     {
                         if (bMode)
                         {
-                            if (IsItemDistinctInList(gRound.sMode, gCore.sRetainModes) && IsItemDistinctInList(sMode, gCore.sRetainModes)) {
+                            if (IsItemInList(gRound.sMode, gCore.sRetainModes) && IsItemInList(sMode, gCore.sRetainModes)) {
                                 Format(sOption, sizeof(sOption), "%T;%s", "xmenu2_map_keep", iClient, gRound.sMap);
                                 dOptions.WriteString(sOption);
                             }
@@ -483,8 +484,8 @@ public Action XMenuAction(int iClient, int iArgs)
                 // Letter select menu
                 else if (StrEqual(sParam[1], "byletter"))
                 {
-                    char sLetters[26] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-                         sLetter[2];
+                    char sLetters[26] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                    char sLetter [2];
 
                     Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_2_map_filter", iClient);
 
@@ -531,18 +532,18 @@ public Action XMenuAction(int iClient, int iArgs)
                     }
 
                     dOptions.Close();
+
                     return Plugin_Handled;
                 }
             }
-
             else if (StrEqual(sParam[0], "selectmode"))
             {
                 if (iArgs == 2)
                 {
-                    char     sModes  [64][MAX_MODE_LENGTH],
-                             sOption [128],
-                             sTitle  [64],
-                             sMessage[512];
+                    char     sModes  [64][MAX_MODE_LENGTH];
+                    char     sOption [128];
+                    char     sTitle  [64];
+                    char     sMessage[512];
                     DataPack dOptions = CreateDataPack();
 
                     dOptions.Reset();
@@ -562,6 +563,7 @@ public Action XMenuAction(int iClient, int iArgs)
                             if (GetModeFullName(sModeName, sizeof(sModeName), sModes[i])) {
                                 Format(sModeName, sizeof(sModeName), "(%s)", sModeName);
                             }
+
                             Format(sOption, sizeof(sOption), "%s %s;%s", sModes[i], sModeName, sModes[i]);
                             dOptions.WriteString(sOption);
                         }
@@ -575,38 +577,37 @@ public Action XMenuAction(int iClient, int iArgs)
                 else
                 {
                     FakeClientCommand(iClient, "sm_xmenu 2 %s-selectmap", sParam[1]);
+
                     return Plugin_Handled;
                 }
             }
-
             else if (StrEqual(sParam[0], "start"))
             {
                 if (iArgs == 2) {
-                    gClient[iClient].mMenu = XMenuQuick(iClient, 3, true, false, "sm_xmenu 2 start", "xmenutitle_2_start", "xmenumsg_2_start", GetRealClientCount(true, false, false) > 1 ? "xmenu2_start_confirm" : "xmenu2_start_deny");
+                    gClient[iClient].mMenu = XMenuQuick(iClient, 3, true, false, "sm_xmenu 2 start", "xmenutitle_2_start", "xmenumsg_2_start", GetClientCount2(true, false, false) > 1 ? "xmenu2_start_confirm" : "xmenu2_start_deny");
                 }
                 else {
                     FakeClientCommand(iClient, sParam[0]);
                     FakeClientCommand(iClient, "sm_xmenu 0");
                 }
             }
-
             else
             {
                 FakeClientCommand(iClient, sParam[0]);
                 FakeClientCommand(iClient, "sm_xmenu 0");
+
                 return Plugin_Handled;
             }
 
             XMenuDisplay(gClient[iClient].mMenu, iClient);
         }
 
-        // Player Info menu
-        case 3:
+        case 3: // Player Info menu
         {
             if (iArgs == 1)
             {
-                char     sMessage[1024],
-                         sTitle  [64];
+                char     sMessage[1024];
+                char     sTitle  [64];
                 DataPack dOptions = CreateDataPack();
 
                 dOptions.Reset();
@@ -618,7 +619,7 @@ public Action XMenuAction(int iClient, int iArgs)
                 {
                     char sOption[64];
 
-                    if (IsClientConnected(i) && IsClientInGame(i) && !IsFakeClient(i))
+                    if (IsClientInGame(i) && !IsFakeClient(i))
                     {
                         Format(sOption, sizeof(sOption), "%N >;%i", i, i);
                         dOptions.WriteString(sOption);
@@ -627,8 +628,8 @@ public Action XMenuAction(int iClient, int iArgs)
 
                 if (gCore.bRanked && gameME_StatsInitialised())
                 {
-                    char sTop10Names[6][MAX_NAME_LENGTH],
-                         sTop10List [512];
+                    char sTop10Names[6][MAX_NAME_LENGTH];
+                    char sTop10List [512];
 
                     for (int i = 1; i < 6; i++)
                     {
@@ -648,17 +649,15 @@ public Action XMenuAction(int iClient, int iArgs)
 
                 gClient[iClient].mMenu = XMenu(iClient, true, false, "sm_xmenu 3", sTitle, sMessage, dOptions);
             }
-
-            // sParam[0] is a client
-            else if (!strlen(sParam[1]))
+            else if (!strlen(sParam[1])) // sParam[0] is a client
             {
                 int      iTarget  = StringToInt(sParam[0]);
-                char     sTarget     [MAX_NAME_LENGTH],
-                         sOption     [64],
-                         sMessage    [1024],
-                         sTitle      [64],
-                         sCommandBase[64];
                 DataPack dOptions = CreateDataPack();
+                char     sTarget     [MAX_NAME_LENGTH];
+                char     sOption     [64];
+                char     sMessage    [1024];
+                char     sTitle      [64];
+                char     sCommandBase[64];
 
                 dOptions.Reset();
 
@@ -701,14 +700,14 @@ public Action XMenuAction(int iClient, int iArgs)
 
                 if (gCore.bRanked && gameME_StatsInitialised() && gameME_IsPlayerRanked(iTarget))
                 {
-                    Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_3_player_gameme", iClient, sTarget, GetClientUserId(iTarget), UnbufferedAuthId(iTarget),
+                    Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_3_player_gameme", iClient, sTarget, GetClientUserId(iTarget), AuthId(iTarget),
                       gameME_FetchPlayerChar(iTarget, GM_RANK), gameME_FetchPlayerChar(iTarget, GM_POINTS), Timestring(gameME_FetchPlayerFloat(iTarget, GM_PLAYTIME)), gameME_FetchPlayerChar(iTarget, GM_KILLS),
                       gameME_FetchPlayerChar(iTarget, GM_DEATHS), gameME_FetchPlayerChar(iTarget, GM_KPD), gameME_FetchPlayerChar(iTarget, GM_HEADSHOTS), gameME_FetchPlayerChar(iTarget, GM_SUICIDES),
                       gameME_FetchPlayerChar(iTarget, GM_ACCURACY, true), gameME_FetchPlayerChar(iTarget, GM_KILLSPREE)
                     );
                 }
                 else {
-                    Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_3_player", iClient, sTarget, GetClientUserId(iTarget), UnbufferedAuthId(iTarget));
+                    Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_3_player", iClient, sTarget, GetClientUserId(iTarget), AuthId(iTarget));
                 }
 
                 gClient[iClient].mMenu = XMenu(iClient, true, false, sCommandBase, sTitle, sMessage, dOptions);
@@ -716,8 +715,8 @@ public Action XMenuAction(int iClient, int iArgs)
 
             else
             {
-                int iTarget   = StringToInt(sParam[0]),
-                    iTargetId = GetClientUserId(iTarget);
+                int iTarget   = StringToInt(sParam[0]);
+                int iTargetId = GetClientUserId(iTarget);
 
                 if (StrEqual(sParam[1], "kick")) {
                     FakeClientCommand(iClient, "sm_kick #%i", iTargetId);
@@ -744,20 +743,20 @@ public Action XMenuAction(int iClient, int iArgs)
                 }
 
                 IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_ACTIVATED);
+
                 return Plugin_Handled;
             }
 
             XMenuDisplay(gClient[iClient].mMenu, iClient);
         }
 
-        // Settings menu
-        case 4:
+        case 4: // Settings menu
         {
             if (iArgs == 1)
             {
-                char     sOption [64],
-                         sTitle  [64],
-                         sMessage[512];
+                char     sOption [64];
+                char     sTitle  [64];
+                char     sMessage[512];
                 DataPack dOptions = CreateDataPack();
 
                 dOptions.Reset();
@@ -786,14 +785,13 @@ public Action XMenuAction(int iClient, int iArgs)
 
                 gClient[iClient].mMenu = XMenu(iClient, true, false, "sm_xmenu 4", sTitle, sMessage, dOptions);
             }
-
             else if (StrEqual(sParam[0], "model"))
             {
                 if (iArgs == 2)
                 {
-                    char     sTitle  [64],
-                             sMessage[512],
-                             sOption [140];
+                    char     sTitle  [64];
+                    char     sMessage[512];
+                    char     sOption [140];
                     DataPack dOptions = CreateDataPack();
 
                     dOptions.Reset();
@@ -815,21 +813,21 @@ public Action XMenuAction(int iClient, int iArgs)
                     ClientCommand(iClient, "cl_playermodel %s", sParam[1]);
                     FakeClientCommand(iClient, "sm_xmenu 4");
                     IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_ACTIVATED);
+
                     return Plugin_Handled;
                 }
             }
-
             else if (StrEqual(sParam[0], "fov"))
             {
                 if (iArgs == 2)
                 {
-                    int      iDefault = FindConVar("xfov_defaultfov").IntValue,
-                             iMin     = FindConVar("xfov_minfov").IntValue,
-                             iMax     = FindConVar("xfov_maxfov").IntValue;
-                    char     sOption [64],
-                             sTitle  [64],
-                             sMessage[512];
+                    int      iDefault = FindConVar("xfov_defaultfov").IntValue;
+                    int      iMin     = FindConVar("xfov_minfov").IntValue;
+                    int      iMax     = FindConVar("xfov_maxfov").IntValue;
                     DataPack dOptions = CreateDataPack();
+                    char     sOption [64];
+                    char     sTitle  [64];
+                    char     sMessage[512];
 
                     dOptions.Reset();
 
@@ -854,21 +852,19 @@ public Action XMenuAction(int iClient, int iArgs)
                 {
                     FakeClientCommand(iClient, "fov %s", sParam[1]);
                     IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_ACTIVATED);
-
                     FakeClientCommand(iClient, "sm_xmenu 4");
+
                     return Plugin_Handled;
                 }
             }
-
             else if (StrEqual(sParam[0], "hudcolor"))
             {
                 if (iArgs == 2)
                 {
-                    gClient[iClient].mMenu =
-                        XMenuQuick(iClient, 3, true, false, "sm_xmenu 4 hudcolor", "xmenutitle_4_hudcolor", "xmenumsg_4_hudcolor",
-                          "xmenu4_hudcolor_yellow;255177000", "xmenu4_hudcolor_cyan;000255255", "xmenu4_hudcolor_blue;100100255", "xmenu4_hudcolor_green;075255075",
-                          "xmenu4_hudcolor_red;220010010", "xmenu4_hudcolor_white;255255255", "xmenu4_hudcolor_pink;238130238"
-                        );
+                    gClient[iClient].mMenu = XMenuQuick(iClient, 3, true, false, "sm_xmenu 4 hudcolor", "xmenutitle_4_hudcolor", "xmenumsg_4_hudcolor",
+                      "xmenu4_hudcolor_yellow;255177000", "xmenu4_hudcolor_cyan;000255255", "xmenu4_hudcolor_blue;100100255", "xmenu4_hudcolor_green;075255075",
+                      "xmenu4_hudcolor_red;220010010", "xmenu4_hudcolor_white;255255255", "xmenu4_hudcolor_pink;238130238"
+                    );
                 }
                 else
                 {
@@ -879,15 +875,15 @@ public Action XMenuAction(int iClient, int iArgs)
                     strcopy(sColor[2], 4, sParam[1][6]);
                     FakeClientCommand(iClient, "hudcolor %s %s %s", sColor[0], sColor[1], sColor[2]);
                     IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_ACTIVATED);
-
                     FakeClientCommand(iClient, "sm_xmenu 4");
+
                     return Plugin_Handled;
                 }
             }
-
             else if (StrEqual(sParam[0], "music"))
             {
-                if (IsCookieEnabled(gSounds.cMusic, iClient)) {
+                if (IsCookieEnabled(gSounds.cMusic, iClient))
+                {
                     SetClientCookie(iClient, gSounds.cMusic, "-1");
                     IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_DEACTIVATED);
                 }
@@ -897,12 +893,13 @@ public Action XMenuAction(int iClient, int iArgs)
                 }
 
                 FakeClientCommand(iClient, "sm_xmenu 4");
+
                 return Plugin_Handled;
             }
-
             else if (StrEqual(sParam[0], "sound"))
             {
-                if (IsCookieEnabled(gSounds.cMisc, iClient)) {
+                if (IsCookieEnabled(gSounds.cMisc, iClient))
+                {
                     SetClientCookie(iClient, gSounds.cMisc, "-1");
                     ClientCommand(iClient, "playgamesound %s", SOUND_DEACTIVATED);
                 }
@@ -912,6 +909,7 @@ public Action XMenuAction(int iClient, int iArgs)
                 }
 
                 FakeClientCommand(iClient, "sm_xmenu 4");
+
                 return Plugin_Handled;
             }
 
@@ -923,18 +921,17 @@ public Action XMenuAction(int iClient, int iArgs)
             if (iArgs == 1)
             {
                 int iServers;
-                char sOption [322],
-                     sMessage[512],
-                     sTitle  [64],
-                     sServers[4096],
-                     sServer [64][64];
-
+                char sOption [322];
+                char sMessage[512];
+                char sTitle  [64];
+                char sServers[4096];
+                char sServer [64][64];
                 DataPack dOptions = CreateDataPack();
+
                 dOptions.Reset();
 
                 Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_5", iClient);
                 Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_5", iClient);
-
                 iServers = GetConfigKeys(sServers, sizeof(sServers), "OtherServers");
                 ExplodeString(sServers, ",", sServer, iServers, 64);
 
@@ -981,7 +978,8 @@ public Action XMenuAction(int iClient, int iArgs)
             if (iArgs == 1)
             {
                 gClient[iClient].mMenu = XMenuQuick(iClient, 3, true, false, "sm_xmenu 6", "xmenutitle_6", "xmenumsg_6", "xmenu6_specall;specall",
-                  "xmenu6_reloadadmins;reloadadmins", "xmenu6_reloadplugin;reloadxms", "xmenu6_restart;restart", "xmenu6_feedback;feedback");
+                  "xmenu6_reloadadmins;reloadadmins", "xmenu6_reloadplugin;reloadxms", "xmenu6_restart;restart", "xmenu6_feedback;feedback"
+                );
             }
             else if (StrEqual(sParam[0], "restart"))
             {
@@ -992,11 +990,9 @@ public Action XMenuAction(int iClient, int iArgs)
             {
                 if (FileExists(gPath.sFeedback))
                 {
-                    char sFeedback[MAX_BUFFER_LENGTH],
-                         sTitle[64];
-
-
-                    File hFile = OpenFile(gPath.sFeedback, "r");
+                    char sFeedback[MAX_BUFFER_LENGTH];
+                    char sTitle   [64];
+                    File hFile    = OpenFile(gPath.sFeedback, "r");
 
                     hFile.ReadString(sFeedback, sizeof(sFeedback));
                     hFile.Close();
@@ -1031,14 +1027,15 @@ public Action XMenuAction(int iClient, int iArgs)
 
             if (StrEqual(sParam[0], "menu"))
             {
-                char sTitle  [64],
-                     sMessage[64];
+                char sTitle  [64];
+                char sMessage[64];
 
                 Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_7", iClient);
                 Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_7", iClient);
 
                 gClient[iClient].mMenu = XMenuBox("sm_xmenu 7", sTitle, sMessage);
                 XMenuDisplay(gClient[iClient].mMenu, iClient);
+
                 return Plugin_Handled;
             }
 
@@ -1050,9 +1047,9 @@ public Action XMenuAction(int iClient, int iArgs)
 
                 if (!StrEqual(sFeedback, sPrevious)) // fix for double entry if client hits enter
                 {
-                    char sName[MAX_NAME_LENGTH],
-                         sId  [32],
-                         sInfo[256];
+                    char sName [MAX_NAME_LENGTH];
+                    char sId   [32];
+                    char sInfo [256];
                     File hFile = OpenFile(gPath.sFeedback, "a");
 
                     GetClientName(iClient, sName, sizeof(sName));
@@ -1082,7 +1079,7 @@ public Action XMenuAction(int iClient, int iArgs)
 void XMenuDisplay(StringMap mMenu, int iClient, int iPage = -1, bool bSilent = false)
 {
     int        iColor[3];
-    char       sPage[3];
+    char       sPage [3];
     DialogType iType;
     KeyValues  kMenu;
 
@@ -1093,8 +1090,8 @@ void XMenuDisplay(StringMap mMenu, int iClient, int iPage = -1, bool bSilent = f
             iPage = 1;
         }
     }
-    IntToString(iPage, sPage, sizeof(sPage));
 
+    IntToString(iPage, sPage, sizeof(sPage));
     GetClientColors(iClient, iColor);
 
     mMenu.GetValue(sPage , kMenu);
@@ -1119,9 +1116,9 @@ public Action XMenuNext(int iClient, int iArgs)
     if (iPage <= XMenuPageCount(iClient)){
         XMenuDisplay(gClient[iClient].mMenu, iClient, iPage);
     }
-    
+
     gClient[iClient].iMenuRefresh = XMENU_REFRESH_WAIT;
-    
+
     return Plugin_Handled;
 }
 
@@ -1133,16 +1130,16 @@ public Action XMenuBack(int iClient, int iArgs)
     if (iPage >= 1) {
         XMenuDisplay(gClient[iClient].mMenu, iClient, iPage);
     }
-    
+
     gClient[iClient].iMenuRefresh = XMENU_REFRESH_WAIT;
-    
+
     return Plugin_Handled;
 }
 
 // Attempt to display root menu:
 public void ShowMenuIfVisible(QueryCookie cookie, int iClient, ConVarQueryResult result, char[] sCvarName, char[] sCvarValue)
 {
-    if (IsClientConnected(iClient) && IsClientInGame(iClient) && !IsFakeClient(iClient))
+    if (IsClientInGame(iClient) && !IsFakeClient(iClient))
     {
         if (!StringToInt(sCvarValue))
         {
@@ -1160,7 +1157,7 @@ public void ShowMenuIfVisible(QueryCookie cookie, int iClient, ConVarQueryResult
                 MC_PrintToChat(iClient, "%t", "xmenu_announce");
                 gClient[iClient].iMenuStatus = 2;
             }
-    
+
             FakeClientCommand(iClient, "sm_xmenu -1");
         }
     }
@@ -1175,9 +1172,9 @@ public Action T_MenuRefresh(Handle hTimer)
         {
             if (gClient[iClient].iMenuRefresh <= 0)
             {
-                if (IsClientConnected(iClient) && IsClientInGame(iClient) && !IsFakeClient(iClient))
+                if (IsClientInGame(iClient) && !IsFakeClient(iClient))
                 {
-    
+
                     if (!gVoting.iStatus || gClient[iClient].iVote != -1) {
                         QueryClientConVar(iClient, "cl_showpluginmessages", ShowMenuIfVisible, iClient);
                     }
@@ -1191,7 +1188,7 @@ public Action T_MenuRefresh(Handle hTimer)
 
     return Plugin_Continue;
 }
- 
+
 // Constrain message to remain visible at default menu size. Only used for "MenuMessage" in xms.cfg
 int FormatMenuMessage(const char[] sMsg, char[] sOutput, int iMaxlen)
 {
@@ -1207,8 +1204,8 @@ int FormatMenuMessage(const char[] sMsg, char[] sOutput, int iMaxlen)
             for (int i = 0; i < iLen; i++)
             {
                 bool bCut;
-                int  iCut = 0,
-                     iNewlPos = StrContains(sArray[iRow][i], "\\n");
+                int  iCut = 0;
+                int  iNewlPos = StrContains(sArray[iRow][i], "\\n");
 
                 if (iNewlPos == 0) {
                     bCut = true;
@@ -1222,7 +1219,7 @@ int FormatMenuMessage(const char[] sMsg, char[] sOutput, int iMaxlen)
                     if (sArray[iRow][i] == ' ')
                     {
                         int iNext = StrContains(sArray[iRow][i + 1], " "); // next word length
-                        
+
                         if (!iNext) {
                             iNext = StrContains(sArray[iRow][i + 1], "\\");
                             if (iNext == -1 || sArray[iRow][i + iNext + 2] != 'n') {

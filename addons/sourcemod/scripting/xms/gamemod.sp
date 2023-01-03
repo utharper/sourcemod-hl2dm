@@ -123,17 +123,20 @@ public Action Event_GameMessage(Event hEvent, const char[] sEvent, bool bDontBro
         if (!IsGameMatch() || GetClientTeam(iClient) != TEAM_SPECTATORS)
         {
             char sName[MAX_NAME_LENGTH];
+
             GetClientName(iClient, sName, sizeof(sName));
 
             if (StrEqual(sEvent, "player_disconnect"))
             {
                 char sReason[32];
+
                 GetEventString(hEvent, "reason", sReason, sizeof(sReason));
                 MC_PrintToChatAll("%t", IsGameMatch() ? "xms_disconnect_match" : "xms_disconnect", sName, sReason);
             }
             else if (StrEqual(sEvent, "player_changename"))
             {
                 char sNew[MAX_NAME_LENGTH];
+
                 GetEventString(hEvent, "newname", sNew, sizeof(sNew));
                 MC_PrintToChatAll("%t", "xms_changename", sName, sNew);
             }
@@ -191,8 +194,7 @@ public Action UserMsg_VGUIMenu(UserMsg msg, Handle hMsg, const int[] iPlayers, i
 
 public void OnGameRestarting(Handle hConvar, const char[] sOldValue, const char[] sNewValue)
 {
-    if (StrEqual(sNewValue, "15")) {
-        // trigger for some CTF maps
+    if (StrEqual(sNewValue, "15")) { // trigger for some CTF maps
         Game_End();
     }
 }
@@ -204,25 +206,25 @@ public void OnMapInit()
 {
     char sKeys[4096];
     char sEntity[2][2048][256];
-    
+
     if (EntityLump.Length() && GetConfigKeys(sKeys, sizeof(sKeys), "Gamemodes", gRound.sNextMode, "ReplaceEntities"))
     {
         int iReplacements = ExplodeString(sKeys, ",", sEntity[0], 2048, 256);
-        
+
         for (int i = 0; i <= iReplacements; i++)
         {
             if (GetConfigString(sEntity[1][i], 256, sEntity[0][i], "Gamemodes", gRound.sNextMode, "ReplaceEntities") == 0) {
                 // if no replacement entity is provided, 'beam' seems to work for null without triggering a console error.
                 strcopy(sEntity[1][i], 256, "beam");
             }
-            
+
         }
-        
+
         for (int x = 0; x < EntityLump.Length(); x++)
         {
             char sClass[256];
             EntityLumpEntry e = EntityLump.Get(x);
-        
+
             for (int y = -1; (y = e.GetNextKey("classname", sClass, sizeof(sClass), y)) != -1;)
             {
                 for (int z = 0; z <= iReplacements; z++)
@@ -254,11 +256,12 @@ void ClearProps()
 {
     for (int iEnt = MaxClients; iEnt < GetMaxEntities(); iEnt++)
     {
+        char sClass[64];
+
         if (!IsValidEntity(iEnt)) {
             continue;
         }
 
-        char sClass[64];
         GetEntityClassname(iEnt, sClass, sizeof(sClass));
 
         if (StrContains(sClass, "prop_physics") == 0) {
@@ -280,7 +283,7 @@ void Game_Restart(int iTime = 1)
 
 public Action T_RemoveWeapons(Handle hTimer, int iClient)
 {
-    if (IsClientConnected(iClient) && IsClientInGame(iClient) && IsPlayerAlive(iClient)) {
+    if (IsClientInGame(iClient) && IsPlayerAlive(iClient)) {
         Client_RemoveAllWeapons(iClient);
     }
 
@@ -289,16 +292,16 @@ public Action T_RemoveWeapons(Handle hTimer, int iClient)
 
 public Action T_SetWeapons(Handle hTimer, int iClient)
 {
-    if (IsClientConnected(iClient) && IsClientInGame(iClient) && IsPlayerAlive(iClient))
+    if (IsClientInGame(iClient) && IsPlayerAlive(iClient))
     {
         Client_RemoveAllWeapons(iClient);
-        
+
         for (int i = 0; i < 16; i++)
         {
             if (!strlen(gsSpawnWeapon[i])) {
                 break;
             }
-            
+
             int iPrimary;
             int iSecondary;
             int iClip = (
@@ -313,7 +316,7 @@ public Action T_SetWeapons(Handle hTimer, int iClient)
               : StrEqual(gsSpawnWeapon[i], "weapon_frag", false)     ? 2
               : -1
             );
-            
+
             if (giSpawnAmmo[i][0] == -1)
             {
                 if (StrEqual(gsSpawnWeapon[i], "weapon_ar2", false)) {
@@ -323,7 +326,7 @@ public Action T_SetWeapons(Handle hTimer, int iClient)
                     giSpawnAmmo[i][0] = iClip;
                 }
             }
-            
+
             if (StrEqual(gsSpawnWeapon[i], "weapon_slam", false)) {
                 iSecondary = giSpawnAmmo[i][0];
             }
@@ -331,7 +334,7 @@ public Action T_SetWeapons(Handle hTimer, int iClient)
             {
                 iPrimary   = clamp(giSpawnAmmo[i][0], 0, 99999);
                 iSecondary = clamp(giSpawnAmmo[i][1], 0, 99999);
-                
+
                 if (StrEqual(gsSpawnWeapon[i], "weapon_rpg", false) || StrEqual(gsSpawnWeapon[i], "weapon_frag", false) || StrEqual(gsSpawnWeapon[i], "weapon_crossbow"), false) {
                     iClip = -1;
                 }
@@ -343,7 +346,7 @@ public Action T_SetWeapons(Handle hTimer, int iClient)
                     iPrimary = 0;
                 }
             }
-            
+
             Client_GiveWeaponAndAmmo(iClient, gsSpawnWeapon[i], false, iPrimary, iSecondary, iClip, -1);
         }
     }
@@ -353,33 +356,33 @@ public Action T_SetWeapons(Handle hTimer, int iClient)
 
 public Action T_Replenish(Handle hTimer, int iClient)
 {
-    if (IsClientConnected(iClient) && IsClientInGame(iClient) && IsPlayerAlive(iClient))
+    if (IsClientInGame(iClient) && IsPlayerAlive(iClient))
     {
         if (GetEntProp(iClient, Prop_Data, "m_iHealth") < gRound.iSpawnHealth) {
             SetEntProp(iClient, Prop_Data, "m_iHealth", gRound.iSpawnHealth);
         }
-        
+
         if (GetEntProp(iClient, Prop_Data, "m_ArmorValue") < gRound.iSpawnArmor) {
             SetEntProp(iClient, Prop_Data, "m_ArmorValue", gRound.iSpawnArmor);
         }
-        
+
         for (int i = 0; i < 16; i++)
         {
             int iWeapon = Client_GetWeapon(iClient, gsSpawnWeapon[i]);
             int iPrimary;
             int iSecondary;
             int iClip;
-            
+
             if (!strlen(gsSpawnWeapon[i])) {
                 break;
             }
             if (iWeapon == INVALID_ENT_REFERENCE) {
                 continue;
             }
-            
+
             Client_GetWeaponPlayerAmmo(iClient, gsSpawnWeapon[i], iPrimary, iSecondary);
             iClip = clamp(Weapon_GetPrimaryClip(iWeapon), 0, 99999);
-            
+
             if (StrEqual(gsSpawnWeapon[i], "weapon_slam", false)) {
                 Client_SetWeaponAmmo(iClient, gsSpawnWeapon[i], -1, giSpawnAmmo[i][0], -1, -1);
             }
@@ -388,15 +391,15 @@ public Action T_Replenish(Handle hTimer, int iClient)
                 if (giSpawnAmmo[i][0] > (iPrimary + iClip)) {
                     Client_SetWeaponAmmo(iClient, gsSpawnWeapon[i], giSpawnAmmo[i][0] - iClip, -1, -1, -1);
                 }
-                
+
                 if (giSpawnAmmo[i][1] > iSecondary) {
                     Client_SetWeaponAmmo(iClient, gsSpawnWeapon[i], -1, giSpawnAmmo[i][1], -1, -1);
                 }
             }
         }
-        
+
         ClientCommand(iClient, "playgamesound %s", SOUND_REPLENISH);
     }
-    
+
     return Plugin_Handled;
 }

@@ -1,9 +1,5 @@
-#if !defined _jhl2dm_included
-    #error "jhl2dm.inc required"
-    #endinput
-#endif
 #if defined _xms_included
-    #endinput
+  #endinput
 #endif
 #define _xms_included
 
@@ -93,55 +89,6 @@ native float GetTimeElapsed();
  */
 native float GetTimeRemaining(bool bChatTime);
 
-/**
- * (Internal use) Create menu from datapack
- *
- * @param iClient       Client index for translation
- * @param bBackButton   Show back button on non-paginated menu?
- * @param bNumbered     Show option numbers?
- * @param sCommandBase  Command base for menu options
- * @param sTitle        Title of menu
- * @param sMessage      Message of menu
- * @param dPack         Datapack
- * @return              StringMap containing KeyValues for each page
- */
-native StringMap XMenu(int iClient, bool bBackButton, bool bNumbered, const char[] sCommandBase, const char[] sTitle, const char[] sMessage, Handle dPack);
-
-/**
- * (Internal use) Create menu from translation strings
- *
- * @param iClient       Client index for translation language
- * @param iTranslate    Translation type
- * @param bBackButton   Show back button on non-paginated menu?
- * @param bNumbered     Show option numbers?
- * @param sCommandBase  Command base for menu options
- * @param sTitle        Title of menu
- * @param sMessage      Message of menu
- * @param ...           Menu options
- * @return              StringMap containing KeyValues for each page
- */
-native StringMap XMenuQuick(int iClient, int iTranslate, bool bBackButton, bool bNumbered, const char[] sCommandBase, const char[] sTitle, const char[] sMessage, any ...);
-#define XMENU_TRANSLATE_NONE                    0
-#define XMENU_TRANSLATE_TITLE                   1
-#define XMENU_TRANSLATE_TITLE_MESSAGE           2
-#define XMENU_TRANSLATE_TITLE_MESSAGE_OPTIONS   3
-#define XMENU_TRANSLATE_TITLE_OPTIONS           4
-#define XMENU_TRANSLATE_MESSAGE_OPTIONS         5
-#define XMENU_TRANSLATE_MESSAGE                 6
-#define XMENU_TRANSLATE_OPTIONS                 7
-
-/**
- * (Internal use) Create menu box without options
- *
- * @param sCommandBase  Command base for menu
- * @param sTitle        Title of menu
- * @param sMessage      Message of menu
- * @param iType         DialogType_Entry or DialogType_Text
- * @return              StringMap containing KeyValues for menu
- */
-native StringMap XMenuBox(const char[] sCommandBase, const char[] sTitle, const char[] sMessage, DialogType iType=DialogType_Entry);
-
-
 /**************************************************************
  * FORWARDS
  *************************************************************/
@@ -209,22 +156,10 @@ stock bool IsGameOver()
 stock bool IsGamemode(const char[] sMode)
 {
     char sCurrent[MAX_MODE_LENGTH];
-
+    
     GetGamemode(sCurrent, sizeof(sCurrent));
-
+    
     return StrEqual(sCurrent, sMode, false);
-}
-
-// Is sMode available on the server?
-stock bool IsValidGamemode(const char[] sMode)
-{
-    char sList[512];
-
-    if (GetConfigKeys(sList, sizeof(sList), "Gamemodes")) {
-        return IsItemDistinctInList(sMode, sList);
-    }
-
-    return false;
 }
 
 // Does sMode support competitive matches?
@@ -244,6 +179,59 @@ stock bool IsModeMatchable(const char[] sMode = NULL_STRING)
 
 
 /**************************************************************
+ * XMENU NATIVES
+ *************************************************************/
+
+/**
+ * (Internal use) Create menu from datapack
+ *
+ * @param iClient       Client index for translation
+ * @param bBackButton   Show back button on non-paginated menu?
+ * @param bNumbered     Show option numbers?
+ * @param sCommandBase  Command base for menu options
+ * @param sTitle        Title of menu
+ * @param sMessage      Message of menu
+ * @param dPack         Datapack
+ * @return              StringMap containing KeyValues for each page
+ */
+native StringMap XMenu(int iClient, bool bBackButton, bool bNumbered, const char[] sCommandBase, const char[] sTitle, const char[] sMessage, Handle dPack);
+
+/**
+ * (Internal use) Create menu from translation strings
+ *
+ * @param iClient       Client index for translation language
+ * @param iTranslate    Translation type
+ * @param bBackButton   Show back button on non-paginated menu?
+ * @param bNumbered     Show option numbers?
+ * @param sCommandBase  Command base for menu options
+ * @param sTitle        Title of menu
+ * @param sMessage      Message of menu
+ * @param ...           Menu options
+ * @return              StringMap containing KeyValues for each page
+ */
+native StringMap XMenuQuick(int iClient, int iTranslate, bool bBackButton, bool bNumbered, const char[] sCommandBase, const char[] sTitle, const char[] sMessage, any ...);
+#define XMENU_TRANSLATE_NONE                    0
+#define XMENU_TRANSLATE_TITLE                   1
+#define XMENU_TRANSLATE_TITLE_MESSAGE           2
+#define XMENU_TRANSLATE_TITLE_MESSAGE_OPTIONS   3
+#define XMENU_TRANSLATE_TITLE_OPTIONS           4
+#define XMENU_TRANSLATE_MESSAGE_OPTIONS         5
+#define XMENU_TRANSLATE_MESSAGE                 6
+#define XMENU_TRANSLATE_OPTIONS                 7
+
+/**
+ * (Internal use) Create menu box without options
+ *
+ * @param sCommandBase  Command base for menu
+ * @param sTitle        Title of menu
+ * @param sMessage      Message of menu
+ * @param iType         DialogType_Entry or DialogType_Text
+ * @return              StringMap containing KeyValues for menu
+ */
+native StringMap XMenuBox(const char[] sCommandBase, const char[] sTitle, const char[] sMessage, DialogType iType=DialogType_Entry);
+
+
+/**************************************************************
  * PLUGIN LIBRARY
  *************************************************************/
 
@@ -252,9 +240,9 @@ public SharedPlugin __pl_xms =
     name = "xms",
     file = "xms.smx",
     #if defined REQUIRE_PLUGIN
-        required = 1,
+      required = 1,
     #else
-        required = 0,
+      required = 0,
     #endif
 };
 

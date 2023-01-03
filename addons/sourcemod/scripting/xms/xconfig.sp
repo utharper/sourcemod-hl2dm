@@ -3,9 +3,9 @@
  *************************************************************/
 public int Native_GetConfigString(Handle hPlugin, int iParams)
 {
-    char sValue[1024],
-         sKey  [32],
-         sInKey[32];
+    char sValue[1024];
+    char sKey  [32];
+    char sInKey[32];
 
     gCore.kConfig.Rewind();
     GetNativeString(3, sKey, sizeof(sKey));
@@ -38,9 +38,9 @@ public int Native_GetConfigString(Handle hPlugin, int iParams)
 
 public int Native_GetConfigInt(Handle hPlugin, int iParams)
 {
-    char sValue[32],
-         sKey  [32],
-         sInKey[4][32];
+    char sValue[32];
+    char sKey  [32];
+    char sInKey[4][32];
 
     GetNativeString(1, sKey, sizeof(sKey));
 
@@ -57,8 +57,8 @@ public int Native_GetConfigInt(Handle hPlugin, int iParams)
 
 public int Native_GetConfigKeys(Handle hPlugin, int iParams)
 {
-    char sKeys [1024],
-         sInKey[32];
+    char sKeys [1024];
+    char sInKey[32];
     int  iCount;
 
     gCore.kConfig.Rewind();
@@ -95,15 +95,13 @@ public int Native_GetConfigKeys(Handle hPlugin, int iParams)
 void LoadConfigValues()
 {
     gCore.kConfig = new KeyValues("xms");
-    gCore.kConfig . ImportFromFile(gPath.sConfig);
+    gCore.kConfig.ImportFromFile(gPath.sConfig);
 
-    // Core settings:
-    if ( !GetConfigKeys(gCore.sGamemodes, sizeof(gCore.sGamemodes), "Gamemodes")
-      || !GetConfigString(gCore.sDefaultMode, sizeof(gCore.sDefaultMode), "DefaultMode")
-    ){
+    if (!GetConfigKeys(gCore.sGamemodes, sizeof(gCore.sGamemodes), "Gamemodes") || !GetConfigString(gCore.sDefaultMode, sizeof(gCore.sDefaultMode), "DefaultMode")) {
         LogError("xms.cfg missing or corrupted!");
     }
 
+    // Core settings:
     if (GetConfigString(gCore.sServerMessage, sizeof(gCore.sServerMessage), "MenuMessage") == 1) {
         FormatMenuMessage(gCore.sServerMessage, gCore.sServerMessage, sizeof(gCore.sServerMessage));
     }
@@ -134,17 +132,18 @@ void LoadConfigValues()
     gHud.bSelfKeys           = GetConfigInt("Selfkeys",     "Gamemodes", gRound.sMode) == 1;
 
     // Weapon settings:
-    char sWeapons[512],
-         sWeapon [16][32],
-         sAmmo   [2][6];
+    char sWeapons[512];
+    char sWeapon [16][32];
+    char sAmmo   [2][6];
 
     if (GetConfigString(sWeapons, sizeof(sWeapons), "SpawnWeapons", "Gamemodes", gRound.sMode))
     {
         for (int i = 0; i < ExplodeString(sWeapons, ",", sWeapon, 16, 32); i++)
         {
             int iPos[2];
-            
+
             iPos[0] = SplitString(sWeapon[i], "(", gsSpawnWeapon[i], sizeof(gsSpawnWeapon[]));
+
             if (iPos[0] != -1)
             {
                 iPos[1] = SplitString(sWeapon[i][iPos[0]], "-", sAmmo[0], sizeof(sAmmo[]));
