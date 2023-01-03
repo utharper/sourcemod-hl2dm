@@ -149,9 +149,9 @@ public Action T_CheckBots(Handle hTimer)
 {
     if (gbEnabled && (GetTimeElapsed() >= giJoinDelay || gbContinue))
     {
-        int iTotal       = GetRealClientCount(true, true) - view_as<int>(gbSourceTV);
-        int iPlayers     = GetRealClientCount(true, false);
-        int iConnecting  = GetRealClientCount(false, false) - iPlayers;
+        int iTotal       = GetClientCount2(true, true) - view_as<int>(gbSourceTV);
+        int iPlayers     = GetClientCount2(true, false);
+        int iConnecting  = GetClientCount2(false, false) - iPlayers;
 
         if (iPlayers == 1)
         {
@@ -179,7 +179,7 @@ public Action T_CheckBots(Handle hTimer)
 
 public Action T_BotAdd(Handle hTimer)
 {
-    if (GetRealClientCount(true, false) == 1 && giState == GAME_DEFAULT) {
+    if (GetClientCount2(true, false) == 1 && giState == GAME_DEFAULT) {
         ServerCommand("rcbotd addbot");
     }
     
@@ -245,7 +245,7 @@ public Action T_BotRemove(Handle hTimer)
 {
     static int iRan;
 
-    if (GetRealClientCount(true, false) != 1 && giState == GAME_DEFAULT)
+    if (GetClientCount2(true, false) != 1 && giState == GAME_DEFAULT)
     {
         if (giBotClient > 0 && IsClientInGame(giBotClient))
         {
@@ -379,7 +379,7 @@ bool BotsAvailable()
             giJoinDelay  = GetConfigInt("JoinDelay", "Bots");
             giLeaveDelay = GetConfigInt("QuitDelay", "Bots");
 
-            if (IsItemDistinctInList(sCurrentMode, sSupportedModes)) {
+            if (IsItemInList(sCurrentMode, sSupportedModes)) {
                 return true;
             }
         }
@@ -398,4 +398,16 @@ int FindBotClient()
     }
 
     return 0;
+}
+
+int Math_GetRandomIntNot(int iMin, int iMax, int iNot)
+{
+    int i;
+    
+    do {
+        i = Math_GetRandomInt(iMin, iMax);
+    }
+    while (i == iNot);
+
+    return i;
 }

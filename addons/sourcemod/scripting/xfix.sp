@@ -393,8 +393,8 @@ public Action T_CheckPlayerStates(Handle hTimer)
             int iKills,
                 iDeaths;
 
-            gmKills.GetValue(UnbufferedAuthId(iClient), iKills);
-            gmDeaths.GetValue(UnbufferedAuthId(iClient), iDeaths);
+            gmKills.GetValue(AuthId(iClient), iKills);
+            gmDeaths.GetValue(AuthId(iClient), iDeaths);
 
             Client_SetScore(iClient, iKills);
             Client_SetDeaths(iClient, iDeaths);
