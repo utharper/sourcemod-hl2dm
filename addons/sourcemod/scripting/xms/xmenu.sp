@@ -602,7 +602,7 @@ public Action XMenuAction(int iClient, int iArgs)
             XMenuDisplay(gClient[iClient].mMenu, iClient);
         }
 
-        case 3: // Player Info menu
+        case 3: // Players menu
         {
             if (iArgs == 1)
             {
@@ -667,6 +667,16 @@ public Action XMenuAction(int iClient, int iArgs)
 
                 Format(sOption, sizeof(sOption), "%T;profile", "xmenu3_profile", iClient);
                 dOptions.WriteString(sOption);
+                
+                if (!IsClientAdmin(iClient, ADMFLAG_KICK)) {
+                    Format(sOption, sizeof(sOption), "%T;votekick", "xmenu3_votekick", iClient);
+                    dOptions.WriteString(sOption);
+                }
+                
+                if (!IsClientAdmin(iClient, ADMFLAG_BAN)) {
+                    Format(sOption, sizeof(sOption), "%T;votemute", "xmenu3_votemute", iClient);
+                    dOptions.WriteString(sOption);
+                }
 
                 if (IsClientAdmin(iClient, ADMFLAG_GENERIC))
                 {

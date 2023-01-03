@@ -64,7 +64,7 @@
     }
     "xmenutitle_3"
     {
-        "en"        "XMS > Player Info"
+        "en"        "XMS > Players"
     }
     "xmenutitle_4"
     {
@@ -207,7 +207,7 @@
     }
     "xmenu0_players"
     {
-        "en"        "Player Info                >"
+        "en"        "Players                      >"
     }
     "xmenu0_settings"
     {
@@ -281,6 +281,14 @@
     {
         "en"        "View Steam Profile *"
     }
+	"xmenu3_votekick"
+	{
+		"en"		"Vote Kick"
+	}
+	"xmenu3_votemute"
+	{
+		"en"		"Vote Mute"
+	}
     "xmenu3_allow"
     {
         "en"        "[Admin] Allow Join"
