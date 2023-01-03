@@ -61,7 +61,10 @@ public void OnPluginStart()
     gConVar.xfov_minfov     = CreateConVar("xfov_minfov", "90", "Minimum FOV allowed on server");
     gConVar.xfov_defaultfov = CreateConVar("xfov_defaultfov", "90", "Default FOV of players on server");
     gConVar.xfov_maxfov     = CreateConVar("xfov_maxfov", "110", "Maximum FOV allowed on server");
+    
     gConVar.sv_tags         = FindConVar("sv_tags");
+    gConVar.sv_tags.AddChangeHook(OnTagsChanged);
+    
     AutoExecConfig();
 
     RegConsoleCmd("sm_fov", Command_FOV, "Set your desired field-of-view value");
