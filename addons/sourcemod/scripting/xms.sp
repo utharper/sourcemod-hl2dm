@@ -249,17 +249,18 @@ public void OnPluginStart()
     gHud.hTime = CreateHudSynchronizer();
     gHud.hVote = CreateHudSynchronizer();
     
+    LoadConfigValues();
     MC_AddJColors();
     HookEvents();
     RegisterCommands();
+    
 
     CreateTimer(0.1, T_KeysHud,     _, TIMER_REPEAT);
     CreateTimer(0.1, T_TimeHud,     _, TIMER_REPEAT);
     CreateTimer(1.0, T_Voting,      _, TIMER_REPEAT);
     CreateTimer(1.0, T_MenuRefresh, _, TIMER_REPEAT);
 
-    AddPluginTag();
-    LoadConfigValues();
+    AddPluginTags();
 
     if (gCore.iAdFrequency) {
         CreateTimer(float(gCore.iAdFrequency), T_Adverts, _, TIMER_REPEAT);
@@ -277,11 +278,11 @@ public void OnPluginStart()
 public void OnTagsChanged(Handle hConvar, const char[] sOldValue, const char[] sNewValue)
 {
     if (!gCore.bChangingTags) {
-        AddPluginTag();
+        AddPluginTags();
     }
 }
 
-void AddPluginTag()
+void AddPluginTags()
 {
     char sTags[128];
 
@@ -289,7 +290,7 @@ void AddPluginTag()
 
     if (StrContains(sTags, "XMS") == -1)
     {
-        StrCat(sTags, sizeof(sTags), sTags[0] != 0 ? ",XMS" : "XMS");
+        Format(sTags, sizeof(sTags), "%s%sXMS,%s", sTags, sTags[0] != 0 ? "," : "", gCore.sGamemodes);
         gCore.bChangingTags = true;
         gConVar.sv_tags.SetString(sTags);
         gCore.bChangingTags = false;
