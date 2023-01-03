@@ -106,13 +106,13 @@ void LoadConfigValues()
         FormatMenuMessage(gCore.sServerMessage, gCore.sServerMessage, sizeof(gCore.sServerMessage));
     }
 
-    GetConfigString(gPath.sDemo           , sizeof(gPath.sDemo)           , "DemoFolder");
-    GetConfigString(gPath.sDemoWeb        , sizeof(gPath.sDemoWeb)        , "DemoURL");
-    GetConfigString(gPath.sDemoWebExt     , sizeof(gPath.sDemoWebExt)     , "DemoExtension");
-    GetConfigString(gCore.sServerName     , sizeof(gCore.sServerName)     , "ServerName");
-    GetConfigString(gCore.sRetainModes    , sizeof(gCore.sRetainModes)    , "RetainModes");
+    GetConfigString(gPath.sDemo,            sizeof(gPath.sDemo),            "DemoFolder");
+    GetConfigString(gPath.sDemoWeb,         sizeof(gPath.sDemoWeb),         "DemoURL");
+    GetConfigString(gPath.sDemoWebExt,      sizeof(gPath.sDemoWebExt),      "DemoExtension");
+    GetConfigString(gCore.sServerName,      sizeof(gCore.sServerName),      "ServerName");
+    GetConfigString(gCore.sRetainModes,     sizeof(gCore.sRetainModes),     "RetainModes");
     GetConfigString(gCore.sRemoveMapPrefix, sizeof(gCore.sRemoveMapPrefix), "StripPrefix", "Maps");
-    GetConfigString(gCore.sEmptyMapcycle  , sizeof(gCore.sEmptyMapcycle)  , "EmptyMapcycle");
+    GetConfigString(gCore.sEmptyMapcycle,   sizeof(gCore.sEmptyMapcycle),   "EmptyMapcycle");
 
     gCore.iAdFrequency       = GetConfigInt("Frequency", "ServerAds");
     gCore.iRevertTime        = GetConfigInt("RevertTime");

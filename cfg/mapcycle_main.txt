@@ -102,3 +102,4 @@ dm_waystation
 dm_weaver
 dm_winterchill_r3
 dm_zeta_rc2
+dm_insomnia_v2

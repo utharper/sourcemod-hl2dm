@@ -10,6 +10,7 @@ For discussion and feedback, join us in the [HL2DM Community](https://hl2dm.comm
   * [xms_bots](#xms_bots) - RCBot2 controller for XMS servers
   * [xms_discord](#xms_discord) - Publish match results to discord server(s).
 * [gameme_hud](#gameme_hud) - Displays a stats HUD in the scoreboard, using gameME data.
+* [Misc](#Misc) - Other potentially useful stuff (work in progress).
 
 
 # xFov
@@ -147,7 +148,7 @@ Calls a vote to kick this player.
 
 **!votemute** `<player name or id>`
 
-Calls a vote to mute this player. They will not be able to chat or talk on the mic.
+Calls a vote to mute this player. They will not be able to talk on the mic.
 
 **!pause**
 
@@ -230,12 +231,38 @@ It only shows when the scoreboard is open (by holding TAB). If you are spectatin
 
 ![gameme_hud_example](https://i.imgur.com/zww76IL.png)
 
-This was quickly hacked together and causes a LOT of rcon message spam in the server console. This annoyance can be remedied with the [Cleaner](https://forums.alliedmods.net/showthread.php?p=1789738) extension.
-
 No configuration is required. If the server is also running XMS, it will use the player's desired `!hudcolor`.
 
 It is not strictly just a HUD, as it also provides hacky natives for other plugins to access the data. This allows for stats to also appear in the XMS menu.
 
+Unfortunately, this plugin causes a LOT of rcon message spam in the server console. See [Cleaning up console spam](#Misc).
+
 ### Download
 * [Download zip](https://github.com/utharper/sourcemod-hl2dm/releases/download/latest/gameme_hud.zip)
 * [Source](addons/sourcemod/scripting/gameme_hud.sp)
+
+
+# Misc
+
+### Cleaning up console spam.
+
+Certain plugins/maps/actions can trigger a lot of annoying spam in the server console, making it difficult to see what is going on. 
+
+This annoyance can be remedied with the [Cleaner](https://forums.alliedmods.net/showthread.php?p=1789738) extension. See an example cleaner.cfg below:
+
+```
+playerinfo
+gameme_raw_message
+[RCBot]
+[RCBOT2]
+rcon
+Ignoring unreasonable position
+"Server" requested "top10"
+DataTable
+Interpenetrating entities
+logaddress_
+gameME
+changed cvar
+ConVarRef room_type
+Writing ctf/banned_
+```
