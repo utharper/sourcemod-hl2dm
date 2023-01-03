@@ -1,5 +1,5 @@
 #define MENU_ROWLEN        32
-#define XMENU_REFRESH_WAIT 15 // Time since last menu action to attempt refresh
+#define XMENU_REFRESH_WAIT 30 // Time since last menu action to attempt refresh
 #define XMENU_REFRESH_BASE 2  // Time to refresh base menu (workaround for 'Close')
 
 /**************************************************************
@@ -1119,6 +1119,9 @@ public Action XMenuNext(int iClient, int iArgs)
     if (iPage <= XMenuPageCount(iClient)){
         XMenuDisplay(gClient[iClient].mMenu, iClient, iPage);
     }
+    
+    gClient[iClient].iMenuRefresh = XMENU_REFRESH_WAIT;
+    
     return Plugin_Handled;
 }
 
@@ -1130,6 +1133,9 @@ public Action XMenuBack(int iClient, int iArgs)
     if (iPage >= 1) {
         XMenuDisplay(gClient[iClient].mMenu, iClient, iPage);
     }
+    
+    gClient[iClient].iMenuRefresh = XMENU_REFRESH_WAIT;
+    
     return Plugin_Handled;
 }
 
@@ -1163,7 +1169,7 @@ public void ShowMenuIfVisible(QueryCookie cookie, int iClient, ConVarQueryResult
 // Timer to (re)attempt displaying root menu:
 public Action T_MenuRefresh(Handle hTimer)
 {
-    if(gCore.bReady)
+    if (gCore.bReady)
     {
         for (int iClient = 1; iClient <= MaxClients; iClient++)
         {
