@@ -2,7 +2,7 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#define PLUGIN_VERSION     "1.94"
+#define PLUGIN_VERSION     "1.95"
 #define PLUGIN_URL         "www.hl2dm.community"
 #define PLUGIN_UPDATE      "http://raw.githubusercontent.com/utharper/sourcemod-hl2dm/master/addons/sourcemod/xms.upd"
 #define PLUGIN_CONFLICT    {"mapchooser", "nominations", "rockthevote", "randomcycle"}
@@ -253,7 +253,6 @@ public void OnPluginStart()
     MC_AddJColors();
     HookEvents();
     RegisterCommands();
-    
 
     CreateTimer(0.1, T_KeysHud,     _, TIMER_REPEAT);
     CreateTimer(0.1, T_TimeHud,     _, TIMER_REPEAT);

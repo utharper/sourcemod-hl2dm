@@ -66,7 +66,7 @@ No configuration is required.
 
 
 # XMS
-**Requires [SteamTools](https://builds.limetech.io/?p=steamtools) and [VPhysics](https://builds.limetech.io/?project=vphysics) extensions**
+**Requires [SteamTools](https://builds.limetech.io/?p=steamtools) and [VPhysics](https://builds.limetech.io/?project=vphysics) extensions, and xFix**
 
 **XMS** (eXtended Match System) is the most advanced system for competitive HL2DM servers. Commands are backwards compatible with VG servers and the old servermanagement plugin by gavvvr. It also features an easy player menu and is intended to be as simple for players to use as possible.
 
