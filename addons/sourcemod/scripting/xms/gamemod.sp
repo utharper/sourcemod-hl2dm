@@ -335,13 +335,13 @@ public Action T_SetWeapons(Handle hTimer, int iClient)
                 iPrimary   = clamp(giSpawnAmmo[i][0], 0, 99999);
                 iSecondary = clamp(giSpawnAmmo[i][1], 0, 99999);
 
-                if (StrEqual(gsSpawnWeapon[i], "weapon_rpg", false) || StrEqual(gsSpawnWeapon[i], "weapon_frag", false) || StrEqual(gsSpawnWeapon[i], "weapon_crossbow"), false) {
+                if (StrEqual(gsSpawnWeapon[i], "weapon_rpg", false) || StrEqual(gsSpawnWeapon[i], "weapon_frag", false)) {
                     iClip = -1;
                 }
                 else if (giSpawnAmmo[i][0] >= iClip && iClip != -1) {
                     iPrimary -= iClip;
                 }
-                else {
+                else if(!StrEqual(gsSpawnWeapon[i], "weapon_crossbow")) {
                     iClip = iPrimary;
                     iPrimary = 0;
                 }
