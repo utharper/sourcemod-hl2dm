@@ -99,11 +99,11 @@ stock int GetClientVelocity(int iClient)
 {
     float fVel[3];
 
-    fVel[0] = GetEntDataFloat(iClient, FindSendPropInfo("CBasePlayer", "m_vecVelocity[0]")) * 2;
-    fVel[1] = GetEntDataFloat(iClient, FindSendPropInfo("CBasePlayer", "m_vecVelocity[1]")) * 2;
-    fVel[2] = GetEntDataFloat(iClient, FindSendPropInfo("CBasePlayer", "m_vecVelocity[2]")) * 2;
+    fVel[0] = GetEntDataFloat(iClient, FindSendPropInfo("CBasePlayer", "m_vecVelocity[0]"));
+    fVel[1] = GetEntDataFloat(iClient, FindSendPropInfo("CBasePlayer", "m_vecVelocity[1]"));
+    fVel[2] = GetEntDataFloat(iClient, FindSendPropInfo("CBasePlayer", "m_vecVelocity[2]"));
 
-    return RoundToNearest(SquareRoot(fVel[0] + fVel[1] + fVel[2]));
+    return RoundToNearest(SquareRoot(fVel[0] * fVel[0] + fVel[1] * fVel[1] + fVel[2] * fVel[2]));
 }
 
 // Identify the winning player index:
