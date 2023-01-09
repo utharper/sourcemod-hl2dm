@@ -1050,8 +1050,13 @@ public Action Cmd_CastVote(int iClient, int iArgs)
     int iVote;
     bool bNumeric = String_IsNumeric(sVote);
     bool bMulti   = (strlen(gsVoteMotion[1]) > 0);
-
-    iVote = bNumeric ? (StringToInt(sVote) - 1) : view_as<int>(StrEqual(sVote, "yes", false));
+    
+    if(bNumeric) {
+        iVote = StringToInt(sVote) - 1;
+    }
+    else {
+        iVote = view_as<int>(StrEqual(sVote, "yes", false));
+    }
 
     if (gVoting.iStatus != 1) {
         MC_ReplyToCommand(iClient, "%t", "xmsc_castvote_deny");
@@ -1059,13 +1064,13 @@ public Action Cmd_CastVote(int iClient, int iArgs)
     else if (IsClientObserver(iClient) && gVoting.iType == VOTE_MATCH) {
         MC_ReplyToCommand(iClient, "%t", "xmsc_castvote_denyspec");
     }
-    else if (!bMulti && bNumeric) {
+    else if (!bMulti && bNumeric && iVote > 1) {
         MC_ReplyToCommand(iClient, "%t", "xmsc_castvote_denymulti");
     }
     else if (bMulti && !bNumeric) {
         MC_ReplyToCommand(iClient, "%t", "xmsc_castvote_denybinary");
     }
-    if (bNumeric && iVote != 0 && !strlen(gsVoteMotion[iVote])) {
+    else if (bNumeric && iVote > 1 && !strlen(gsVoteMotion[iVote])) {
         MC_ReplyToCommand(iClient, "%t", "xmsc_castvote_denynumber");
     }
     else
@@ -1324,11 +1329,13 @@ public Action OnClientSayCommand(int iClient, const char[] sCommand, const char[
             // make all votes silent
             if (StrContains(sArgs, "/", false) != 0)
             {
-                bool bMulti   = strlen(gsVoteMotion[1]) > 0,
-                     bNumeric = String_IsNumeric(sArgs[i]);
+                bool bMulti   = strlen(gsVoteMotion[1]) > 0;
+                bool bNumeric = String_IsNumeric(sArgs[i]);
 
-                if (!bMulti && !bNumeric || bMulti && bNumeric) {
+                if (!bMulti && ( !bNumeric || StrEqual(sArgs[i], "1") || StrEqual(sArgs[i], "2") ) || bMulti && bNumeric)
+                {
                     FakeClientCommandEx(iClient, "say /%s", sArgs[i]);
+                    
                     return Plugin_Stop;
                 }
             }
@@ -1337,10 +1344,13 @@ public Action OnClientSayCommand(int iClient, const char[] sCommand, const char[
     else if (StrEqual(sArgs[i], "rtv"))
     {
         MC_PrintToChat(iClient, "%t", "xmsc_rtv");
+        
         return Plugin_Stop;
     }
-    else if (StrEqual(sArgs[i], "nominate")) {
+    else if (StrEqual(sArgs[i], "nominate"))
+    {
         MC_PrintToChat(iClient, "%t", "xmsc_nominate");
+        
         return Plugin_Stop;
     }
     else if (bCommand)

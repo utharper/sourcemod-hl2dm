@@ -25,10 +25,9 @@ public Action T_Voting(Handle hTimer)
     bool bDraw;
     int  iVotes;
     int  iAbstains;
-    int  iTally[5];
-    int  iPercent[5];
     int  iLead;
     int  iHighest;
+    int  iTally[5];
 
     if (!gVoting.iStatus)
     {
@@ -41,6 +40,7 @@ public Action T_Voting(Handle hTimer)
 
             gVoting.iElapsed = 0;
             iTarget = 0;
+            iTally =  { 0, 0, 0, 0, 0 };
         }
 
         return Plugin_Continue;
@@ -145,9 +145,10 @@ public Action T_Voting(Handle hTimer)
             continue;
         }
 
-        if (gVoting.iType != VOTE_MATCH || !IsClientObserver(iClient))
+        if ( (!IsGameMatch() && gVoting.iType != VOTE_MATCH) || !IsClientObserver(iClient))
         {
-            if (gClient[iClient].iVote != -1) {
+            if (gClient[iClient].iVote != -1)
+            {
                 iTally[gClient[iClient].iVote]++;
                 iVotes++;
             }
@@ -172,9 +173,8 @@ public Action T_Voting(Handle hTimer)
             iLead = -1; // draw
             bDraw = true;
         }
-
-        iPercent[i] = RoundToCeil(iTally[i] ? ( iTally[i] / iVotes * 100.0 ) : 0.0);
     }
+
 
     for (int i = 0; i < 5; i++)
     {
@@ -231,6 +231,10 @@ public Action T_Voting(Handle hTimer)
                 MC_PrintToChatAll("%t", "xms_vote_victory", iLead + 1, sMotion[iLead]);
             }
         }
+        
+        else if (iLead == 0) {
+            iLead = -1;
+        }
 
         gVoting.iStatus = iLead > (-1 + view_as<int>(gVoting.iType == VOTE_RUNRANDOM)) ? 2 : -1;
     }
@@ -243,8 +247,8 @@ public Action T_Voting(Handle hTimer)
 
     if (!bMultiChoice) {
         Format(sHud, sizeof(sHud), "%s%s (%i)\n▪ %s: %i (%i%%%%)\n▪ %s:  %i (%i%%%%)", sHud, sMotion[0], gVoting.iMaxTime - gVoting.iElapsed,
-            (iTally[1] >= iTally[0] ? "YES" : "yes"), iTally[1], iPercent[1],
-            (iTally[0] > iTally[1]  ? "NO"  : "no"), iTally[0], iPercent[0]
+            (iTally[1] >= iTally[0] ? "YES" : "yes"), iTally[1],
+            (iTally[0] > iTally[1]  ? "NO"  : "no"), iTally[0]
         );
     }
     else
