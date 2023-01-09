@@ -40,7 +40,6 @@ public Action T_Voting(Handle hTimer)
 
             gVoting.iElapsed = 0;
             iTarget = 0;
-            iTally =  { 0, 0, 0, 0, 0 };
         }
 
         return Plugin_Continue;
@@ -246,7 +245,7 @@ public Action T_Voting(Handle hTimer)
     }
 
     if (!bMultiChoice) {
-        Format(sHud, sizeof(sHud), "%s%s (%i)\n▪ %s: %i (%i%%%%)\n▪ %s:  %i (%i%%%%)", sHud, sMotion[0], gVoting.iMaxTime - gVoting.iElapsed,
+        Format(sHud, sizeof(sHud), "%s%s (%i)\n▪ %s: %i\n▪ %s:  %i", sHud, sMotion[0], gVoting.iMaxTime - gVoting.iElapsed,
             (iTally[1] >= iTally[0] ? "YES" : "yes"), iTally[1],
             (iTally[0] > iTally[1]  ? "NO"  : "no"), iTally[0]
         );

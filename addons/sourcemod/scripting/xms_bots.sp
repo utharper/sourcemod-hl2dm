@@ -1,7 +1,7 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#define PLUGIN_VERSION  "1.2"
+#define PLUGIN_VERSION  "1.3"
 #define PLUGIN_URL      "www.hl2dm.community"
 #define PLUGIN_UPDATE   "http://raw.githubusercontent.com/utharper/sourcemod-hl2dm/master/addons/sourcemod/xms_bots.upd"
 
@@ -105,7 +105,7 @@ public void OnClientPutInServer(int iClient)
 
 public Action OnClientSayCommand(int iClient, const char[] sCommand, const char[] sArgs)
 {
-    if (!iClient || giBotClient < 0 || !IsClientInGame(giBotClient)) {
+    if (!iClient || giBotClient <= 0 || !IsClientInGame(giBotClient)) {
         return Plugin_Continue;
     }
 
