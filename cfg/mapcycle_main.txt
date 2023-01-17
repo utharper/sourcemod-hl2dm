@@ -103,3 +103,9 @@ dm_weaver
 dm_winterchill_r3
 dm_zeta_rc2
 dm_insomnia_v2
+dm_the_rad_place_b4
+dm_ghettoquad_r3
+dm_katsura_rc1
+dm_powerup_prefinal
+dm_uplink_rc2
+dm_xenarium_prefinal

@@ -8,3 +8,4 @@ dm_killbox_kbh_2_fix2
 dm_nuclearis_rc1
 dm_overwatch
 tdm_triplebox_kwl
+dm_killbox_awesome_final_clanginated_v1
