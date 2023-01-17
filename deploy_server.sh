@@ -115,6 +115,8 @@ sed -i "s|\"FeedbackWebhook\"   \"\"|\"FeedbackWebhook\"   \"$WEBHOOK_F\"|" addo
 sed -i "s|\"FooterText\"|//\"FooterText\"|" addons/sourcemod/configs/xms.cfg
 
 sed -i "s|hostname \"Another XMS Server\"|hostname \"[λ] $SERVER_NAME — hl2dm.community\"|" cfg/server.cfg
+sed -i "s|hostname \"Another XMS Server|hostname \"[λ] $SERVER_NAME|" cfg/server_match.cfg
+sed -i "s|hostname \"Another XMS Server|hostname \"[λ] $SERVER_NAME|" cfg/server_match_post.cfg
 sed -i "s|sv_region \"5\"|sv_region \"$REGIONCODE\"|" cfg/server.cfg
 sed -i "s|rcon_password \"\"|rcon_password \"$STATS_PASSWORD\"|" cfg/server.cfg
 echo -e "\n\nlogaddress_delall\nlogaddress_add logs.hl2dm.community:31434" >> cfg/server.cfg
