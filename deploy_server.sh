@@ -103,6 +103,7 @@ rm downloadlist.txt
 # Server configuration
 cd ..
 
+
 sed -i "s|\"ServerName\"     \"Another XMS Server\"|\"ServerName\"     \"$SERVER_NAME\"|" addons/sourcemod/configs/xms.cfg
 sed -i "s|\"DemoExtension\"  \".dem\"|\"DemoExtension\"  \".zip\"|" addons/sourcemod/configs/xms.cfg
 sed -i "s|\"DemoURL\"        \"\"|\"DemoURL\"        \"https://hl2dm.community/demos/$DEMOSYNC_FOLDER\"|" addons/sourcemod/configs/xms.cfg
@@ -110,7 +111,7 @@ sed -i "s|\"MatchWebhook1\"     \"\"|\"MatchWebhook1\"     \"$WEBHOOK_M\"|" addo
 sed -i "s|\"FeedbackWebhook\"   \"\"|\"FeedbackWebhook\"   \"$WEBHOOK_F\"|" addons/sourcemod/configs/xms.cfg
 sed -i "s|\"FooterText\"|//\"FooterText\"|" addons/sourcemod/configs/xms.cfg
 
-sed -i "s|hostname \"Another XMS Server\"|hostname \"[λ] $SERVER_NAME | hl2dm.community\"|" cfg/server.cfg
+sed -i "s|hostname \"Another XMS Server\"|hostname \"[λ] $SERVER_NAME — hl2dm.community\"|" cfg/server.cfg
 sed -i "s|sv_region \"5\"|sv_region \"$REGIONCODE\"|" cfg/server.cfg
 sed -i "s|rcon_password \"\"|rcon_password \"$STATS_PASSWORD\"|" cfg/server.cfg
 echo -e "\n\nlogaddress_delall\nlogaddress_add logs.hl2dm.community:31434" >> cfg/server.cfg
@@ -170,7 +171,7 @@ cat >START_SERVER <<EOF
 rm -rf hl2mp/logs/*
 rm -rf hl2mp/addons/sourcemod/logs/L*.log
 
-screen -S hl2dm -d -m ./srcds_run -console -game hl2mp +map dm_lockdown +maxplayers 20 -tickrate 100 -autoupdate -steam_dir /home/srcds/ -steamcmd_script /home/srcds/autoupdate -strictportbind +port 27015 +tv_port 27020 +clientport 27005
+screen -S hl2dm -d -m ./srcds_run -console -game hl2mp +map dm_lockdown +maxplayers 20 -tickrate 100 -autoupdate -steam_dir /home/srcds/ -steamcmd_script /home/srcds/autoupdate +port 27015 +tv_port 27020 +clientport 27005
 
 exit 0
 EOF
