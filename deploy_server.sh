@@ -41,6 +41,9 @@ cd /home/srcds/
 ln -s /usr/games/steamcmd steamcmd
 su srcds -c "./steamcmd +force_install_dir /home/srcds +login anonymous +app_update 232370 validate +quit"
 
+mkdir -p .steam/sdk32
+ln -s bin/steamclient.so .steam/sdk32/steamclient.so
+
 # Install Adrianilloo's custom server binary
 wget $URL_SSDK
 unzip -j \*.zip "SourceSDK2013_Release-5/mod_hl2mp/bin/server.so" -d "/home/srcds/bin"
