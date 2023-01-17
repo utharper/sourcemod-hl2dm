@@ -38,11 +38,11 @@ apt --assume-yes install lib32gcc-s1 lib32stdc++6 libtinfo5:i386 libncurses5:i38
 # Install HL2DM files under a new user
 useradd -m -s /bin/bash srcds
 cd /home/srcds/
-ln -s /usr/games/steamcmd steamcmd
+ln -s /usr/games/steamcmd steamcmd.sh
 su srcds -c "./steamcmd +force_install_dir /home/srcds +login anonymous +app_update 232370 validate +quit"
 
 mkdir -p .steam/sdk32
-ln -s bin/steamclient.so .steam/sdk32/steamclient.so
+cp bin/steamclient.so .steam/sdk32/
 
 # Install Adrianilloo's custom server binary
 wget $URL_SSDK
