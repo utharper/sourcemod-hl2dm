@@ -5,8 +5,6 @@
 # You will be prompted to accept the SteamCMD terms of service, after this no further interaction is needed.
 # The server will automatically start and is ready to use without any further configuration.
 # The required parameters below can be provided on request to anyone who wants to run an XMS server affiliated with the community:
-SERVER_NAME="Australian Deathmatch"
-REGIONCODE="5"
 DEMOSYNC_KEYID="REDACTED"
 DEMOSYNC_KEY="REDACTED"
 DEMOSYNC_FOLDER="REDACTED"
@@ -14,6 +12,10 @@ DEMOSYNC_PREFIX="REDACTED"
 WEBHOOK_M="REDACTED"
 WEBHOOK_F="REDACTED"
 STATS_PASSWORD="REDACTED"
+
+SERVER_IP="112.213.39.83"
+SERVER_NAME="Australian Deathmatch"
+REGIONCODE="5"
 ###
 
 URL_METAMOD="https://mms.alliedmods.net/mmsdrop/1.11/mmsource-1.11.0-git1148-linux.tar.gz" # https://www.sourcemm.net/downloads.php?branch=stable
@@ -52,7 +54,7 @@ cd /home/srcds/bin
 ln -s soundemittersystem_srv.so soundemittersystem.so
 ln -s scenefilecache_srv.so scenefilecache.so
 
-# Install Metamod/Sourcemod/RCBot2 and extensions
+# Install Metamod/Sourcemod/RCBot2 and extensions/plugins
 cd /home/srcds/hl2mp
 wget $URL_METAMOD
 wget $URL_SOURCEMOD
@@ -92,21 +94,26 @@ mv basevotes.smx disabled/
 
 # Fetch all maps from XMS maplists
 cd /home/srcds/hl2mp/cfg
-mv mapcycle_default.txt default.txt && cat mapcycle_*.txt >> ../maps/downloadlist.txt && mv default.txt mapcycle_default.txt
+
+mv mapcycle_default.txt default.txt
+for f in mapcycle_*.txt; do
+	(cat "${f}"; echo) >> ../maps/downloadlist.txt;
+done
+mv default.txt mapcycle_default.txt
+
 cd ../maps
 dos2unix downloadlist.txt
-
 while IFS="" read -r p || [ -n "$p" ]
 do
   wget -nc https://fastdl.hl2dm.community/maps/$p.bsp.bz2
   bzip2 -d $p.bsp.bz2
 done < downloadlist.txt
 rm downloadlist.txt
+rm *.bsp.bz2
 
-# Server configuration
 cd ..
 
-
+# xms.cfg
 sed -i "s|\"ServerName\"     \"Another XMS Server\"|\"ServerName\"     \"$SERVER_NAME\"|" addons/sourcemod/configs/xms.cfg
 sed -i "s|\"DemoExtension\"  \".dem\"|\"DemoExtension\"  \".zip\"|" addons/sourcemod/configs/xms.cfg
 sed -i "s|\"DemoURL\"        \"\"|\"DemoURL\"        \"https://hl2dm.community/demos/$DEMOSYNC_FOLDER\"|" addons/sourcemod/configs/xms.cfg
@@ -114,13 +121,15 @@ sed -i "s|\"MatchWebhook1\"     \"\"|\"MatchWebhook1\"     \"$WEBHOOK_M\"|" addo
 sed -i "s|\"FeedbackWebhook\"   \"\"|\"FeedbackWebhook\"   \"$WEBHOOK_F\"|" addons/sourcemod/configs/xms.cfg
 sed -i "s|\"FooterText\"|//\"FooterText\"|" addons/sourcemod/configs/xms.cfg
 
-sed -i "s|hostname \"Another XMS Server\"|hostname \"[λ] $SERVER_NAME — hl2dm.community\"|" cfg/server.cfg
-sed -i "s|hostname \"Another XMS Server|hostname \"[λ] $SERVER_NAME|" cfg/server_match.cfg
-sed -i "s|hostname \"Another XMS Server|hostname \"[λ] $SERVER_NAME|" cfg/server_match_post.cfg
+# server.cfg
+sed -i "s|hostname \"Another XMS Server\"|hostname \"			[λ] $SERVER_NAME — hl2dm.community\"|" cfg/server.cfg
+sed -i "s|hostname \"Another XMS Server|hostname \"			[λ] $SERVER_NAME|" cfg/server_match.cfg
+sed -i "s|hostname \"Another XMS Server|hostname \"			[λ] $SERVER_NAME|" cfg/server_match_post.cfg
 sed -i "s|sv_region \"5\"|sv_region \"$REGIONCODE\"|" cfg/server.cfg
 sed -i "s|rcon_password \"\"|rcon_password \"$STATS_PASSWORD\"|" cfg/server.cfg
 echo -e "\n\nlogaddress_delall\nlogaddress_add logs.hl2dm.community:31434" >> cfg/server.cfg
 
+# RCBOT
 sed -i "s|rcbot_show_welcome_msg 1|rcbot_show_welcome_msg 0|" addons/rcbot2/config/config.ini
 sed -i "s|rcbot_bot_quota_interval -1|rcbot_bot_quota_interval 0|" addons/rcbot2/config/config.ini
 sed -i "s|rcbotd config min_bots -1|rcbotd config min_bots 0|" addons/rcbot2/config/config.ini
@@ -140,6 +149,7 @@ aim_skill = 60
 sensitivity = 5
 EOF
 
+# Cleaner
 cat >addons/sourcemod/configs/cleaner.cfg <<EOF
 playerinfo
 gameme_raw_message
@@ -155,13 +165,10 @@ gameME
 changed cvar
 ConVarRef room_type
 Writing cfg/banned_
-RecordSteamInterfaceCreation
-Could not find steamerrorreporter binary
-Bogus constraint
 EOF
 
 cd ..
-
+# Autoupdate
 cat >autoupdate <<EOF
 @ShutdownOnFailedCommand 1
 @NoPromptForPassword 1
@@ -171,21 +178,21 @@ app_update 232370
 quit
 EOF
 
+# Start script
 cat >START_SERVER <<EOF
 #!/bin/bash
 rm -rf hl2mp/logs/*
 rm -rf hl2mp/addons/sourcemod/logs/L*.log
 
-screen -S hl2dm -d -m ./srcds_run -console -game hl2mp +map dm_lockdown +maxplayers 20 -tickrate 100 -autoupdate -steam_dir /home/srcds/ -steamcmd_script /home/srcds/autoupdate +port 27015 +tv_port 27020 +clientport 27005
+screen -S hl2dm -d -m ./srcds_run -console -game hl2mp +map dm_lockdown +maxplayers 20 -tickrate 100 -autoupdate -steam_dir /home/srcds/ -steamcmd_script /home/srcds/autoupdate -ip $SERVER_IP -strictportbind +port 27015 +tv_port 27020 +clientport 27005
 
 exit 0
 EOF
 chmod +x START_SERVER
 
-# Setup demo syncing
+# Demo syncing
 mkdir -p /home/srcds/hl2mp/demos/incomplete
 su srcds -c "rclone config create demosync b2 account $DEMOSYNC_KEYID key $DEMOSYNC_KEY hard_delete false"
-
 cat >hl2mp/demos/SYNC <<\EOF
 #!/bin/bash
 cd /home/srcds/hl2mp/demos
