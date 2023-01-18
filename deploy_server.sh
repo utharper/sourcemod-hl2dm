@@ -39,7 +39,7 @@ apt --assume-yes install lib32gcc-s1 lib32stdc++6 libtinfo5:i386 libncurses5:i38
 useradd -m -s /bin/bash srcds
 cd /home/srcds/
 ln -s /usr/games/steamcmd steamcmd.sh
-su srcds -c "./steamcmd +force_install_dir /home/srcds +login anonymous +app_update 232370 validate +quit"
+su srcds -c "./steamcmd.sh +force_install_dir /home/srcds +login anonymous +app_update 232370 validate +quit"
 
 mkdir -p .steam/sdk32
 cp bin/steamclient.so .steam/sdk32/
