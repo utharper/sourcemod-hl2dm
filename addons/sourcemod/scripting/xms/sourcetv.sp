@@ -16,6 +16,14 @@ void StartRecord()
         ServerCommand("tv_name \"%s - %s\";tv_record %s/incomplete/%s", gCore.sServerName, gRound.sUID, gPath.sDemo, gRound.sUID);
         gRound.bRecording = true;
     }
+    
+    for (int iClient = 1; iClient < MaxClients; iClient++)
+    {
+        if (IsClientInGame(iClient) && IsClientSourceTV(iClient)) {
+            ShowVGUIPanel(iClient, "specmenu", _, false);
+            ShowVGUIPanel(iClient, "specgui", _, true);
+        }
+    }
 }
 
 public Action T_StopRecord(Handle hTimer, bool bEarly)
