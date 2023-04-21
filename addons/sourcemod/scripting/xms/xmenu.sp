@@ -296,7 +296,6 @@ public Action XMenuAction(int iClient, int iArgs)
         {
             if (iArgs <= 1)
             {
-                bool bLan = FindConVar("sv_lan").BoolValue;
                 char sTitle[64];
                 char sMessage[1024];
                 char sModeName[32];
@@ -307,7 +306,7 @@ public Action XMenuAction(int iClient, int iArgs)
                     Format(sModeName, sizeof(sModeName), "(%s)", gRound.sModeDescription);
                 }
 
-                Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_0", iClient, gRound.sMode, sModeName, gRound.sMap, gCore.sServerName, GameVersion(), PLUGIN_VERSION, Tickrate(), bLan ? "local" : "dedicated", gCore.sServerMessage);
+                Format(sMessage, sizeof(sMessage), "%T", "xmenumsg_0", iClient, gRound.sMode, sModeName, gRound.sMap, gCore.sServerName, GameVersion(), PLUGIN_VERSION, Tickrate(), gCore.bLan ? "local" : "dedicated", gCore.sServerMessage);
 
                 gClient[iClient].mMenu = XMenuQuick(iClient, 7, false, false, "sm_xmenu 0", sTitle, sMessage, !IsGameMatch() ? "xmenu0_team" : "xmenu0_pause;pause",
                   "xmenu0_vote", "xmenu0_players", "xmenu0_settings", "xmenu0_switch", IsClientAdmin(iClient) ? "xmenu0_admin" : "xmenu0_report;report"
@@ -667,12 +666,12 @@ public Action XMenuAction(int iClient, int iArgs)
 
                 Format(sOption, sizeof(sOption), "%T;profile", "xmenu3_profile", iClient);
                 dOptions.WriteString(sOption);
-                
+
                 if (!IsClientAdmin(iClient, ADMFLAG_KICK)) {
                     Format(sOption, sizeof(sOption), "%T;votekick", "xmenu3_votekick", iClient);
                     dOptions.WriteString(sOption);
                 }
-                
+
                 if (!IsClientAdmin(iClient, ADMFLAG_BAN)) {
                     Format(sOption, sizeof(sOption), "%T;votemute", "xmenu3_votemute", iClient);
                     dOptions.WriteString(sOption);
@@ -831,14 +830,20 @@ public Action XMenuAction(int iClient, int iArgs)
             {
                 if (iArgs == 2)
                 {
-                    int      iDefault = FindConVar("xfov_defaultfov").IntValue;
-                    int      iMin     = FindConVar("xfov_minfov").IntValue;
-                    int      iMax     = FindConVar("xfov_maxfov").IntValue;
-                    DataPack dOptions = CreateDataPack();
+                    static int iDefault;
+                    static int iMin;
+                    static int iMax;
+                    if(!iDefault) {
+                        iDefault = FindConVar("xfov_defaultfov").IntValue;
+                        iMin     = FindConVar("xfov_minfov").IntValue;
+                        iMax     = FindConVar("xfov_maxfov").IntValue;
+                    }
+
                     char     sOption [64];
                     char     sTitle  [64];
                     char     sMessage[512];
 
+                    DataPack dOptions = CreateDataPack();
                     dOptions.Reset();
 
                     Format(sTitle, sizeof(sTitle), "%T", "xmenutitle_4_fov", iClient);

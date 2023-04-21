@@ -53,7 +53,7 @@ enum struct _gConVar
     ConVar      mp_forcerespawn;
 }
 _gConVar        gConVar;
- 
+
 enum struct _gPath
 {
     char        sConfig         [PLATFORM_MAX_PATH];// Path to XMS.cfg
@@ -66,6 +66,10 @@ _gPath          gPath;
 
 enum struct _gCore
 {
+    bool        bLan;                               // Server is running on LAN?
+    char        sIPAddr[16];                        // IP address of server
+    int         iPort;                              // Primary port of server (typically 27015)
+
     KeyValues   kConfig;                            // Raw values of xms.cfg
     char        sServerName     [32];               // Name of the server.
     char        sServerMessage  [192];              // Custom message shown in menu
@@ -214,13 +218,17 @@ public APLRes AskPluginLoad2(Handle hPlugin, bool bLate, char[] sError, int iLen
 public void OnPluginStart()
 {
     CreateConVar("xms_version", PLUGIN_VERSION, _, FCVAR_NOTIFY);
-    
+
     BuildPath(Path_SM, gPath.sConfig,   PLATFORM_MAX_PATH, "configs/xms.cfg");
     BuildPath(Path_SM, gPath.sFeedback, PLATFORM_MAX_PATH, "logs/feedback.log");
-    
+
     LoadTranslations("common.phrases.txt");
     LoadTranslations("xms.phrases.txt");
     LoadTranslations("xms_menu.phrases.txt");
+
+    FindConVar("ip").GetString(gCore.sIPAddr, sizeof(gCore.sIPAddr));
+    gCore.iPort = FindConVar("hostport").IntValue;
+    gCore.bLan = FindConVar("sv_lan").BoolValue;
 
     gConVar.tv_enable       = FindConVar("tv_enable");
     gConVar.sv_pausable     = FindConVar("sv_pausable");
@@ -236,7 +244,7 @@ public void OnPluginStart()
     gConVar.sm_nextmap      . AddChangeHook(OnNextmapChanged);
     gConVar.sv_tags         . AddChangeHook(OnTagsChanged);
     gConVar.mp_timelimit    . AddChangeHook(OnTimelimitChanged);
-    
+
     gHud.cColors[0] = RegClientCookie("hudcolor_r",     "HUD color red value",    CookieAccess_Public);
     gHud.cColors[1] = RegClientCookie("hudcolor_g",     "HUD color green value",    CookieAccess_Public);
     gHud.cColors[2] = RegClientCookie("hudcolor_b",     "HUD color blue value",       CookieAccess_Public);
@@ -248,7 +256,7 @@ public void OnPluginStart()
     gHud.hKeys = CreateHudSynchronizer();
     gHud.hTime = CreateHudSynchronizer();
     gHud.hVote = CreateHudSynchronizer();
-    
+
     LoadConfigValues();
     MC_AddJColors();
     HookEvents();
@@ -319,23 +327,23 @@ public void OnAllPluginsLoaded()
     if (!LibraryExists("xfix")) {
         LogError("xFix is not loaded !");
     }
-    
+
     if (!gCore.bReady)
     {
         // Warn about conflicting plugins.
         char sConflict[][32] = PLUGIN_CONFLICT;
-        
+
         for (int i = 0; i < sizeof(sConflict); i++)
         {
             char sPath[PLATFORM_MAX_PATH];
-            
-            BuildPath(Path_SM, sPath, sizeof(sPath), "plugins/%s.smx", sConflict[i]);   
-            
+
+            BuildPath(Path_SM, sPath, sizeof(sPath), "plugins/%s.smx", sConflict[i]);
+
             if(FileExists(sPath)) {
                 LogError("Plugin %s conflicts with xms and should be disabled!", sConflict[i]);
             }
         }
-        
+
         // Restart on first load - avoids issues with SourceTV (etc)
         CreateTimer(2.0, T_RestartMap, _, TIMER_FLAG_NO_MAPCHANGE);
     }
