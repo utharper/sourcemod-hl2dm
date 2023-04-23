@@ -253,7 +253,22 @@ stock any clamp(any Value, any Min, any Max)
  * CLIENTPREFS
  *************************************************************/
 #if defined _clientprefs_included
-  stock bool IsCookieEnabled(Handle hCookie, int iClient, bool bUnset=true)
+
+  // Does cookie have value
+  stock bool ClientCookieHasValue(int iClient, Handle hCookie)
+  {
+      char sCookie[2];
+      GetClientCookie(iClient, hCookie, sCookie, sizeof(sCookie));
+      
+      if (sCookie[0] == '\0') {
+          return false;
+      }
+      
+      return true;
+  }
+
+  // Get cookie boolean value
+  stock bool GetClientCookieBool(Handle hCookie, int iClient, bool bUnset=true)
   {
       if (!IsClientConnected(iClient) || !IsClientInGame(iClient) || IsFakeClient(iClient)) {
           return false;
@@ -263,16 +278,25 @@ stock any clamp(any Value, any Min, any Max)
           return false;
       }
 
-      return (GetClientCookieInt(iClient, hCookie) == 1);
+      return (GetClientCookieInt(iClient, hCookie) >= 1);
   }
 
-  // Get cookie int value:
+  // Get cookie int value
   stock int GetClientCookieInt(int iClient, Handle hCookie)
   {
       char sCookie[8];
       GetClientCookie(iClient, hCookie, sCookie, sizeof(sCookie));
       
       return StringToInt(sCookie);
+  }
+  
+  // Set cookie int value
+  stock void SetClientCookieInt(int iClient, Handle hCookie, int iValue)
+  {
+      char sValue[8];
+      IntToString(iValue, sValue, sizeof(sValue));
+      
+      SetClientCookie(iClient, hCookie, sValue);
   }
 #endif
 

@@ -897,7 +897,7 @@ public Action XMenuAction(int iClient, int iArgs)
             }
             else if (StrEqual(sParam[0], "music"))
             {
-                if (IsCookieEnabled(gSounds.cMusic, iClient))
+                if (GetClientCookieBool(gSounds.cMusic, iClient))
                 {
                     SetClientCookie(iClient, gSounds.cMusic, "-1");
                     IfCookiePlaySound(gSounds.cMisc, iClient, SOUND_DEACTIVATED);
@@ -913,7 +913,7 @@ public Action XMenuAction(int iClient, int iArgs)
             }
             else if (StrEqual(sParam[0], "sound"))
             {
-                if (IsCookieEnabled(gSounds.cMisc, iClient))
+                if (GetClientCookieBool(gSounds.cMisc, iClient))
                 {
                     SetClientCookie(iClient, gSounds.cMisc, "-1");
                     ClientCommand(iClient, "playgamesound %s", SOUND_DEACTIVATED);
