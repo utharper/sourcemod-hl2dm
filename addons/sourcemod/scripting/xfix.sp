@@ -1,7 +1,7 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#define PLUGIN_VERSION  "1.2"
+#define PLUGIN_VERSION  "1.3"
 #define PLUGIN_URL      "www.hl2dm.community"
 #define PLUGIN_UPDATE   "http://raw.githubusercontent.com/utharper/sourcemod-hl2dm/master/addons/sourcemod/xfix.upd"
 
@@ -73,6 +73,7 @@ public void OnPluginStart()
     HookEvent("server_cvar", Event_GameMessage, EventHookMode_Pre);
     HookUserMessage(GetUserMessageId("TextMsg"),  UserMsg_TextMsg,  true);
     HookUserMessage(GetUserMessageId("VGUIMenu"), UserMsg_VGUIMenu, false);
+    AddNormalSoundHook(OnNormalSound);
 
     if (LibraryExists("updater")) {
         Updater_AddPlugin(PLUGIN_UPDATE);
@@ -319,6 +320,19 @@ public void OnEntityCreated(int iEntity, const char[] sEntity)
     }
 
     return;
+}
+
+public Action OnNormalSound(int iClients[MAXPLAYERS], int &iNumClients, char sSample[PLATFORM_MAX_PATH], int &iEntity, int &iChannel, float &fVolume, int &iLevel, int &iPitch, int &iFlags, char sEntry[PLATFORM_MAX_PATH], int &seed)
+{
+    if (iEntity > 1 && iEntity <= MaxClients && IsClientInGame(iEntity))
+    {
+        if (StrContains(sSample, "npc/metropolice/die", false) != -1) {
+            Format(sSample, sizeof(sSample), "npc/combine_soldier/die%i.wav", GetRandomInt(1, 3));
+            return Plugin_Changed;
+        }
+    }
+
+    return Plugin_Continue;
 }
 
 void GetSpriteData(int iRef)
