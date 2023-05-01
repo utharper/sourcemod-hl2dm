@@ -833,7 +833,7 @@ public Action XMenuAction(int iClient, int iArgs)
                     static int iDefault;
                     static int iMin;
                     static int iMax;
-                    if(!iDefault) {
+                    if (!iDefault) {
                         iDefault = FindConVar("xfov_defaultfov").IntValue;
                         iMin     = FindConVar("xfov_minfov").IntValue;
                         iMax     = FindConVar("xfov_maxfov").IntValue;

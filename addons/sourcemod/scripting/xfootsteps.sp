@@ -135,7 +135,7 @@ public Action OnSound(int iClients[MAXPLAYERS], int &iNumClients, char sSample[P
 
     for (int iClient = 1; iClient <= MaxClients; iClient++)
     {
-        if(!IsClientConnected(iClient) || !IsClientInGame(iClient)) {
+        if (!IsClientConnected(iClient) || !IsClientInGame(iClient)) {
             continue;
         }
 

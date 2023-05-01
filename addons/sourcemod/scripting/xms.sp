@@ -339,7 +339,7 @@ public void OnAllPluginsLoaded()
 
             BuildPath(Path_SM, sPath, sizeof(sPath), "plugins/%s.smx", sConflict[i]);
 
-            if(FileExists(sPath)) {
+            if (FileExists(sPath)) {
                 LogError("Plugin %s conflicts with xms and should be disabled!", sConflict[i]);
             }
         }

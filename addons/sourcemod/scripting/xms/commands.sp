@@ -376,8 +376,11 @@ public Action Cmd_Run(int iClient, int iArgs)
                                 char sQuery2[256];
 
                                 Format(sQuery2, sizeof(sQuery2), "{H}%s{I}", sMap);
-                                ReplaceString(sHits[iHit], sizeof(sHits[]), sMap, sQuery2, false);
-
+                                
+                                if (strlen(sHits[iHit])) {
+                                	ReplaceString(sHits[iHit], sizeof(sHits[]), sMap, sQuery2, false);
+                                }
+                                
                                 if (strlen(sOutput) + strlen(sHits[iHit]) + (!iHits[1] ? 0 : 3) < 140) {
                                     Format(sOutput, sizeof(sOutput), "%s%s%s", sOutput, !iHits[1] ? "" : ", ", sHits[iHit]);
                                     iHits[1]++;
@@ -1051,7 +1054,7 @@ public Action Cmd_CastVote(int iClient, int iArgs)
     bool bNumeric = String_IsNumeric(sVote);
     bool bMulti   = (strlen(gsVoteMotion[1]) > 0);
     
-    if(bNumeric) {
+    if (bNumeric) {
         iVote = StringToInt(sVote) - 1;
     }
     else {
