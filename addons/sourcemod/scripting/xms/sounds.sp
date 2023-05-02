@@ -41,7 +41,7 @@ void PlayRoundEndMusic()
     iRan = i;
 
     for (int iClient = 1; iClient <= MaxClients; iClient++) {
-        if (IsCookieEnabled(gSounds.cMusic, iClient)) {
+        if (GetClientCookieBool(gSounds.cMusic, iClient)) {
             QueryClientConVar(iClient, "snd_musicvolume", PlayMusicAtClientVolume, iRan);
         }
     }
@@ -81,7 +81,7 @@ void PrepareSound(const char[] sName)
 
 void IfCookiePlaySound(Handle hCookie, int iClient, const char[] sFile, bool bUnset=true)
 {
-    if (IsCookieEnabled(hCookie, iClient, bUnset)) {
+    if (GetClientCookieBool(hCookie, iClient, bUnset)) {
         ClientCommand(iClient, "playgamesound %s", sFile);
     }
 }

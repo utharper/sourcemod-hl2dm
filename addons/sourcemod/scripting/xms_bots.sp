@@ -269,7 +269,7 @@ public Action T_BotTaunt(Handle hTimer)
 {
     static int iText;
 
-    if (IsClientInGame(giBotClient))
+    if (giBotClient > 0 && IsClientInGame(giBotClient))
     {
         char sText[MAX_SAY_LENGTH];
 
@@ -287,7 +287,7 @@ public Action T_BotDeath(Handle hTimer, bool bSuicide)
 {
     static int iText;
 
-    if (IsClientInGame(giBotClient))
+    if (giBotClient > 0 && IsClientInGame(giBotClient))
     {
         char sText[MAX_SAY_LENGTH];
 
@@ -305,7 +305,7 @@ public Action T_BotResponse(Handle hTimer)
 {
     static int iText;
 
-    if (IsClientInGame(giBotClient))
+    if (giBotClient > 0 && IsClientInGame(giBotClient))
     {
         char sText[MAX_SAY_LENGTH];
 

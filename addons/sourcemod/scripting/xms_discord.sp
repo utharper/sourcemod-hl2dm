@@ -91,7 +91,7 @@ public void OnAllPluginsLoaded()
     GetConfigString(gsFooter,     sizeof(gsFooter),     "FooterText",      "Discord");
     GetConfigString(gsFlagCode,   sizeof(gsFlagCode),   "FlagCode",        "Discord");
     
-    if(GetConfigString(gsReportHook, sizeof(gsReportHook), "FeedbackWebhook", "Discord")) {
+    if (GetConfigString(gsReportHook, sizeof(gsReportHook), "FeedbackWebhook", "Discord")) {
         ReplaceString(gsReportHook, sizeof(gsReportHook), "://discord.com", "://discordapp.com", false);        
     }
 

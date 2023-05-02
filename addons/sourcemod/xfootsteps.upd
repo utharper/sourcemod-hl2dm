@@ -1,0 +1,16 @@
+"Updater"
+{
+    "Information"
+    {
+        "Version"
+        {
+            "Latest"    "1.0"
+        }
+    }
+
+    "Files"
+    {
+        "Plugin"    "Path_SM/plugins/xfootsteps.smx"
+        "Source"    "Path_SM/scripting/xfootsteps.sp"
+    }
+}
