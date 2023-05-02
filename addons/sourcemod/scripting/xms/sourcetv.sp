@@ -16,6 +16,14 @@ void StartRecord()
         ServerCommand("tv_name \"%s - %s\";tv_record %s/incomplete/%s", gCore.sServerName, gRound.sUID, gPath.sDemo, gRound.sUID);
         gRound.bRecording = true;
     }
+    
+    for (int iClient = 1; iClient < MaxClients; iClient++)
+    {
+        if (IsClientInGame(iClient) && IsClientSourceTV(iClient)) {
+            ShowVGUIPanel(iClient, "specmenu", _, false);
+            ShowVGUIPanel(iClient, "specgui", _, true);
+        }
+    }
 }
 
 public Action T_StopRecord(Handle hTimer, bool bEarly)
@@ -54,20 +62,12 @@ void StopRecord(bool bDiscard)
 // Generate accompanying .txt file:
 void GenerateDemoTxt(const char[] sPath)
 {
-    static char sHost[16];
-    static int  iPort;
-
     char sPath2 [PLATFORM_MAX_PATH];
     char sTime  [32];
     char sTitle [256];
     char sPlayers[2][2048];
     bool bDuel = GetClientCount2(true, false, false) == 2;
     File hFile;
-
-    if (!strlen(sHost)) {
-        FindConVar("ip").GetString(sHost, sizeof(sHost));
-        iPort = FindConVar("hostport").IntValue;
-    }
 
     Format(sPath2, PLATFORM_MAX_PATH, "%s.txt", sPath);
     FormatTime(sTime, sizeof(sTime), "%d %b %Y");
@@ -115,7 +115,7 @@ void GenerateDemoTxt(const char[] sPath)
         hFile.WriteLine(sPlayers[1]);
     }
 
-    hFile.WriteLine("Server: \"%s\" [%s:%i]", gCore.sServerName, sHost, iPort);
+    hFile.WriteLine("Server: \"%s\" [%s:%i]", gCore.sServerName, gCore.sIPAddr, gCore.iPort);
     hFile.WriteLine("Version: %i [XMS v%s]", GameVersion(), PLUGIN_VERSION);
     hFile.Close();
 }

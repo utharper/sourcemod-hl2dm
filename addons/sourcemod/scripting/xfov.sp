@@ -137,10 +137,7 @@ void RequestFOV(int iClient, int iFov)
     }
     else
     {
-        char sFov[4];
-
-        IntToString(iFov, sFov, sizeof(sFov));
-        SetClientCookie(iClient, gcFov, sFov);
+        SetClientCookieInt(iClient, gcFov, iFov);
         MC_ReplyToCommand(iClient, "%t", "xfov_success", iFov);
     }
 }

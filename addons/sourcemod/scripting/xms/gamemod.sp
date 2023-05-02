@@ -341,7 +341,7 @@ public Action T_SetWeapons(Handle hTimer, int iClient)
                 else if (giSpawnAmmo[i][0] >= iClip && iClip != -1) {
                     iPrimary -= iClip;
                 }
-                else if(!StrEqual(gsSpawnWeapon[i], "weapon_crossbow")) {
+                else if (!StrEqual(gsSpawnWeapon[i], "weapon_crossbow")) {
                     iClip = iPrimary;
                     iPrimary = 0;
                 }
@@ -355,8 +355,8 @@ public Action T_SetWeapons(Handle hTimer, int iClient)
 }
 
 public Action T_Replenish(Handle hTimer, int iClient)
-{
-    if (IsClientInGame(iClient) && IsPlayerAlive(iClient))
+{	
+    if (iClient >= 1 && IsClientInGame(iClient) && IsPlayerAlive(iClient))
     {
         if (GetEntProp(iClient, Prop_Data, "m_iHealth") < gRound.iSpawnHealth) {
             SetEntProp(iClient, Prop_Data, "m_iHealth", gRound.iSpawnHealth);
