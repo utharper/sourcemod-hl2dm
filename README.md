@@ -197,7 +197,7 @@ You can refer to any `error_` log files in `addons/sourcemod/logs` to help ident
 
 
 ## xms_bots
-**Requires XMS and [RCBot2](https://github.com/rcbotCheeseh/rcbot2)**
+**Requires XMS and [RCBot2](https://github.com/APGRoboCop/rcbot2)**
 
 RCBot2 controller. Quickly created because I had issues with getting bot quotas to work. In its current state, the plugin will spawn a bot when someone joins an empty server. The bot will play until a second human connects, then it will promptly leave. The idea is to boost activity by keeping someone in the server long enough for others to join.
 
