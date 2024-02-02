@@ -1,8 +1,4 @@
-This page hosts my public Sourcemod plugins for [Half-Life 2 Deathmatch](https://store.steampowered.com/app/320/HalfLife_2_Deathmatch/) servers.
-
-These were originally created for Australian Deathmatch (IP: [au.hl2dm.community:27015](https://hl2dm.community/connect/?au.hl2dm.community:27015)), and can be seen in action on there.
-
-For discussion and feedback, join us in the [HL2DM Community](https://hl2dm.community) (#development channel)
+This page hosts my public Sourcemod plugins for [Half-Life 2 Deathmatch](https://store.steampowered.com/app/320/HalfLife_2_Deathmatch/) servers. These were originally created for Australian Deathmatch
 
 * [xFov](#xFov) - Extended field-of-view for players
 * [xFix](#xFix) - Fixes various game bugs/exploits/annoyances (previously called hl2dmfix)
@@ -264,5 +260,5 @@ logaddress_
 gameME
 changed cvar
 ConVarRef room_type
-Writing ctf/banned_
+Writing cfg/banned_
 ```
